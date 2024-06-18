@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Textarea, Button, Input, Group, Accordion, ActionIcon, Center, Text, Menu, Box } from "@mantine/core";
+import { Textarea, Button, TextInput, Group, Accordion, ActionIcon, Center, Text, Menu, Box } from "@mantine/core";
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaInfoCircle } from 'react-icons/fa';
 
 interface AlgSet {
@@ -120,33 +120,60 @@ const AddAlgSet: React.FC<{ algSets: AlgSet[], setAlgSets: React.Dispatch<React.
         {showInstructions ? "Hide Instructions" : "Show Instructions"}
       </Button>
       {showInstructions && (
-        <Box my="sm" style={{ padding: '10px', border: '1px solid #ddd', borderRadius: '5px' }}>
-          <Text weight={500} mb="xs">Format</Text>
-          <Text>List each algorithm on a different line.</Text>
-          <Text>Separate each move by at least one space.</Text>
-          <Text>First list the name of the algorithm, followed by a colon, and then the algorithm in quotations like below:</Text>
-          <Text>T: "R U R' U' R' F R2 U' R' U' R U R' F'"</Text>
-          <Text>J: "R U R' F' R U R' U' R' F R2 U' R' U' R U R' F'"</Text>
-          <Text>Give each algorithm a unique name (times are saved for each name, so if you want unique times for every algorithm use unique names).</Text>
-          <Text>Use only the following moves (', 2, or 3 can be added to the end, but nothing 4 or above):</Text>
-          <Text>R L U D F B M S E r l u d f b</Text>
-          <Text>Use a maximum of 1000 algorithms.</Text>
-          <Text>Almost any algorithm ranging from F2L, last layer, blindfolded, FMC and more are usable!</Text>
+        <Box my="sm" style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '5px' }}>
+          <Text weight={700} mb="xs" style={{ fontSize: '20px', }}>Algorithm Input Format</Text>
+          <Box style={{ paddingLeft: '20px', color: '#555', lineHeight: '1.6' }}>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>1. List each algorithm on a separate line.</strong></Text>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>2. Separate each move by at least one space.</strong></Text>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>3. Start with the name of the algorithm, followed by a colon, and then the algorithm in quotations, like this:</strong></Text>
+              <Box ml="md" my="xs">
+                <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>T: "R U R' U' R' F R2 U' R' U' R U R' F'"</Text>
+                <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>J: "R U R' F' R U R' U' R' F R2 U' R' U' R U R' F'"</Text>
+              </Box>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>4. Assign a unique name to each algorithm</strong> (times are saved for each name, so if you want unique times for every algorithm use unique names).</Text>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>5. Only use the following moves</strong> (', 2, or 3 can be added to the end, but nothing 4 or above):</Text>
+              <Box ml="md" my="xs">
+                <Text style={{ fontFamily: 'monospace', color: '#3498db' }}>R L U D F B M S E r l u d f b</Text>
+              </Box>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>6. Use a maximum of 1000 algorithms.</strong></Text>
+            </Box>
+            <Box style={{ marginBottom: '10px' }}>
+              <Text><strong>7. Most algorithms ranging from F2L, last layer, blindfolded, FMC and more are usable!</strong></Text>
+            </Box>
+          </Box>
         </Box>
       )}
-      <Input
+      <TextInput
+        mb="md"
+        label="Algorithm Set Name"
+        description="max 30 character(s)"
         ref={folderNameRef}
         placeholder="Set Name"
         maxLength={30}
         onChange={handleNameChange}
-        style={{ marginBottom: '10px', maxWidth: '300px' }}
+        style={{ maxWidth: '300px' }}
         error={nameExists ? "An algorithm set of this name already exists" : undefined}
       />
+
       <Textarea
         ref={textareaRef}
+        label="Algorithm List"
+        description="see instructions for formatting"
         placeholder={`T: "R U R' U' R' F R2 U' R' U' R U R' F'"`}
         minRows={15}
         maxRows={15}
+        autosize
         style={{ marginBottom: '10px' }}
       />
       <Group position="right">
