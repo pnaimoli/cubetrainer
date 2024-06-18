@@ -9,10 +9,9 @@ interface AlgSet {
 interface AddAlgSetViewProps {
   algSets: AlgSet[];
   setAlgSets: React.Dispatch<React.SetStateAction<AlgSet[]>>;
-  setView: (view: string) => void;
 }
 
-const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets, setView }) => {
+const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const folderNameRef = useRef<HTMLInputElement>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
