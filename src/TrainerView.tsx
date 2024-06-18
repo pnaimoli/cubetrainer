@@ -3,7 +3,13 @@ import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import 'cubing/twisty';
 
-const TrainerView: React.FC = () => {
+import { AlgSet } from './interfaces';
+
+interface TrainerViewProps {
+  currentAlgSet: AlgSet;
+}
+
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
   const [scramble, setScramble] = useState("R U R' U'");
 
@@ -63,6 +69,16 @@ const TrainerView: React.FC = () => {
           <MdBluetooth className="icon" />
         )}
       </button>
+      {currentAlgSet && (
+        <div>
+          <h2>Training on: {currentAlgSet.name}</h2>
+          <ul>
+            {currentAlgSet.algs.map((alg) => (
+              <li key={alg.name}>{alg.name}: {alg.alg}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

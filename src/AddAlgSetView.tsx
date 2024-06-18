@@ -1,10 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text } from "@mantine/core";
 
-interface AlgSet {
-  name: string;
-  algs: { name: string; alg: string }[];
-}
+import { Alg, AlgSet } from './interfaces';
 
 interface AddAlgSetViewProps {
   algSets: AlgSet[];
@@ -18,17 +15,20 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
   const [nameExists, setNameExists] = useState<boolean>(false);
 
   const handleAddAlgSet = () => {
-    const currentInput = textareaRef.current?.value || "";
-    const newFolderName = folderNameRef.current?.value || "";
-    if (algSets.some(set => set.name === newFolderName)) {
+    const currentInput: string = textareaRef.current?.value || "";
+    const newFolderName: string = folderNameRef.current?.value || "";
+    if (algSets.some((set: AlgSet) => set.name === newFolderName)) {
       setNameExists(true);
       return;
     }
-    const algs = currentInput.split("\n").map(line => {
+
+    const algs: Alg[] = currentInput.split("\n").map((line: string): Alg => {
       const [name, alg] = line.split(": ");
       return { name, alg: alg?.replace(/"/g, "") || "" };
     });
+
     setAlgSets([...algSets, { name: newFolderName, algs }]);
+
     if (textareaRef.current) textareaRef.current.value = "";
     if (folderNameRef.current) folderNameRef.current.value = "";
   };

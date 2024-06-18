@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Box } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
+
+import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView"; // Assuming you have this component
 
@@ -12,6 +14,8 @@ const App = () => {
     const savedAlgSets = localStorage.getItem("algSets");
     return savedAlgSets ? JSON.parse(savedAlgSets) : [];
   });
+  const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
+
 
   // For the Navbar
   const [expandedItem, setExpandedItem] = useState("");
@@ -37,7 +41,10 @@ const App = () => {
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>
-          <Menu.Item onClick={() => setView('TrainerView')}>Train</Menu.Item>
+          <Menu.Item onClick={() => {
+            setCurrentAlgSet(set);
+            setView('TrainerView');
+          }}>Train</Menu.Item>
           <Menu.Item>Edit</Menu.Item>
           <Menu.Item onClick={() => handleDeleteAlgSet(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
@@ -52,7 +59,7 @@ const App = () => {
       case 'AddAlgSetView':
         return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView />;
+        return <TrainerView currentAlgSet={currentAlgSet} />;
       default:
         return <AboutView />;
     }
