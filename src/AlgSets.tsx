@@ -48,7 +48,7 @@ const AlgSets: React.FC = () => {
   return (
     <div style={{ display: "flex" }}>
       <div style={{ width: "300px" }}>
-        <Button leftSection={<FaPlus />} onClick={() => setShowForm(true)} style={{ marginBottom: '10px' }}>
+        <Button leftSection={<FaPlus />} fullWidth onClick={() => setShowForm(true)} style={{ marginBottom: '10px' }}>
           New Algorithm Set
         </Button>
         <Accordion
