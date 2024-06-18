@@ -4,7 +4,8 @@ import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import 'cubing/twisty';
 
-const HomeView: React.FC = () => <Text>Home View</Text>;
+import AlgSets from "./AlgSets";
+
 const AboutView: React.FC = () => <Text>About View</Text>;
 
 const RubiksTrainer: React.FC = () => {
@@ -77,24 +78,26 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'home':
-        return <HomeView />;
+        return <AlgSets />;
       case 'about':
         return <AboutView />;
       case 'trainer':
         return <RubiksTrainer />;
       default:
-        return <HomeView />;
+        return <AlgSets />;
     }
   };
 
   return (
     <AppShell
       header={{ height: 60 }}
+      transitionDuration={5000}
+      transitionTimingFunction="ease"
       padding="md"
     >
       <AppShell.Header>
         <Group h="100%" px="md">
-          <Button variant="subtle" onClick={() => setView('home')}>Home</Button>
+          <Button variant="subtle" onClick={() => setView('algsets')}>AlgSets</Button>
           <Button variant="subtle" onClick={() => setView('about')}>About</Button>
           <Button variant="subtle" onClick={() => setView('trainer')}>Trainer</Button>
         </Group>
