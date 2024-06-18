@@ -6,13 +6,13 @@ interface AlgSet {
   algs: { name: string; alg: string }[];
 }
 
-interface AddAlgSetProps {
+interface AddAlgSetViewProps {
   algSets: AlgSet[];
   setAlgSets: React.Dispatch<React.SetStateAction<AlgSet[]>>;
-  setShowForm: React.Dispatch<React.SetStateAction<boolean>>;
+  setView: (view: string) => void;
 }
 
-const AddAlgSet: React.FC<AddAlgSetProps> = ({ algSets, setAlgSets, setShowForm }) => {
+const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets, setView }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const folderNameRef = useRef<HTMLInputElement>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
@@ -32,7 +32,6 @@ const AddAlgSet: React.FC<AddAlgSetProps> = ({ algSets, setAlgSets, setShowForm 
     setAlgSets([...algSets, { name: newFolderName, algs }]);
     if (textareaRef.current) textareaRef.current.value = "";
     if (folderNameRef.current) folderNameRef.current.value = "";
-    setShowForm(false);
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,4 +111,4 @@ const AddAlgSet: React.FC<AddAlgSetProps> = ({ algSets, setAlgSets, setShowForm 
   );
 };
 
-export default AddAlgSet;
+export default AddAlgSetView;

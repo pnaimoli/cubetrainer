@@ -7,17 +7,14 @@ interface AlgSet {
   algs: { name: string; alg: string }[];
 }
 
-const AlgSetsNavbar: React.FC = () => {
-  const [algSets, setAlgSets] = useState<AlgSet[]>(() => {
-    const savedAlgSets = localStorage.getItem("algSets");
-    return savedAlgSets ? JSON.parse(savedAlgSets) : [];
-  });
-  const [expandedItem, setExpandedItem] = useState<string>("");
-  const [showForm, setShowForm] = useState<boolean>(false);
+interface AlgSetsNavbarProps {
+  setView: (view: string) => void;
+  algSets: AlgSet[];
+  setAlgSets: React.Dispatch<React.SetStateAction<AlgSet[]>>;
+}
 
-  useEffect(() => {
-    localStorage.setItem("algSets", JSON.stringify(algSets));
-  }, [algSets]);
+const AlgSetsNavbar: React.FC<AlgSetsNavbarProps> = ({ setView, algSets, setAlgSets }) => {
+  const [expandedItem, setExpandedItem] = useState<string>("");
 
   const handleDeleteAlgSet = (name: string) => {
     setAlgSets(algSets.filter(set => set.name !== name));
@@ -48,7 +45,12 @@ const AlgSetsNavbar: React.FC = () => {
   return (
     <div style={{ display: "flex" }}>
       <div style={{ width: "300px" }}>
-        <Button leftSection={<FaPlus />} fullWidth onClick={() => setShowForm(true)} style={{ marginBottom: '10px' }}>
+        <Button
+          leftSection={<FaPlus />}
+          fullWidth onClick={() => setView('AddAlgSetView')}
+          radius="0px"
+          style={{ borderRadius: '0px', marginBottom: '10px' }}
+        >
           New Algorithm Set
         </Button>
         <Accordion
@@ -72,11 +74,6 @@ const AlgSetsNavbar: React.FC = () => {
             </Accordion.Item>
           ))}
         </Accordion>
-      </div>
-      <div style={{ marginLeft: "20px", flex: 1 }}>
-        {showForm && (
-          <AddAlgSet algSets={algSets} setAlgSets={setAlgSets} setShowForm={setShowForm} />
-        )}
       </div>
     </div>
   );

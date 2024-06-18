@@ -1,20 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppShell, Group, Button, Text } from '@mantine/core';
-import AlgSets from "./AlgSets";
+import AlgSetsNavbar from "./AlgSetsNavbar";
 import TrainerView from "./TrainerView";
-import AlgSetsNavbar from "./AlgSetsNavbar"
+import AddAlgSetView from "./AddAlgSetView"; // Assuming you have this component
 
 const AboutView: React.FC = () => <Text>About View</Text>;
 
 const App: React.FC = () => {
-  const [view, setView] = useState('home');
+  const [view, setView] = useState('About');
+  const [algSets, setAlgSets] = useState<AlgSet[]>(() => {
+    const savedAlgSets = localStorage.getItem("algSets");
+    return savedAlgSets ? JSON.parse(savedAlgSets) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("algSets", JSON.stringify(algSets));
+  }, [algSets]);
 
   const renderView = () => {
     switch (view) {
       case 'About':
         return <AboutView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView />;
+        return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} setView={setView} />;
       case 'TrainerView':
         return <TrainerView />;
       default:
@@ -26,7 +34,7 @@ const App: React.FC = () => {
     <AppShell
       header={{ height: 60 }}
       padding="md"
-      navbar={{ width: "300", breakpoint: 'sm', }}
+      navbar={{ width: "300", breakpoint: 'sm' }}
     >
       <AppShell.Header>
         <Group h="100%" px="md">
@@ -35,7 +43,7 @@ const App: React.FC = () => {
         </Group>
       </AppShell.Header>
       <AppShell.Navbar>
-        <AlgSetsNavbar/>
+        <AlgSetsNavbar setView={setView} algSets={algSets} setAlgSets={setAlgSets} />
       </AppShell.Navbar>
       <AppShell.Main>
         {renderView()}
