@@ -1,34 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
-
 import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView"; // Assuming you have this component
 
-const AboutView = () => <Text>About View</Text>;
+const AboutView: React.FC = () => <Text>About View</Text>;
 
-const App = () => {
-  const [view, setView] = useState('About');
-  const [algSets, setAlgSets] = useState(() => {
+const App: React.FC = () => {
+  const [view, setView] = useState<string>('About');
+  const [algSets, setAlgSets] = useState<AlgSet[]>(() => {
     const savedAlgSets = localStorage.getItem("algSets");
     return savedAlgSets ? JSON.parse(savedAlgSets) : [];
   });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
 
-
   // For the Navbar
-  const [expandedItem, setExpandedItem] = useState("");
+  const [expandedItem, setExpandedItem] = useState<string>("");
 
   useEffect(() => {
     localStorage.setItem("algSets", JSON.stringify(algSets));
   }, [algSets]);
 
-  const handleDeleteAlgSet = (name) => {
+  const handleDeleteAlgSet = (name: string): void => {
     setAlgSets(algSets.filter(set => set.name !== name));
   };
 
-  const AccordionControl = ({ set, expanded }) => (
+  interface AccordionControlProps {
+    set: AlgSet;
+    expanded: boolean;
+  }
+
+  const AccordionControl: React.FC<AccordionControlProps> = ({ set, expanded }) => (
     <Center style={{ justifyContent: 'space-between' }}>
       <Accordion.Control>
         {expanded ? <FaFolderOpen style={{ marginRight: 8 }} /> : <FaFolder style={{ marginRight: 8 }} />}
@@ -52,7 +55,7 @@ const App = () => {
     </Center>
   );
 
-  const renderView = () => {
+  const renderView = (): React.ReactNode => {
     switch (view) {
       case 'About':
         return <AboutView />;
