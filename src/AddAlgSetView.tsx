@@ -1,8 +1,8 @@
 import React, { useRef, useState } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text, List } from "@mantine/core";
+import { useForm } from "@mantine/form";
 import Papa from 'papaparse';
-
-import { SolvedState, ValidMove, Alg, AlgSet, SOLVED_STATES } from './interfaces';
+import { Alg, AlgSet, ValidMove, SolvedState } from './interfaces';
 import { ALG_PRESETS } from './algPresets';
 
 interface AddAlgSetViewProps {
@@ -12,70 +12,82 @@ interface AddAlgSetViewProps {
 
 const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const folderNameRef = useRef<HTMLInputElement>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
-  const [nameExists, setNameExists] = useState<boolean>(false);
+  const [parseErrorDescription, setParseErrorDescription] = useState<string>("");
 
-  const handleAddAlgSet = (): void => {
-    const currentInput: string = textareaRef.current?.value.trim() || "";
-    const newFolderName: string = folderNameRef.current?.value.trim() || "";
+  const form = useForm({
+    initialValues: {
+      setName: '',
+      algList: '',
+    },
+    validate: {
+      setName: (value) => {
+        if (value.trim().length === 0) {
+          return 'Set Name is required';
+        }
+        if (value.length > 30) {
+          return 'Name must be at most 30 characters';
+        }
+        if (algSets.some(set => set.name === value)) {
+          return 'An algorithm set of this name already exists';
+        }
+        return null;
+      },
+      algList: (value) => value.trim().length === 0 ? 'Algorithm list is required' : null,
+    },
+  });
 
-    if (algSets.some((set: AlgSet) => set.name === newFolderName)) {
-      setNameExists(true);
-      return;
-    }
+  const handleAddAlgSet = (values: { setName: string, algList: string }) => {
+    const { setName, algList } = values;
 
     let parsedData: string[][] = [];
 
     try {
-      parsedData = Papa.parse(currentInput.trim(), {
+      parsedData = Papa.parse(algList.trim(), {
         delimiter: ",",
         skipEmptyLines: true,
         transform: (value) => value.trim().replace(/[()]/g, '')
       }).data as string[][];
     } catch (error) {
       console.error("Error parsing CSV:", error);
+      setParseErrorDescription("Error parsing CSV data.");
       return;
     }
 
-    const algs: Alg[] = [];
-
     try {
-      parsedData.forEach((line) => {
+      const algs: Alg[] = parsedData.map((line) => {
         if (line.length < 2) {
           throw new Error(`Invalid line format: ${line}`);
         }
         const [name, alg, solved = 'full'] = line;
         const algMoves = alg.split(/\s+/).map(move => {
           if (!Object.values(ValidMove).includes(move as ValidMove)) {
-            throw new Error(`Invalid move found in algorithm: ${move}, line: ${line}`);
+            throw new Error(`Invalid move found in algorithm: ${move}`);
           }
           return move as ValidMove;
         });
 
         const solvedLower = solved.trim().toLowerCase();
         if (!Object.values(SolvedState).includes(solvedLower as SolvedState)) {
-          throw new Error(`Invalid solved state: ${solved}, line: ${line}`);
+          throw new Error(`Invalid solved state: ${solved}`);
         }
 
-        algs.push({ name: name.trim(), alg: algMoves, solved: solvedLower as SolvedState });
+        return { name: name.trim(), alg: algMoves, solved: solvedLower as SolvedState };
       });
+
+      setAlgSets([...algSets, { name: setName, algs }]);
+      form.reset();
+      setParseErrorDescription("");
     } catch (error) {
       console.error("Error converting to Alg:", error);
-      return;
+      setParseErrorDescription(error.message);
     }
-
-    setAlgSets([...algSets, { name: newFolderName, algs }]);
-  };
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
-    const newFolderName = e.target.value.trim();
-    setNameExists(algSets.some(set => set.name === newFolderName));
   };
 
   const insertPreset = (preset: string) => {
     if (textareaRef.current) {
       textareaRef.current.value = preset.trim();
+      form.setFieldValue('algList', preset.trim());
     }
   };
 
@@ -119,46 +131,50 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
           </List>
         </Box>
       )}
-      <TextInput
-        mb="md"
-        label="Algorithm Set Name"
-        description="max 30 character(s)"
-        ref={folderNameRef}
-        placeholder="Set Name"
-        maxLength={30}
-        onChange={handleNameChange}
-        style={{ maxWidth: '300px' }}
-        error={nameExists ? "An algorithm set of this name already exists" : undefined}
-      />
-      <Textarea
-        ref={textareaRef}
-        label="Algorithm List"
-        description={
-          <>
-            Presets:
-            {Object.keys(ALG_PRESETS).map(preset => (
-              <Button
-                key={preset}
-                size="xs"
-                variant="outline"
-                style={{ marginLeft: '10px' }}
-                onClick={() => insertPreset(ALG_PRESETS[preset])}
-              >
-                {preset}
-              </Button>
-            ))}
+      <form onSubmit={form.onSubmit((values) => handleAddAlgSet(values))}>
+        <TextInput
+          mb="md"
+          label="Algorithm Set Name"
+          description="max 30 character(s)"
+          placeholder="Set Name"
+          {...form.getInputProps('setName')}
+          style={{ maxWidth: '300px' }}
+          error={form.errors.setName}
+        />
+        <Textarea
+          ref={textareaRef}
+          label="Algorithm List"
+          description={
+            <>
+              Presets:
+              {Object.keys(ALG_PRESETS).map(preset => (
+                <Button
+                  key={preset}
+                  size="xs"
+                  variant="outline"
+                  style={{ marginLeft: '10px' }}
+                  onClick={() => insertPreset(ALG_PRESETS[preset])}
+                >
+                  {preset}
+                </Button>
+              ))}
             </>
-        }
-        placeholder={`T: "R U R' U' R' F R2 U' R' U' R U R' F'"`}
-        minRows={15}
-        maxRows={15}
-        autosize
-        styles={{ input: { fontFamily: 'monospace' } }}
-        style={{ marginBottom: '10px' }}
-      />
-      <Group position="right">
-        <Button onClick={handleAddAlgSet} disabled={nameExists}>Add AlgSet</Button>
-      </Group>
+          }
+          placeholder={`T: "R U R' U' R' F R2 U' R' U' R U R' F'"`}
+          minRows={15}
+          maxRows={15}
+          autosize
+          styles={{ input: { fontFamily: 'monospace' } }}
+          style={{ marginBottom: '10px' }}
+          {...form.getInputProps('algList')}
+        />
+        {parseErrorDescription && (
+          <Text color="red" size="sm" mt="xs">{parseErrorDescription}</Text>
+        )}
+        <Group position="right">
+          <Button type="submit">Add AlgSet</Button>
+        </Group>
+      </form>
     </Box>
   );
 };
