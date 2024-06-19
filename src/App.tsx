@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
+import ReactLogo from './assets/logo.svg?react'
 import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView"; // Assuming you have this component
@@ -76,6 +77,7 @@ const App: React.FC = () => {
     >
       <AppShell.Header>
         <Group h="100%" px="md">
+          <ReactLogo width="50px" height="50px" />
           <Button variant="subtle" onClick={() => setView('About')}>About</Button>
         </Group>
       </AppShell.Header>
