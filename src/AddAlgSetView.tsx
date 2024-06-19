@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text } from "@mantine/core";
 import Papa from 'papaparse';
 
-import { Alg, AlgSet } from './interfaces';
+import { SolvedState, ValidMove, Alg, AlgSet, SOLVED_STATES } from './interfaces';
 
 interface AddAlgSetViewProps {
   algSets: AlgSet[];
@@ -16,31 +16,59 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
   const [nameExists, setNameExists] = useState<boolean>(false);
 
   const handleAddAlgSet = (): void => {
-    const currentInput: string = textareaRef.current?.value || "";
-    const newFolderName: string = folderNameRef.current?.value || "";
+    const currentInput: string = textareaRef.current?.value.trim() || "";
+    const newFolderName: string = folderNameRef.current?.value.trim() || "";
+
     if (algSets.some((set: AlgSet) => set.name === newFolderName)) {
       setNameExists(true);
       return;
     }
 
-    const parsedData = Papa.parse(currentInput.trim(), {
-      delimiter: ",",
-      skipEmptyLines: true,
-    }).data as string[][];
+    let parsedData: string[][] = [];
 
-    const algs: Alg[] = parsedData.map((line): Alg => {
-      const [name, alg, solved = 'full'] = line;
-      return { name: name.trim(), alg: alg.trim(), solved: solved.trim() as Alg['solved'] };
-    });
+    try {
+      parsedData = Papa.parse(currentInput.trim(), {
+        delimiter: ",",
+        skipEmptyLines: true,
+        transform: (value) => value.trim()
+      }).data as string[][];
+    } catch (error) {
+      console.error("Error parsing CSV:", error);
+      return;
+    }
+
+    const algs: Alg[] = [];
+
+    try {
+      parsedData.forEach((line) => {
+        if (line.length < 2) {
+          throw new Error(`Invalid line format: ${line}`);
+        }
+        const [name, alg, solved = 'full'] = line;
+        const algMoves = alg.split(/\s+/).map(move => {
+          if (!Object.values(ValidMove).includes(move as ValidMove)) {
+            throw new Error(`Invalid move found in algorithm: ${move}`);
+          }
+          return move as ValidMove;
+        });
+
+        const solvedLower = solved.trim().toLowerCase();
+        if (!Object.values(SolvedState).includes(solvedLower as SolvedState)) {
+          throw new Error(`Invalid solved state: ${solved}`);
+        }
+
+        algs.push({ name: name.trim(), alg: algMoves, solved: solvedLower as SolvedState });
+      });
+    } catch (error) {
+      console.error("Error converting to Alg:", error);
+      return;
+    }
 
     setAlgSets([...algSets, { name: newFolderName, algs }]);
-
-    if (textareaRef.current) textareaRef.current.value = "";
-    if (folderNameRef.current) folderNameRef.current.value = "";
   };
 
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newFolderName = e.target.value;
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const newFolderName = e.target.value.trim();
     setNameExists(algSets.some(set => set.name === newFolderName));
   };
 
