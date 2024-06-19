@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import 'cubing/twisty';
-
-import { AlgSet } from './interfaces';
+import { AlgSet, Alg } from './interfaces';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -11,14 +10,20 @@ interface TrainerViewProps {
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
-  const [scramble, setScramble] = useState("R U R' U'");
+  const [currentAlg, setCurrentAlg] = useState<Alg | null>(null);
+
+  useEffect(() => {
+    if (currentAlgSet && currentAlgSet.algs.length > 0) {
+      setCurrentAlg(currentAlgSet.algs[0]);
+    }
+  }, [currentAlgSet]);
 
   useEffect(() => {
     const player = document.querySelector('twisty-player');
-    if (player) {
-      (player as any).experimentalSetupAlg = `z2 ${scramble}`;
+    if (player && currentAlg) {
+      (player as any).alg = currentAlg.alg;
     }
-  }, [scramble]);
+  }, [currentAlg]);
 
   const connectCube = async () => {
     if (conn) {
@@ -59,6 +64,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
           puzzle="3x3x3"
           tempo-scale="4"
           hint-facelets="none"
+          experimental-setup-anchor="end"
           style={{ width: "300px", height: "300px" }}
         />
       </div>
@@ -72,9 +78,17 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
       {currentAlgSet && (
         <div>
           <h2>Training on: {currentAlgSet.name}</h2>
+          {currentAlg && (
+            <div>
+              <p>Current Algorithm: {currentAlg.name}</p>
+              <p>{currentAlg.alg}</p>
+            </div>
+          )}
           <ul>
             {currentAlgSet.algs.map((alg) => (
-              <li key={alg.name}>{alg.name}: {alg.alg} ({alg.solved})</li>
+              <li key={alg.name} onClick={() => setCurrentAlg(alg)}>
+                {alg.name}
+              </li>
             ))}
           </ul>
         </div>
