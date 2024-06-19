@@ -13,7 +13,6 @@ interface AddAlgSetViewProps {
 const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
-  const [parseErrorDescription, setParseErrorDescription] = useState<string>("");
 
   const form = useForm({
     initialValues: {
@@ -21,14 +20,14 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
       algList: '',
     },
     validate: {
-      setName: (value) => {
+      setName: (value: string) => {
         if (value.trim().length === 0) {
           return 'Set Name is required';
         }
         if (value.length > 30) {
           return 'Name must be at most 30 characters';
         }
-        if (algSets.some(set => set.name === value)) {
+        if (algSets.some(set => set.name === value.trim())) {
           return 'An algorithm set of this name already exists';
         }
         return null;
@@ -49,8 +48,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
         transform: (value) => value.trim().replace(/[()]/g, '')
       }).data as string[][];
     } catch (error) {
-      console.error("Error parsing CSV:", error);
-      setParseErrorDescription("Error parsing CSV data.");
+      form.setErrors({ algList: "Error parsing CSV data." });
       return;
     }
 
@@ -62,25 +60,23 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
         const [name, alg, solved = 'full'] = line;
         const algMoves = alg.split(/\s+/).map(move => {
           if (!Object.values(ValidMove).includes(move as ValidMove)) {
-            throw new Error(`Invalid move found in algorithm: ${move}`);
+            throw new Error(`Invalid move found in algorithm: ${move}, line: ${line}`);
           }
           return move as ValidMove;
         });
 
         const solvedLower = solved.trim().toLowerCase();
         if (!Object.values(SolvedState).includes(solvedLower as SolvedState)) {
-          throw new Error(`Invalid solved state: ${solved}`);
+          throw new Error(`Invalid solved state: ${solved}, line: ${line}`);
         }
 
         return { name: name.trim(), alg: algMoves, solved: solvedLower as SolvedState };
       });
 
-      setAlgSets([...algSets, { name: setName, algs }]);
+      setAlgSets([...algSets, { name: setName.trim(), algs }]);
       form.reset();
-      setParseErrorDescription("");
     } catch (error) {
-      console.error("Error converting to Alg:", error);
-      setParseErrorDescription(error.message);
+      form.setErrors({ algList: error.message });
     }
   };
 
@@ -167,10 +163,8 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
           styles={{ input: { fontFamily: 'monospace' } }}
           style={{ marginBottom: '10px' }}
           {...form.getInputProps('algList')}
+          error={form.errors.algList}
         />
-        {parseErrorDescription && (
-          <Text color="red" size="sm" mt="xs">{parseErrorDescription}</Text>
-        )}
         <Group position="right">
           <Button type="submit">Add AlgSet</Button>
         </Group>
