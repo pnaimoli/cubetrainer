@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import React, { useState } from 'react';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex } from '@mantine/core';
+import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react';
@@ -13,17 +13,13 @@ const AboutView: React.FC = () => <Text>About View</Text>;
 
 const App: React.FC = () => {
   const [view, setView] = useState<string>('About');
-  const [algSets, setAlgSets] = useState<AlgSet[]>(() => {
-    const savedAlgSets = localStorage.getItem("algSets");
-    return savedAlgSets ? JSON.parse(savedAlgSets) : [];
+  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({
+    key: 'algSets',
+    defaultValue: []
   });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
-
-  useEffect(() => {
-    localStorage.setItem("algSets", JSON.stringify(algSets));
-  }, [algSets]);
 
   const handleDeleteAlgSet = (name: string): void => {
     setAlgSets(algSets.filter(set => set.name !== name));
@@ -63,7 +59,7 @@ const App: React.FC = () => {
       case 'About':
         return <AboutView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
+        return <AddAlgSetView />;
       case 'TrainerView':
         return <TrainerView currentAlgSet={currentAlgSet} />;
       default:

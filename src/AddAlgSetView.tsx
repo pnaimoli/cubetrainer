@@ -1,18 +1,15 @@
 import React, { useRef, useState } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text, List } from "@mantine/core";
+import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { useForm } from "@mantine/form";
 import Papa from 'papaparse';
 import { Alg, AlgSet, ValidMove, SolvedState } from './interfaces';
 import { ALG_PRESETS } from './algPresets';
 
-interface AddAlgSetViewProps {
-  algSets: AlgSet[];
-  setAlgSets: React.Dispatch<React.SetStateAction<AlgSet[]>>;
-}
-
-const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) => {
+const AddAlgSetView: React.FC = () => {
+  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [showInstructions, setShowInstructions] = useState<boolean>(false);
+  const [showInstructions, {toggle: toggleInstructions}] = useDisclosure(false);
 
   const form = useForm({
     initialValues: {
@@ -92,7 +89,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
   return (
     <Box>
       <Button
-        onClick={() => setShowInstructions(!showInstructions)}
+        onClick={toggleInstructions}
         variant="subtle"
         style={{ marginBottom: '10px' }}
       >
