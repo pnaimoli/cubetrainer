@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu } from '@mantine/core';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
+import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react'
 import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
@@ -76,10 +77,15 @@ const App: React.FC = () => {
       navbar={{ width: 300, breakpoint: 'sm' }}
     >
       <AppShell.Header>
-        <Group h="100%" px="md">
-          <ReactLogo width="50px" height="50px" />
-          <Button variant="subtle" onClick={() => setView('About')}>About</Button>
-        </Group>
+        <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+          <Group h="100%" px="md">
+            <ReactLogo width="50px" height="50px" />
+            <Button variant="subtle" onClick={() => setView('About')}>About</Button>
+          </Group>
+          <Box mr="md">
+            <Text>Cubetrainer v{version}</Text>
+          </Box>
+        </Flex>
       </AppShell.Header>
       <AppShell.Navbar>
         <div style={{ width: "300px" }}>
