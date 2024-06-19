@@ -65,6 +65,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
           tempo-scale="4"
           hint-facelets="none"
           experimental-setup-anchor="end"
+          experimental-stickering="full"
           style={{ width: "300px", height: "300px" }}
         />
       </div>

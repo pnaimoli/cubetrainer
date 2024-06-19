@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box, Checkbox, Select, Tooltip } from '@mantine/core';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box, Checkbox, Select, Tooltip, Stack } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaInfoCircle } from 'react-icons/fa';
 import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react';
@@ -96,7 +96,7 @@ const App: React.FC = () => {
   };
 
   const SettingsComponent: React.FC = () => (
-    <div style={{ padding: '1rem' }}>
+    <Stack>
       <Checkbox
         label="Random AUF"
         checked={settings.randomAUF}
@@ -142,12 +142,12 @@ const App: React.FC = () => {
         checked={settings.useMaskings}
         onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
       />
-    </div>
+    </Stack>
   );
 
   return (
     <AppShell
-      header={{ height: 60 }}
+      header={{ height: 75 }}
       padding="md"
       navbar={{ width: 300, breakpoint: 'sm' }}
       aside={{ width: 300, collapsed: !asideOpen }}
@@ -155,15 +155,15 @@ const App: React.FC = () => {
       <AppShell.Header>
         <Flex justify="space-between" align="center" style={{ width: '100%' }}>
           <Group h="100%" px="md">
-            <ReactLogo width="50px" height="50px" />
+            <ReactLogo width="65px" height="100%" style={{ paddingTop: '10px' }}/>
             <Button variant="subtle" onClick={() => setView('About')}>About</Button>
           </Group>
-          <Flex align="center" mr="md">
+          <Group>
             <Text>Cubetrainer v{version}</Text>
             <Button variant="subtle" onClick={() => setAsideOpen((prev) => !prev)}>
               {asideOpen ? 'Close Settings' : 'Open Settings'}
             </Button>
-          </Flex>
+          </Group>
         </Flex>
       </AppShell.Header>
       <AppShell.Navbar>
@@ -199,7 +199,7 @@ const App: React.FC = () => {
           </Accordion>
         </div>
       </AppShell.Navbar>
-      <AppShell.Aside>
+      <AppShell.Aside p="md">
         <SettingsComponent />
       </AppShell.Aside>
       <AppShell.Main>
