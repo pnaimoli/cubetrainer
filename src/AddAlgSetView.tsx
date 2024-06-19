@@ -15,7 +15,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
   const [showInstructions, setShowInstructions] = useState<boolean>(false);
   const [nameExists, setNameExists] = useState<boolean>(false);
 
-  const handleAddAlgSet = () => {
+  const handleAddAlgSet = (): void => {
     const currentInput: string = textareaRef.current?.value || "";
     const newFolderName: string = folderNameRef.current?.value || "";
     if (algSets.some((set: AlgSet) => set.name === newFolderName)) {
@@ -28,7 +28,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
       skipEmptyLines: true,
     }).data as string[][];
 
-    const algs: Alg[] = parsedData.map((line) => {
+    const algs: Alg[] = parsedData.map((line): Alg => {
       const [name, alg, solved = 'full'] = line;
       return { name: name.trim(), alg: alg.trim(), solved: solved.trim() as Alg['solved'] };
     });
