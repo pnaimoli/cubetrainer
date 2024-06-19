@@ -74,7 +74,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
           <h2>Training on: {currentAlgSet.name}</h2>
           <ul>
             {currentAlgSet.algs.map((alg) => (
-              <li key={alg.name}>{alg.name}: {alg.alg}</li>
+              <li key={alg.name}>{alg.name}: {alg.alg} ({alg.solved})</li>
             ))}
           </ul>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Box } from '@mantine/core';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu } from '@mantine/core';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
 
 import { AlgSet } from './interfaces';
@@ -99,7 +99,7 @@ const App = () => {
                     {set.algs.map(alg => (
                       <Text key={`${set.name}-${alg.name}`} style={{ display: 'flex', alignItems: 'center' }}>
                         <FaStar style={{ marginRight: 8 }} />
-                        {alg.name}: {alg.alg}
+                        {alg.name}: {alg.alg} ({alg.solved})
                       </Text>
                     ))}
                   </div>

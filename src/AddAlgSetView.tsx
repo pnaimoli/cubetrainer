@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text } from "@mantine/core";
+import Papa from 'papaparse';
 
 import { Alg, AlgSet } from './interfaces';
 
@@ -22,9 +23,14 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ algSets, setAlgSets }) =>
       return;
     }
 
-    const algs: Alg[] = currentInput.split("\n").map((line: string): Alg => {
-      const [name, alg] = line.split(": ");
-      return { name, alg: alg?.replace(/"/g, "") || "" };
+    const parsedData = Papa.parse(currentInput.trim(), {
+      delimiter: ",",
+      skipEmptyLines: true,
+    }).data as string[][];
+
+    const algs: Alg[] = parsedData.map((line) => {
+      const [name, alg, solved = 'full'] = line;
+      return { name: name.trim(), alg: alg.trim(), solved: solved.trim() as Alg['solved'] };
     });
 
     setAlgSets([...algSets, { name: newFolderName, algs }]);
