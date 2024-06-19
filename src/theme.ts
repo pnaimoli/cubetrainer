@@ -19,18 +19,6 @@ export const theme: MantineThemeOverride = createTheme({
       "#002699",
       "#001966",
     ],
-    red: [
-      "#ffe5e5",
-      "#ffb2b2",
-      "#ff7f7f",
-      "#ff4c4c",
-      "#ff1919",
-      "#e60000",
-      "#b30000",
-      "#800000",
-      "#4d0000",
-      "#1a0000",
-    ],
     green: [
       "#e5ffe5",
       "#b2ffb2",
