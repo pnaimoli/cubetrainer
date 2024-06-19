@@ -10,38 +10,36 @@ cubetrainer is a powerful tool designed to help you practice and perfect any Rub
 - **Interactive Interface**: User-friendly interface supporting both desktop and mobile devices.
 - **Bluetooth Integration**: Connect to a GAN Cube via Bluetooth to track physical moves.
 
+
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js
-- npm (Node Package Manager)
+- Yarn (Node Package Manager)
 
 ### Installation
 
 1. Clone the repository:
+    ```sh
+    git clone https://github.com/your-username/cubetrainer.git
+    ```
 2. Navigate to the project directory:
     ```sh
     cd cubetrainer
     ```
 3. Install the dependencies:
     ```sh
-    npm install
+    yarn install
     ```
 
 ### Usage
 
 1. Start the development server:
     ```sh
-    npm start
+    yarn start
     ```
-2. Open your browser and navigate to `http://localhost:3000`.
-
-## Bluetooth Integration
-
-Connect to a GAN Cube to track physical moves:
-- Click the Bluetooth icon to pair your GAN Cube.
-- Monitor and record your physical solves directly in the app.
+2. Open your browser and navigate to `http://localhost:3000` (the port might vary, check your terminal output for the correct port).
 
 ## Contributing
 
