@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box, Checkbox, Select, Tooltip, Stack } from '@mantine/core';
-import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaInfoCircle } from 'react-icons/fa';
+import { useDisclosure } from '@mantine/hooks';
+import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaInfoCircle, FaCog } from 'react-icons/fa';
 import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react';
 import { AlgSet } from './interfaces';
@@ -39,7 +40,7 @@ const App: React.FC = () => {
     const savedSettings = localStorage.getItem("settings");
     return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
   });
-  const [asideOpen, setAsideOpen] = useState(false);
+  const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
 
   useEffect(() => {
     localStorage.setItem("algSets", JSON.stringify(algSets));
@@ -150,7 +151,7 @@ const App: React.FC = () => {
       header={{ height: 75 }}
       padding="md"
       navbar={{ width: 300, breakpoint: 'sm' }}
-      aside={{ width: 300, collapsed: !asideOpen }}
+      aside={{ width: 300, collapsed: { mobile: !asideOpened, desktop: !asideOpened }, breakpoint: 'sm' }}
     >
       <AppShell.Header>
         <Flex justify="space-between" align="center" style={{ width: '100%' }}>
@@ -158,11 +159,11 @@ const App: React.FC = () => {
             <ReactLogo width="65px" height="100%" style={{ paddingTop: '10px' }}/>
             <Button variant="subtle" onClick={() => setView('About')}>About</Button>
           </Group>
-          <Group>
+          <Group mr="md">
             <Text>Cubetrainer v{version}</Text>
-            <Button variant="subtle" onClick={() => setAsideOpen((prev) => !prev)}>
-              {asideOpen ? 'Close Settings' : 'Open Settings'}
-            </Button>
+            <ActionIcon variant="subtle" onClick={toggleAside}>
+              <FaCog size="1.5rem" />
+            </ActionIcon>
           </Group>
         </Flex>
       </AppShell.Header>
