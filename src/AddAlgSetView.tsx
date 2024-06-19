@@ -153,7 +153,7 @@ const AddAlgSetView: React.FC = () => {
               ))}
             </>
           }
-          placeholder={`T: "R U R' U' R' F R2 U' R' U' R U R' F'"`}
+          placeholder={`T, R U R' U' R' F R2 U' R' U' R U R' F'`}
           minRows={15}
           maxRows={15}
           autosize

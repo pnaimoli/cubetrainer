@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import 'cubing/twisty';
-import { AlgSet, Alg, ValidMove } from './interfaces';
+import { useLocalStorage } from '@mantine/hooks';
+import { AlgSet, Alg, ValidMove, Settings } from './interfaces';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
 }
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
+  const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg | null>(null);
 
@@ -54,7 +56,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
 
   return (
     <div>
-      <h1>Rubik's Cube Trainer</h1>
+      <h1>Algorithm Set: {currentAlgSet.name}</h1>
       <div className="cube-container">
         <twisty-player
           class="cube"
@@ -78,7 +80,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
       </button>
       {currentAlgSet && (
         <div>
-          <h2>Training on: {currentAlgSet.name}</h2>
+
           {currentAlg && (
             <div>
               <p>Current Algorithm: {currentAlg.name}</p>

@@ -2,17 +2,9 @@ import React from 'react';
 import { Stack, Checkbox, Select, Tooltip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
+import { Settings } from './interfaces';
 
 type CrossColor = 'U' | 'D' | 'L' | 'R' | 'F' | 'B';
-
-interface Settings {
-  randomAUF: boolean;
-  goInOrder: boolean;
-  mirrorAcrossM: boolean;
-  mirrorAcrossS: boolean;
-  crossColor: CrossColor;
-  useMaskings: boolean;
-}
 
 const defaultSettings: Settings = {
   randomAUF: false,
@@ -26,10 +18,7 @@ const defaultSettings: Settings = {
 const crossColors: CrossColor[] = ['U', 'D', 'L', 'R', 'F', 'B'];
 
 const SettingsAside: React.FC = () => {
-  const [settings, setSettings] = useLocalStorage<Settings>({
-    key: 'settings',
-    defaultValue: defaultSettings
-  });
+  const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
 
   return (
     <Stack>

@@ -47,4 +47,13 @@ export interface AlgSet {
   algs: Alg[];
 }
 
+interface Settings {
+  randomAUF: boolean;
+  goInOrder: boolean;
+  mirrorAcrossM: boolean;
+  mirrorAcrossS: boolean;
+  crossColor: CrossColor;
+  useMaskings: boolean;
+}
+
 export const SOLVED_STATES: SolvedState[] = Object.values(SolvedState).filter(value => typeof value === 'string') as SolvedState[];
