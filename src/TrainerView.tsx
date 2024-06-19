@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import 'cubing/twisty';
-import { AlgSet, Alg } from './interfaces';
+import { AlgSet, Alg, ValidMove } from './interfaces';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -21,7 +21,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
   useEffect(() => {
     const player = document.querySelector('twisty-player');
     if (player && currentAlg) {
-      (player as any).alg = currentAlg.alg;
+      (player as any).alg = currentAlg.alg.join(' ');
     }
   }, [currentAlg]);
 
@@ -81,7 +81,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
           {currentAlg && (
             <div>
               <p>Current Algorithm: {currentAlg.name}</p>
-              <p>{currentAlg.alg}</p>
+              <p>{currentAlg.alg.join(' ')}</p>
             </div>
           )}
           <ul>
