@@ -1,13 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box } from '@mantine/core';
-import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Box, Checkbox, Select, Tooltip } from '@mantine/core';
+import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaInfoCircle } from 'react-icons/fa';
 import { version } from '../package.json';
-import ReactLogo from './assets/logo.svg?react'
+import ReactLogo from './assets/logo.svg?react';
 import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView"; // Assuming you have this component
 
 const AboutView: React.FC = () => <Text>About View</Text>;
+
+interface Settings {
+  randomAUF: boolean;
+  goInOrder: boolean;
+  mirrorAcrossM: boolean;
+  mirrorAcrossS: boolean;
+  crossColor: string;
+  useMaskings: boolean;
+}
+
+const defaultSettings: Settings = {
+  randomAUF: false,
+  goInOrder: false,
+  mirrorAcrossM: false,
+  mirrorAcrossS: false,
+  crossColor: 'B',
+  useMaskings: false
+};
 
 const App: React.FC = () => {
   const [view, setView] = useState<string>('About');
@@ -16,13 +34,20 @@ const App: React.FC = () => {
     return savedAlgSets ? JSON.parse(savedAlgSets) : [];
   });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
-
-  // For the Navbar
   const [expandedItem, setExpandedItem] = useState<string>("");
+  const [settings, setSettings] = useState<Settings>(() => {
+    const savedSettings = localStorage.getItem("settings");
+    return savedSettings ? JSON.parse(savedSettings) : defaultSettings;
+  });
+  const [asideOpen, setAsideOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("algSets", JSON.stringify(algSets));
   }, [algSets]);
+
+  useEffect(() => {
+    localStorage.setItem("settings", JSON.stringify(settings));
+  }, [settings]);
 
   const handleDeleteAlgSet = (name: string): void => {
     setAlgSets(algSets.filter(set => set.name !== name));
@@ -64,17 +89,68 @@ const App: React.FC = () => {
       case 'AddAlgSetView':
         return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView currentAlgSet={currentAlgSet} />;
+        return <TrainerView currentAlgSet={currentAlgSet} settings={settings} />;
       default:
         return <AboutView />;
     }
   };
+
+  const SettingsComponent: React.FC = () => (
+    <div style={{ padding: '1rem' }}>
+      <Checkbox
+        label="Random AUF"
+        checked={settings.randomAUF}
+        onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
+      />
+      <Checkbox
+        label="Go in Order"
+        checked={settings.goInOrder}
+        onChange={(event) => setSettings({ ...settings, goInOrder: event.currentTarget.checked })}
+      />
+      <Checkbox
+        label="Mirror Across M Randomize"
+        checked={settings.mirrorAcrossM}
+        onChange={(event) => setSettings({ ...settings, mirrorAcrossM: event.currentTarget.checked })}
+      />
+      <Checkbox
+        label="Mirror Across S Randomize"
+        checked={settings.mirrorAcrossS}
+        onChange={(event) => setSettings({ ...settings, mirrorAcrossS: event.currentTarget.checked })}
+      />
+      <Select
+        label="Cross Color"
+        value={settings.crossColor}
+        onChange={(value) => setSettings({ ...settings, crossColor: value })}
+        data={[
+          { value: 'U', label: 'U' },
+          { value: 'D', label: 'D' },
+          { value: 'L', label: 'L' },
+          { value: 'R', label: 'R' },
+          { value: 'F', label: 'F' },
+          { value: 'B', label: 'B' }
+        ]}
+      />
+      <Checkbox
+        label={
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            Use Maskings
+            <Tooltip label="3D cube can optionally grey out unimportant stickers to your current case" withArrow>
+              <span><FaInfoCircle style={{ marginLeft: 5 }} /></span>
+            </Tooltip>
+          </div>
+        }
+        checked={settings.useMaskings}
+        onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
+      />
+    </div>
+  );
 
   return (
     <AppShell
       header={{ height: 60 }}
       padding="md"
       navbar={{ width: 300, breakpoint: 'sm' }}
+      aside={{ width: 300, collapsed: !asideOpen }}
     >
       <AppShell.Header>
         <Flex justify="space-between" align="center" style={{ width: '100%' }}>
@@ -82,9 +158,12 @@ const App: React.FC = () => {
             <ReactLogo width="50px" height="50px" />
             <Button variant="subtle" onClick={() => setView('About')}>About</Button>
           </Group>
-          <Box mr="md">
+          <Flex align="center" mr="md">
             <Text>Cubetrainer v{version}</Text>
-          </Box>
+            <Button variant="subtle" onClick={() => setAsideOpen((prev) => !prev)}>
+              {asideOpen ? 'Close Settings' : 'Open Settings'}
+            </Button>
+          </Flex>
         </Flex>
       </AppShell.Header>
       <AppShell.Navbar>
@@ -120,6 +199,9 @@ const App: React.FC = () => {
           </Accordion>
         </div>
       </AppShell.Navbar>
+      <AppShell.Aside>
+        <SettingsComponent />
+      </AppShell.Aside>
       <AppShell.Main>
         {renderView()}
       </AppShell.Main>
