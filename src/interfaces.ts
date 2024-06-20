@@ -47,15 +47,26 @@ export interface AlgSet {
   algs: Alg[];
 }
 
-interface Settings {
+// Define an enumeration for cube rotations
+export enum CubeRotation {
+  x = 'x', x2 = 'x2', xPrime = "x'", y = 'y', y2 = 'y2', yPrime = "y'", z = 'z', z2 = 'z2', zPrime = "z'"
+}
+
+// Extend the Settings interface to include cube rotation settings
+export interface Settings {
   randomAUF: boolean;
   goInOrder: boolean;
   mirrorAcrossM: boolean;
   mirrorAcrossS: boolean;
   randomizeMirrorAcrossM: boolean;
   randomizeMirrorAcrossS: boolean;
-  crossColor: CrossColor;
   useMaskings: boolean;
+  fullColourNeutrality: boolean;
+  firstRotation: CubeRotation | '';
+  randomRotations1: CubeRotation | '';
+  randomRotations2: CubeRotation | '';
 }
 
+// Export arrays of enum values for easy usage
 export const SOLVED_STATES: SolvedState[] = Object.values(SolvedState).filter(value => typeof value === 'string') as SolvedState[];
+export const CUBE_ROTATIONS: CubeRotation[] = Object.values(CubeRotation).filter(value => typeof value === 'string') as CubeRotation[];

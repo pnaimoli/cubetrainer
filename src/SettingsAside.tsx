@@ -1,10 +1,8 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Tooltip, Group } from '@mantine/core';
+import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Flex, Collapse, Text, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
-import { Settings } from './interfaces';
-
-type CrossColor = 'U' | 'D' | 'L' | 'R' | 'F' | 'B';
+import { Settings, CUBE_ROTATIONS } from './interfaces';
 
 const defaultSettings: Settings = {
   randomAUF: false,
@@ -13,14 +11,20 @@ const defaultSettings: Settings = {
   mirrorAcrossS: false,
   randomizeMirrorAcrossM: false,
   randomizeMirrorAcrossS: false,
-  crossColor: 'B',
-  useMaskings: false
+  useMaskings: false,
+  fullColourNeutrality: false,
+  firstRotation: '',
+  randomRotations1: '',
+  randomRotations2: ''
 };
-
-const crossColors: CrossColor[] = ['U', 'D', 'L', 'R', 'F', 'B'];
 
 const SettingsAside: React.FC = () => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
+
+  const handleFullColourNeutralityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { checked } = event.currentTarget;
+    setSettings({ ...settings, fullColourNeutrality: checked });
+  };
 
   return (
     <Stack>
@@ -58,24 +62,54 @@ const SettingsAside: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossS: event.currentTarget.checked })}
         />
       </Group>
-      <Select
-        label="Cross Color"
-        value={settings.crossColor}
-        onChange={(value: CrossColor) => setSettings({ ...settings, crossColor: value })}
-        data={crossColors.map((color) => ({ value: color, label: color }))}
-      />
       <Checkbox
         label={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Center>
             Use Maskings
             <Tooltip label="3D cube can optionally grey out unimportant stickers to your current case" withArrow>
-              <span><FaInfoCircle style={{ marginLeft: 5 }} /></span>
+              <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
             </Tooltip>
-          </div>
+          </Center>
         }
         checked={settings.useMaskings}
         onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
       />
+      <Divider />
+      <Group>
+        <Text>Full Colour Neutrality</Text>
+        <Checkbox
+          checked={settings.fullColourNeutrality}
+          onChange={handleFullColourNeutralityChange}
+        />
+      </Group>
+      <Collapse in={!settings.fullColourNeutrality}>
+        <Stack gap="xs">
+          <Center>
+            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>First Rotation</Text>
+            <Select
+              value={settings.firstRotation}
+              onChange={(value) => setSettings({ ...settings, firstRotation: value })}
+              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
+            />
+          </Center>
+          <Center>
+            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations 1</Text>
+            <Select
+              value={settings.randomRotations1}
+              onChange={(value) => setSettings({ ...settings, randomRotations1: value })}
+              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
+            />
+          </Center>
+          <Center>
+            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations 2</Text>
+            <Select
+              value={settings.randomRotations2}
+              onChange={(value) => setSettings({ ...settings, randomRotations2: value })}
+              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
+            />
+          </Center>
+        </Stack>
+      </Collapse>
     </Stack>
   );
 };
