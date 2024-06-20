@@ -4,7 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
-import { Box, Stack, Text, Badge, List, ListItem, Flex } from '@mantine/core';
+import { Box, Stack, Text, Badge, List, Flex, Center } from '@mantine/core';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -74,7 +74,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
         <Badge color={isSolved ? 'green' : 'red'}>{isSolved ? 'Solved' : 'Not Solved'}</Badge>
         <Text weight={500} size="lg">Algorithm Set: {currentAlgSet.name}</Text>
       </Stack>
-      <Flex justify="center" style={{ marginBottom: '20px' }}>
+      <Center style={{ marginBottom: '20px' }}>
         <twisty-player
           class="cube"
           visualization="PG3D"
@@ -85,7 +85,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           hint-facelets="none"
           style={{ width: "300px", height: "300px" }}
         />
-      </Flex>
+      </Center>
       {currentAlgSet && (
         <Stack>
           {currentAlg && (
@@ -96,9 +96,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           )}
           <List>
             {currentAlgSet.algs.map((alg) => (
-              <ListItem key={alg.name} onClick={() => setCurrentAlg(alg)}>
+              <List.Item key={alg.name} onClick={() => setCurrentAlg(alg)}>
                 {alg.name}
-              </ListItem>
+              </List.Item>
             ))}
           </List>
         </Stack>
