@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
-import { AlgSet, Alg, Settings } from './interfaces';
+import { Alg } from 'cubing/alg';
+import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -11,7 +12,8 @@ interface TrainerViewProps {
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
-  const [currentAlg, setCurrentAlg] = useState<Alg | null>(null);
+  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
+  const [subscription, setSubscription] = useState<any>(null);
 
   useEffect(() => {
     if (currentAlgSet && currentAlgSet.algs.length > 0) {
@@ -22,7 +24,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   useEffect(() => {
     const player = document.querySelector('twisty-player');
     if (player && currentAlg) {
-      (player as any).alg = currentAlg.alg.join(' ');
+      const algString = currentAlg.alg.join(' ');
+      const parsedAlg = Alg.fromString(algString);
+      const inverseAlg = parsedAlg.invert().toString();
+      (player as any).experimentalSetupAlg = inverseAlg;
     }
   }, [currentAlg]);
 
