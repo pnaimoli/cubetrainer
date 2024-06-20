@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Flex, Collapse, Text, Divider } from '@mantine/core';
+import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, Text, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Settings, CUBE_ROTATIONS } from './interfaces';
@@ -20,11 +20,6 @@ const defaultSettings: Settings = {
 
 const SettingsAside: React.FC = () => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
-
-  const handleFullColourNeutralityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { checked } = event.currentTarget;
-    setSettings({ ...settings, fullColourNeutrality: checked });
-  };
 
   return (
     <Stack>
@@ -79,7 +74,7 @@ const SettingsAside: React.FC = () => {
         <Text>Full Colour Neutrality</Text>
         <Checkbox
           checked={settings.fullColourNeutrality}
-          onChange={handleFullColourNeutralityChange}
+          onChange={(event) => setSettings({ ...settings, fullColourNeutrality: event.currentTarget.checked })}
         />
       </Group>
       <Collapse in={!settings.fullColourNeutrality}>
