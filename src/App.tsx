@@ -1,25 +1,47 @@
 import React, { useState } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex } from '@mantine/core';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Stack, Loader } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
+import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
+import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react';
 import { AlgSet } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
 import SettingsAside from './SettingsAside';
-
-const AboutView: React.FC = () => <Text>About View</Text>;
+import WelcomeView from './WelcomeView';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<string>('About');
-  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({
-    key: 'algSets',
-    defaultValue: []
-  });
+  const [view, setView] = useState<string>('Welcome');
+  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
+  const [conn, setConn] = useState<GanCubeConnection | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleBluetoothConnect = async () => {
+    setError(null);
+    setLoading(true);
+    if (conn) {
+      conn.disconnect();
+      setConn(null);
+      setLoading(false);
+    } else {
+      try {
+        const connection = await connectGanCube();
+        setConn(connection);
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
+        if (error.name !== 'NotFoundError') {
+          setError("Error connecting to the cube: " + error.message);
+        }
+      }
+    }
+  };
 
   const handleDeleteAlgSet = (name: string): void => {
     setAlgSets(algSets.filter(set => set.name !== name));
@@ -56,14 +78,14 @@ const App: React.FC = () => {
 
   const renderView = (): React.ReactNode => {
     switch (view) {
-      case 'About':
-        return <AboutView />;
+      case 'Welcome':
+        return <WelcomeView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView />;
+        return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView currentAlgSet={currentAlgSet} />;
+        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} />;
       default:
-        return <AboutView />;
+        return <WelcomeView />;
     }
   };
 
@@ -78,7 +100,17 @@ const App: React.FC = () => {
         <Flex justify="space-between" align="center" style={{ width: '100%' }}>
           <Group h="100%" px="md">
             <ReactLogo width="65px" height="100%" style={{ paddingTop: '10px' }}/>
-            <Button variant="subtle" onClick={() => setView('About')}>About</Button>
+            <Stack align="center">
+              <Button
+                leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}
+                onClick={handleBluetoothConnect}
+                style={{ backgroundColor: conn ? 'auto' : 'red', position: 'relative' }}
+                loading={loading}
+              >
+                {conn ? 'Disconnect Gan 12 Cube' : 'Connect Gan 12 Cube'}
+              </Button>
+              {error && <Text color="red" size="sm" style={{ position: 'absolute', top: '110%' }}>{error}</Text>}
+            </Stack>
           </Group>
           <Group mr="md">
             <Text>Cubetrainer v{version}</Text>

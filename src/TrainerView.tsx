@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import 'cubing/twisty';
 import { useLocalStorage } from '@mantine/hooks';
-import { AlgSet, Alg, ValidMove, Settings } from './interfaces';
+import 'cubing/twisty';
+import { AlgSet, Alg, Settings } from './interfaces';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
+  conn: GanCubeConnection | null;
 }
 
-const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
-  const [conn, setConn] = useState<GanCubeConnection | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg | null>(null);
 
   useEffect(() => {
@@ -27,32 +26,24 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
     }
   }, [currentAlg]);
 
-  const connectCube = async () => {
+  useEffect(() => {
     if (conn) {
-      conn.disconnect();
-      setConn(null);
-    } else {
-      try {
-        const connection = await connectGanCube();
-        setConn(connection);
-        connection.events$.subscribe(handleCubeEvent);
-        await connection.sendCubeCommand({ type: "REQUEST_FACELETS" });
-      } catch (error) {
-        if (error.name !== 'NotFoundError') {
-          console.error("Error connecting to the cube:", error);
+      const handleCubeEvent = (event: GanCubeEvent) => {
+        if (event.type === "MOVE") {
+          const player = document.querySelector('twisty-player');
+          if (player) {
+            (player as any).experimentalAddMove(event.move);
+          }
         }
-      }
-    }
-  };
+      };
 
-  const handleCubeEvent = (event: GanCubeEvent) => {
-    if (event.type === "MOVE") {
-      const player = document.querySelector('twisty-player');
-      if (player) {
-        (player as any).experimentalAddMove(event.move);
-      }
+      conn.events$.subscribe(handleCubeEvent);
+
+      return () => {
+        conn.events$.unsubscribe(handleCubeEvent);
+      };
     }
-  };
+  }, [conn]);
 
   return (
     <div>
@@ -66,21 +57,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet }) => {
           puzzle="3x3x3"
           tempo-scale="4"
           hint-facelets="none"
-          experimental-setup-anchor="end"
-          experimental-stickering="full"
           style={{ width: "300px", height: "300px" }}
         />
       </div>
-      <button onClick={connectCube}>
-        {conn ? (
-          <MdBluetoothDisabled className="icon" />
-        ) : (
-          <MdBluetooth className="icon" />
-        )}
-      </button>
       {currentAlgSet && (
         <div>
-
           {currentAlg && (
             <div>
               <p>Current Algorithm: {currentAlg.name}</p>
