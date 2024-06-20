@@ -3,7 +3,7 @@ import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetoo
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
-import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
+import { AlgSet, Alg as Algorithm, Settings, CUBE_ROTATIONS } from './interfaces';
 import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
 
 interface TrainerViewProps {
@@ -22,16 +22,50 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   }, [currentAlgSet]);
 
-  useEffect(() => {
-    const player = document.querySelector('twisty-player');
-    if (player && currentAlg) {
-      const algString = currentAlg.alg.join(' ');
-      const parsedAlg = Alg.fromString(algString);
-      const inverseAlg = parsedAlg.invert().toString();
-      (player as any).experimentalSetupAlg = inverseAlg;
-      (player as any).alg = "";
+useEffect(() => {
+  const player = document.querySelector('twisty-player');
+  if (player && currentAlg) {
+    const algString = currentAlg.alg.join(' ');
+    const parsedAlg = Alg.fromString(algString);
+    const inverseAlg = parsedAlg.invert().toString();
+    let setupAlg = '';
+
+    const getRandomRotations = (rotation: string, count: number): string => {
+      let rotations = '';
+      for (let i = 0; i < count; i++) {
+        rotations += ` ${rotation}`;
+      }
+      return rotations.trim();
+    };
+
+    if (settings.fullColourNeutrality) {
+      // Apply 6 random rotations for full color neutrality
+      for (let i = 0; i < 6; i++) {
+        const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
+        setupAlg += ` ${randomRotation}`;
+      }
+    } else {
+      // Apply specific rotations based on settings
+      if (settings.firstRotation) {
+        setupAlg += ` ${settings.firstRotation}`;
+      }
+      if (settings.randomRotations1) {
+        const randomCount1 = Math.floor(Math.random() * 4) + 1;
+        setupAlg += ` ${getRandomRotations(settings.randomRotations1, randomCount1)}`;
+      }
     }
-  }, [currentAlg]);
+
+    setupAlg = `${setupAlg.trim()} ${inverseAlg}`;
+    if (settings.randomAUF) {
+      setupAlg += ` ${getRandomRotations('U', Math.floor(Math.random() * 4) + 1)}`;
+    }
+    if (settings.randomAdF) {
+      setupAlg += ` ${getRandomRotations('d', Math.floor(Math.random() * 4) + 1)}`;
+    }
+    (player as any).experimentalSetupAlg = setupAlg;
+    (player as any).alg = "";
+  }
+}, [currentAlg, settings]);
 
   useEffect(() => {
     if (conn) {

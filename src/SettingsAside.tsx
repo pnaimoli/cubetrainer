@@ -1,11 +1,12 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, Text, Divider } from '@mantine/core';
+import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Flex, Collapse, Text, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Settings, CUBE_ROTATIONS } from './interfaces';
 
 const defaultSettings: Settings = {
   randomAUF: false,
+  randomAdF: false,
   goInOrder: false,
   mirrorAcrossM: false,
   mirrorAcrossS: false,
@@ -14,8 +15,7 @@ const defaultSettings: Settings = {
   useMaskings: false,
   fullColourNeutrality: false,
   firstRotation: '',
-  randomRotations1: '',
-  randomRotations2: ''
+  randomRotations1: ''
 };
 
 const SettingsAside: React.FC = () => {
@@ -23,11 +23,25 @@ const SettingsAside: React.FC = () => {
 
   return (
     <Stack>
-      <Checkbox
-        label="Random AUF"
-        checked={settings.randomAUF}
-        onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
-      />
+      <Group position="apart">
+        <Checkbox
+          label="Random AUF"
+          checked={settings.randomAUF}
+          onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
+        />
+        <Checkbox
+          label={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              Random AdF
+              <Tooltip label="Do a random number of 'd' moves after the setup" withArrow>
+                <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
+              </Tooltip>
+            </div>
+          }
+          checked={settings.randomAdF}
+          onChange={(event) => setSettings({ ...settings, randomAdF: event.currentTarget.checked })}
+        />
+      </Group>
       <Checkbox
         label="Go in Order"
         checked={settings.goInOrder}
@@ -88,18 +102,10 @@ const SettingsAside: React.FC = () => {
             />
           </Center>
           <Center>
-            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations 1</Text>
+            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations</Text>
             <Select
               value={settings.randomRotations1}
               onChange={(value) => setSettings({ ...settings, randomRotations1: value })}
-              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
-            />
-          </Center>
-          <Center>
-            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations 2</Text>
-            <Select
-              value={settings.randomRotations2}
-              onChange={(value) => setSettings({ ...settings, randomRotations2: value })}
               data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
             />
           </Center>
