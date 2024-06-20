@@ -4,7 +4,6 @@ import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
-import { KPattern } from 'cubing/kpuzzle';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -14,7 +13,6 @@ interface TrainerViewProps {
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
-  const [moves, setMoves] = useState<string[]>([]);
   const [isSolved, setIsSolved] = useState<boolean>(true);
 
   useEffect(() => {
@@ -35,13 +33,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
 
   useEffect(() => {
     if (conn) {
-      const handleCubeEvent = (event: GanCubeEvent) => {
+      const handleCubeEvent = async (event: GanCubeEvent) => {
         if (event.type === "MOVE") {
           const player = document.querySelector('twisty-player');
           if (player) {
             (player as any).experimentalAddMove(event.move);
-            setMoves(prevMoves => [...prevMoves, event.move]);
-            checkIfSolved();
+            await checkIfSolved();
           }
         }
       };
@@ -55,25 +52,20 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   }, [conn]);
 
   const checkIfSolved = async () => {
-    if (currentAlg) {
-      const setupAlg = Alg.fromString(currentAlg.alg.join(' ')).invert().toString();
-      const allMoves = setupAlg + ' ' + moves.join(' ');
-
-      const player = document.querySelector('twisty-player');
-      const puzzle = await player.experimentalModel.kpuzzle.get();
-      const pattern = puzzle.defaultPattern();
-      const updatedPattern = pattern.applyAlg(Alg.fromString(allMoves));
-
-      setIsSolved(updatedPattern.experimentalIsSolved({
+    const player = document.querySelector('twisty-player');
+    if (player) {
+      const currentPattern = await (player as any).experimentalModel.currentPattern.get();
+      const isSolved = currentPattern.experimentalIsSolved({
         ignoreCenterOrientation: true,
         ignorePuzzleOrientation: true,
-      }));
+      });
+      setIsSolved(isSolved);
     }
   };
 
   useEffect(() => {
     checkIfSolved();
-  }, [currentAlg, moves]);
+  }, [currentAlg]);
 
   return (
     <div>
@@ -113,7 +105,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
             {currentAlgSet.algs.map((alg) => (
               <li key={alg.name} onClick={() => {
                 setCurrentAlg(alg);
-                setMoves([]);
               }}>
                 {alg.name}
               </li>
