@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Tooltip } from '@mantine/core';
+import { Stack, Checkbox, Select, Tooltip, Group } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Settings } from './interfaces';
@@ -11,6 +11,8 @@ const defaultSettings: Settings = {
   goInOrder: false,
   mirrorAcrossM: false,
   mirrorAcrossS: false,
+  randomizeMirrorAcrossM: false,
+  randomizeMirrorAcrossS: false,
   crossColor: 'B',
   useMaskings: false
 };
@@ -32,16 +34,30 @@ const SettingsAside: React.FC = () => {
         checked={settings.goInOrder}
         onChange={(event) => setSettings({ ...settings, goInOrder: event.currentTarget.checked })}
       />
-      <Checkbox
-        label="Mirror Across M Randomize"
-        checked={settings.mirrorAcrossM}
-        onChange={(event) => setSettings({ ...settings, mirrorAcrossM: event.currentTarget.checked })}
-      />
-      <Checkbox
-        label="Mirror Across S Randomize"
-        checked={settings.mirrorAcrossS}
-        onChange={(event) => setSettings({ ...settings, mirrorAcrossS: event.currentTarget.checked })}
-      />
+      <Group position="apart">
+        <Checkbox
+          label="Mirror Across M"
+          checked={settings.mirrorAcrossM}
+          onChange={(event) => setSettings({ ...settings, mirrorAcrossM: event.currentTarget.checked })}
+        />
+        <Checkbox
+          label="Randomize"
+          checked={settings.randomizeMirrorAcrossM}
+          onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossM: event.currentTarget.checked })}
+        />
+      </Group>
+      <Group position="apart">
+        <Checkbox
+          label="Mirror Across S"
+          checked={settings.mirrorAcrossS}
+          onChange={(event) => setSettings({ ...settings, mirrorAcrossS: event.currentTarget.checked })}
+        />
+        <Checkbox
+          label="Randomize"
+          checked={settings.randomizeMirrorAcrossS}
+          onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossS: event.currentTarget.checked })}
+        />
+      </Group>
       <Select
         label="Cross Color"
         value={settings.crossColor}

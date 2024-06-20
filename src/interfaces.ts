@@ -52,6 +52,8 @@ interface Settings {
   goInOrder: boolean;
   mirrorAcrossM: boolean;
   mirrorAcrossS: boolean;
+  randomizeMirrorAcrossM: boolean;
+  randomizeMirrorAcrossS: boolean;
   crossColor: CrossColor;
   useMaskings: boolean;
 }
