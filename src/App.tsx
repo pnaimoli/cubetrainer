@@ -32,12 +32,13 @@ const App: React.FC = () => {
     } else {
       try {
         const connection = await connectGanCube();
+        await connection.sendCubeCommand({ type: "REQUEST_FACELETS" });
         setConn(connection);
         setLoading(false);
       } catch (error) {
         setLoading(false);
         if (error.name !== 'NotFoundError') {
-          setError("Error connecting to the cube: " + error.message);
+          setError(error.message);
         }
       }
     }
@@ -104,12 +105,13 @@ const App: React.FC = () => {
               <Button
                 leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}
                 onClick={handleBluetoothConnect}
-                style={{ backgroundColor: conn ? 'auto' : 'red', position: 'relative' }}
+                color={conn ? '' : 'red'}
+                style={{ position: 'relative' }}
                 loading={loading}
               >
                 {conn ? 'Disconnect Gan 12 Cube' : 'Connect Gan 12 Cube'}
               </Button>
-              {error && <Text color="red" size="sm" style={{ position: 'absolute', top: '110%' }}>{error}</Text>}
+              <Text color="red" size="xs" style={{ position: 'absolute', top: '0px' }}>{error}</Text>
             </Stack>
           </Group>
           <Group mr="md">

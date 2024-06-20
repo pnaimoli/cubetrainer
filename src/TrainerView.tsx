@@ -37,10 +37,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
         }
       };
 
-      conn.events$.subscribe(handleCubeEvent);
+      const sub = conn.events$.subscribe(handleCubeEvent);
 
       return () => {
-        conn.events$.unsubscribe(handleCubeEvent);
+        sub.unsubscribe();
       };
     }
   }, [conn]);
