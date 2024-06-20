@@ -4,6 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
+import { Box, Stack, Text, Badge, List, ListItem, Flex } from '@mantine/core';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -54,7 +55,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const checkIfSolved = async () => {
     const player = document.querySelector('twisty-player');
     if (player) {
-      const currentPattern = await (player as any).experimentalModel.currentPattern.get();
+      const currentPattern = await player.experimentalModel.currentPattern.get();
       const isSolved = currentPattern.experimentalIsSolved({
         ignoreCenterOrientation: true,
         ignorePuzzleOrientation: true,
@@ -68,20 +69,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   }, [currentAlg]);
 
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-        <div
-          style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '50%',
-            backgroundColor: isSolved ? 'green' : 'red',
-            marginRight: '10px'
-          }}
-        ></div>
-        <h1>Algorithm Set: {currentAlgSet.name}</h1>
-      </div>
-      <div className="cube-container">
+    <Box>
+      <Stack align="center" spacing="md" style={{ marginBottom: '10px' }}>
+        <Badge color={isSolved ? 'green' : 'red'}>{isSolved ? 'Solved' : 'Not Solved'}</Badge>
+        <Text weight={500} size="lg">Algorithm Set: {currentAlgSet.name}</Text>
+      </Stack>
+      <Flex justify="center" style={{ marginBottom: '20px' }}>
         <twisty-player
           class="cube"
           visualization="PG3D"
@@ -92,27 +85,25 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           hint-facelets="none"
           style={{ width: "300px", height: "300px" }}
         />
-      </div>
+      </Flex>
       {currentAlgSet && (
-        <div>
+        <Stack>
           {currentAlg && (
-            <div>
-              <p>Current Algorithm: {currentAlg.name}</p>
-              <p>{currentAlg.alg.join(' ')}</p>
-            </div>
+            <Box>
+              <Text>Current Algorithm: {currentAlg.name}</Text>
+              <Text>{currentAlg.alg.join(' ')}</Text>
+            </Box>
           )}
-          <ul>
+          <List>
             {currentAlgSet.algs.map((alg) => (
-              <li key={alg.name} onClick={() => {
-                setCurrentAlg(alg);
-              }}>
+              <ListItem key={alg.name} onClick={() => setCurrentAlg(alg)}>
                 {alg.name}
-              </li>
+              </ListItem>
             ))}
-          </ul>
-        </div>
+          </List>
+        </Stack>
       )}
-    </div>
+    </Box>
   );
 };
 
