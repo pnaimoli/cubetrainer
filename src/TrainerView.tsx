@@ -4,6 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
+import { KPattern } from 'cubing/kpuzzle';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -13,7 +14,8 @@ interface TrainerViewProps {
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
-  const [subscription, setSubscription] = useState<any>(null);
+  const [moves, setMoves] = useState<string[]>([]);
+  const [isSolved, setIsSolved] = useState<boolean>(true);
 
   useEffect(() => {
     if (currentAlgSet && currentAlgSet.algs.length > 0) {
@@ -38,6 +40,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           const player = document.querySelector('twisty-player');
           if (player) {
             (player as any).experimentalAddMove(event.move);
+            setMoves(prevMoves => [...prevMoves, event.move]);
+            checkIfSolved();
           }
         }
       };
@@ -50,9 +54,41 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   }, [conn]);
 
+  const checkIfSolved = async () => {
+    if (currentAlg) {
+      const setupAlg = Alg.fromString(currentAlg.alg.join(' ')).invert().toString();
+      const allMoves = setupAlg + ' ' + moves.join(' ');
+
+      const player = document.querySelector('twisty-player');
+      const puzzle = await player.experimentalModel.kpuzzle.get();
+      const pattern = puzzle.defaultPattern();
+      const updatedPattern = pattern.applyAlg(Alg.fromString(allMoves));
+
+      setIsSolved(updatedPattern.experimentalIsSolved({
+        ignoreCenterOrientation: true,
+        ignorePuzzleOrientation: true,
+      }));
+    }
+  };
+
+  useEffect(() => {
+    checkIfSolved();
+  }, [currentAlg, moves]);
+
   return (
     <div>
-      <h1>Algorithm Set: {currentAlgSet.name}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
+            backgroundColor: isSolved ? 'green' : 'red',
+            marginRight: '10px'
+          }}
+        ></div>
+        <h1>Algorithm Set: {currentAlgSet.name}</h1>
+      </div>
       <div className="cube-container">
         <twisty-player
           class="cube"
@@ -75,7 +111,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           )}
           <ul>
             {currentAlgSet.algs.map((alg) => (
-              <li key={alg.name} onClick={() => setCurrentAlg(alg)}>
+              <li key={alg.name} onClick={() => {
+                setCurrentAlg(alg);
+                setMoves([]);
+              }}>
                 {alg.name}
               </li>
             ))}
