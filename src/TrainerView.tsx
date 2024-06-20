@@ -4,7 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings } from './interfaces';
-import { Box, Stack, Text, Badge, List, Flex, Center } from '@mantine/core';
+import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -14,7 +14,7 @@ interface TrainerViewProps {
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
-  const [isSolved, setIsSolved] = useState<boolean>(true);
+  const [isSolved, setIsSolved] = useState<boolean>(false);
 
   useEffect(() => {
     if (currentAlgSet && currentAlgSet.algs.length > 0) {
@@ -29,6 +29,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
       const parsedAlg = Alg.fromString(algString);
       const inverseAlg = parsedAlg.invert().toString();
       (player as any).experimentalSetupAlg = inverseAlg;
+      (player as any).alg = "";
     }
   }, [currentAlg]);
 
@@ -52,6 +53,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   }, [conn]);
 
+  useEffect(() => {
+    if (isSolved) {
+      cycleAlgorithm();
+      setIsSolved(false);
+    }
+  }, [isSolved]);
+
   const checkIfSolved = async () => {
     const player = document.querySelector('twisty-player');
     if (player) {
@@ -64,9 +72,18 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   };
 
-  useEffect(() => {
-    checkIfSolved();
-  }, [currentAlg]);
+  const cycleAlgorithm = async () => {
+    if (!currentAlgSet || currentAlgSet.algs.length === 0) return;
+
+    if (settings.goInOrder) {
+      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg?.name);
+      const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
+      setCurrentAlg(currentAlgSet.algs[nextIndex]);
+    } else {
+      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+      setCurrentAlg(currentAlgSet.algs[randomIndex]);
+    }
+  };
 
   return (
     <Box>
