@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { Textarea, Button, TextInput, Group, Box, Text, List } from "@mantine/core";
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { useForm } from "@mantine/form";

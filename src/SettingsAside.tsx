@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Flex, Collapse, Text, Divider } from '@mantine/core';
+import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, Text, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
 import { Settings, CUBE_ROTATIONS } from './interfaces';

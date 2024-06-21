@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { connectGanCube, GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
+import React, { useState, useEffect, useRef } from 'react';
+import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
+import { TwistyPlayer } from 'cubing/twisty';
 import { Alg } from 'cubing/alg';
 import { AlgSet, Alg as Algorithm, Settings, CUBE_ROTATIONS } from './interfaces';
 import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
@@ -12,56 +13,19 @@ interface TrainerViewProps {
 }
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
-  const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings' });
+  const [settings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
   const [isSolved, setIsSolved] = useState<boolean>(false);
+  const playerRef = useRef<TwistyPlayer>(null);
 
   const [randomAUF, setRandomAUF] = useState<string>('');
   const [randomAdF, setRandomAdF] = useState<string>('');
   const [randomRotations1, setRandomRotations1] = useState<string>('');
   const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
 
-  useEffect(() => {
-    if (currentAlgSet && currentAlgSet.algs.length > 0) {
-      if (settings?.goInOrder) {
-        setCurrentAlg(currentAlgSet.algs[0]);
-      } else {
-        const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-        setCurrentAlg(currentAlgSet.algs[randomIndex]);
-      }
-    }
-  }, [currentAlgSet, settings?.goInOrder]);
-
-  const getRandomRotations = (rotation: string, count: number): string => {
-    let rotations = '';
-    for (let i = 0; i < count; i++) {
-      rotations += ` ${rotation}`;
-    }
-    return rotations.trim();
-  };
-
-  const computeSetupAlg = () => {
-    if (!currentAlg) return '';
-
-    const algString = currentAlg.alg.join(' ');
-    const parsedAlg = Alg.fromString(algString);
-    const inverseAlg = parsedAlg.invert().toString();
-    let setupAlg = '';
-
-    if (settings.fullColourNeutrality) {
-      setupAlg = fullColourNeutrality;
-    } else {
-      if (settings.firstRotation) {
-        setupAlg += ` ${settings.firstRotation}`;
-      }
-      setupAlg += ` ${randomRotations1}`;
-    }
-
-    setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomAdF}`.trim();
-
-    return setupAlg;
-  };
-
+  /////////////////////////////////////////////////////////////////////////////
+  // useEffects
+  /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
     if (settings?.randomAUF) {
       setRandomAUF(getRandomRotations('U', Math.floor(Math.random() * 4) + 1));
@@ -100,19 +64,19 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   }, [settings?.fullColourNeutrality, currentAlg]);
 
   useEffect(() => {
-    const player = document.querySelector('twisty-player');
-    if (player) {
-      (player as any).alg = "";
+    if (playerRef.current && currentAlg) {
+      const setupAlg = computeSetupAlg();
+      playerRef.current.experimentalSetupAlg = setupAlg;
+      playerRef.current.alg = "";
     }
-  }, [currentAlg]);
+  }, [currentAlg, randomAUF, randomAdF, randomRotations1, fullColourNeutrality]);
 
   useEffect(() => {
     if (conn) {
       const handleCubeEvent = async (event: GanCubeEvent) => {
         if (event.type === "MOVE") {
-          const player = document.querySelector('twisty-player');
-          if (player) {
-            (player as any).experimentalAddMove(event.move);
+          if (playerRef.current) {
+            playerRef.current.experimentalAddMove(event.move);
             await checkIfSolved();
           }
         }
@@ -133,16 +97,26 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   }, [isSolved]);
 
-  const checkIfSolved = async () => {
-    const player = document.querySelector('twisty-player');
-    if (player) {
-      const currentPattern = await player.experimentalModel.currentPattern.get();
-      const isSolved = currentPattern.experimentalIsSolved({
-        ignoreCenterOrientation: true,
-        ignorePuzzleOrientation: true,
-      });
-      setIsSolved(isSolved);
+  useEffect(() => {
+    if (currentAlgSet && currentAlgSet.algs.length > 0) {
+      if (settings?.goInOrder) {
+        setCurrentAlg(currentAlgSet.algs[0]);
+      } else {
+        const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+        setCurrentAlg(currentAlgSet.algs[randomIndex]);
+      }
     }
+  }, [currentAlgSet, settings?.goInOrder]);
+
+  /////////////////////////////////////////////////////////////////////////////
+  // member functions
+  /////////////////////////////////////////////////////////////////////////////
+  const getRandomRotations = (rotation: string, count: number): string => {
+    let rotations = '';
+    for (let i = 0; i < count; i++) {
+      rotations += ` ${rotation}`;
+    }
+    return rotations.trim();
   };
 
   const cycleAlgorithm = async () => {
@@ -157,9 +131,41 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
       setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
 
-    const player = document.querySelector('twisty-player');
-    if (player) {
-      (player as any).alg = "";
+    if (playerRef.current) {
+      playerRef.current.alg = "";
+    }
+  };
+
+  const computeSetupAlg = () => {
+    if (!currentAlg) return '';
+
+    const algString = currentAlg.alg.join(' ');
+    const parsedAlg = Alg.fromString(algString);
+    const inverseAlg = parsedAlg.invert().toString();
+    let setupAlg = '';
+
+    if (settings.fullColourNeutrality) {
+      setupAlg = fullColourNeutrality;
+    } else {
+      if (settings.firstRotation) {
+        setupAlg += ` ${settings.firstRotation}`;
+      }
+      setupAlg += ` ${randomRotations1}`;
+    }
+
+    setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomAdF}`.trim();
+
+    return setupAlg;
+  };
+
+  const checkIfSolved = async () => {
+    if (playerRef.current) {
+      const currentPattern = await playerRef.current.experimentalModel.currentPattern.get();
+      const isSolved = currentPattern.experimentalIsSolved({
+        ignoreCenterOrientation: true,
+        ignorePuzzleOrientation: true,
+      });
+      setIsSolved(isSolved);
     }
   };
 
@@ -171,6 +177,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
       </Stack>
       <Center style={{ marginBottom: '20px' }}>
         <twisty-player
+          ref={playerRef}
           class="cube"
           visualization="PG3D"
           control-panel="none"

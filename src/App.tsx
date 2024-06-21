@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Stack, Loader } from '@mantine/core';
+import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Stack } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
