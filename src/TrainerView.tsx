@@ -16,6 +16,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
   const [isSolved, setIsSolved] = useState<boolean>(false);
 
+  const [randomAUF, setRandomAUF] = useState<string>('');
+  const [randomAdF, setRandomAdF] = useState<string>('');
+  const [randomRotations1, setRandomRotations1] = useState<string>('');
+  const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
+
   useEffect(() => {
     if (currentAlgSet && currentAlgSet.algs.length > 0) {
       if (settings?.goInOrder) {
@@ -27,51 +32,79 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
     }
   }, [currentAlgSet, settings?.goInOrder]);
 
+  const getRandomRotations = (rotation: string, count: number): string => {
+    let rotations = '';
+    for (let i = 0; i < count; i++) {
+      rotations += ` ${rotation}`;
+    }
+    return rotations.trim();
+  };
+
+  const computeSetupAlg = () => {
+    if (!currentAlg) return '';
+
+    const algString = currentAlg.alg.join(' ');
+    const parsedAlg = Alg.fromString(algString);
+    const inverseAlg = parsedAlg.invert().toString();
+    let setupAlg = '';
+
+    if (settings.fullColourNeutrality) {
+      setupAlg = fullColourNeutrality;
+    } else {
+      if (settings.firstRotation) {
+        setupAlg += ` ${settings.firstRotation}`;
+      }
+      setupAlg += ` ${randomRotations1}`;
+    }
+
+    setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomAdF}`.trim();
+
+    return setupAlg;
+  };
+
+  useEffect(() => {
+    if (settings?.randomAUF) {
+      setRandomAUF(getRandomRotations('U', Math.floor(Math.random() * 4) + 1));
+    } else {
+      setRandomAUF('');
+    }
+  }, [settings?.randomAUF, currentAlg]);
+
+  useEffect(() => {
+    if (settings?.randomAdF) {
+      setRandomAdF(getRandomRotations('d', Math.floor(Math.random() * 4) + 1));
+    } else {
+      setRandomAdF('');
+    }
+  }, [settings?.randomAdF, currentAlg]);
+
+  useEffect(() => {
+    if (settings?.randomRotations1) {
+      setRandomRotations1(getRandomRotations(settings.randomRotations1, Math.floor(Math.random() * 4) + 1));
+    } else {
+      setRandomRotations1('');
+    }
+  }, [settings?.randomRotations1, currentAlg]);
+
+  useEffect(() => {
+    if (settings?.fullColourNeutrality) {
+      let rotations = '';
+      for (let i = 0; i < 6; i++) {
+        const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
+        rotations += ` ${randomRotation}`;
+      }
+      setFullColourNeutrality(rotations.trim());
+    } else {
+      setFullColourNeutrality('');
+    }
+  }, [settings?.fullColourNeutrality, currentAlg]);
+
   useEffect(() => {
     const player = document.querySelector('twisty-player');
-    if (player && currentAlg) {
-      const algString = currentAlg.alg.join(' ');
-      const parsedAlg = Alg.fromString(algString);
-      const inverseAlg = parsedAlg.invert().toString();
-      let setupAlg = '';
-
-      const getRandomRotations = (rotation: string, count: number): string => {
-        let rotations = '';
-        for (let i = 0; i < count; i++) {
-          rotations += ` ${rotation}`;
-        }
-        return rotations.trim();
-      };
-
-      if (settings.fullColourNeutrality) {
-        // Apply 6 random rotations for full color neutrality
-        for (let i = 0; i < 6; i++) {
-          const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
-          setupAlg += ` ${randomRotation}`;
-        }
-      } else {
-        // Apply specific rotations based on settings
-        if (settings.firstRotation) {
-          setupAlg += ` ${settings.firstRotation}`;
-        }
-        if (settings.randomRotations1) {
-          const randomCount1 = Math.floor(Math.random() * 4) + 1;
-          setupAlg += ` ${getRandomRotations(settings.randomRotations1, randomCount1)}`;
-        }
-      }
-
-      setupAlg = `${setupAlg.trim()} ${inverseAlg}`;
-
-      if (settings.randomAUF) {
-        setupAlg += ` ${getRandomRotations('U', Math.floor(Math.random() * 4) + 1)}`;
-      }
-      if (settings.randomAdF) {
-        setupAlg += ` ${getRandomRotations('d', Math.floor(Math.random() * 4) + 1)}`;
-      }
-      (player as any).experimentalSetupAlg = setupAlg;
+    if (player) {
       (player as any).alg = "";
     }
-  }, [currentAlg, settings]);
+  }, [currentAlg]);
 
   useEffect(() => {
     if (conn) {
@@ -123,6 +156,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
       const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
       setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
+
+    const player = document.querySelector('twisty-player');
+    if (player) {
+      (player as any).alg = "";
+    }
   };
 
   return (
@@ -140,6 +178,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           puzzle="3x3x3"
           tempo-scale="4"
           hint-facelets="none"
+          experimental-setup-alg={computeSetupAlg()}
           style={{ width: "300px", height: "300px" }}
         />
       </Center>
