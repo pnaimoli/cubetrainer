@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "mocha --require esm --require ts-node/register 'src/__tests__/**/*.test.ts'",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -22,18 +23,25 @@
     "vite-plugin-svgr": "^4.2.0"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.16",
+    "@types/esm": "^3",
+    "@types/mocha": "^10.0.6",
     "@types/papaparse": "^5",
     "@types/react": "^18.2.65",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "chai": "^5.1.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "esm": "^3.2.25",
+    "mocha": "^10.4.0",
     "postcss": "^8.4.35",
     "postcss-preset-mantine": "1.15.0",
     "postcss-simple-vars": "^7.0.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.2",
     "vite": "^5.1.6"
   },
