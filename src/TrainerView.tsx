@@ -1,9 +1,10 @@
+// TrainerView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
-import { Alg } from 'cubing/alg';
+import { CTAlg } from './CTAlg'; // Import the new CTAlg class
 import { AlgSet, Alg as Algorithm, Settings, CUBE_ROTATIONS } from './interfaces';
 import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
 
@@ -139,8 +140,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const computeSetupAlg = () => {
     if (!currentAlg) return '';
 
-    const algString = currentAlg.alg.join(' ');
-    const parsedAlg = Alg.fromString(algString);
+    const parsedAlg = new CTAlg(currentAlg.alg);
     const inverseAlg = parsedAlg.invert().toString();
     let setupAlg = '';
 
@@ -194,7 +194,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           {currentAlg && (
             <Box>
               <Text>Current Algorithm: {currentAlg.name}</Text>
-              <Text>{currentAlg.alg.join(' ')}</Text>
+              <Text>{currentAlg.alg}</Text>
             </Box>
           )}
           <List>
