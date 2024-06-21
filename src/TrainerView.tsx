@@ -1,10 +1,9 @@
-// TrainerView.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
-import { CTAlg } from './CTAlg'; // Import the new CTAlg class
+import { CTAlg } from './CTAlg';
 import { AlgSet, Alg as Algorithm, Settings, CUBE_ROTATIONS } from './interfaces';
 import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
 
@@ -140,7 +139,34 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const computeSetupAlg = () => {
     if (!currentAlg) return '';
 
-    const parsedAlg = new CTAlg(currentAlg.alg);
+    let algString = currentAlg.alg;
+    let ctAlg = new CTAlg(algString);
+
+    // Mirror across M if settings are enabled
+    if (settings.mirrorAcrossM) {
+      if (settings.randomizeMirrorAcrossM) {
+        if (Math.random() < 0.5) {
+          algString = ctAlg.mirror().toString();
+        }
+      } else {
+        algString = ctAlg.mirror().toString();
+      }
+    }
+
+    ctAlg = new CTAlg(algString); // Recreate CTAlg with potentially mirrored moves
+
+    // Mirror across S if settings are enabled
+    if (settings.mirrorAcrossS) {
+      if (settings.randomizeMirrorAcrossS) {
+        if (Math.random() < 0.5) {
+          algString = ctAlg.mirrorOverS().toString();
+        }
+      } else {
+        algString = ctAlg.mirrorOverS().toString();
+      }
+    }
+
+    const parsedAlg = CTAlg.fromString(algString);
     const inverseAlg = parsedAlg.invert().toString();
     let setupAlg = '';
 
