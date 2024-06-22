@@ -1,4 +1,4 @@
-import { KPattern } from 'cubing/kpuzzle';
+import { KPattern, KPuzzle } from 'cubing/kpuzzle';
 import { SolvedState } from './interfaces';
 
 const pieceNames: Record<string, string[]> = {
@@ -18,7 +18,7 @@ function rotateLeft(s: string, i: number): string {
 
 let pieceMap: { [s: string]: PieceInfo } | null = null;
 
-function memoizePieceMap(kpuzzle: any) {
+function memoizePieceMap(kpuzzle: KPuzzle) {
   if (pieceMap !== null) return;
   pieceMap = {};
 

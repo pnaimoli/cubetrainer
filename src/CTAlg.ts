@@ -1,4 +1,4 @@
-import { Alg } from 'cubing/alg';
+import { Alg, AlgLeaf } from 'cubing/alg';
 
 class CTAlg extends Alg {
   constructor(algString: string) {
@@ -39,13 +39,13 @@ class CTAlg extends Alg {
 
   mirror(): CTAlg {
     const mirroredMoves = Array.from(this.experimentalExpand())
-      .map(node => this.mirrorMoveOverM((node as any).toString()));
+      .map(node => this.mirrorMoveOverM((node as AlgLeaf).toString()));
     return new CTAlg(mirroredMoves.join(' '));
   }
 
   mirrorOverS(): CTAlg {
     const mirroredMoves = Array.from(this.experimentalExpand())
-      .map(node => this.mirrorMoveOverS((node as any).toString()));
+      .map(node => this.mirrorMoveOverS((node as AlgLeaf).toString()));
     return new CTAlg(mirroredMoves.join(' '));
   }
 }

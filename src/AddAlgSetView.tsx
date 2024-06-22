@@ -62,13 +62,13 @@ const AddAlgSetView: React.FC = () => {
           return move as ValidMove;
         });
 
-      const solvedStates = solved.toUpperCase().split('|').reduce((acc, state) => {
-        const solvedState = state.trim();
-        if (!Object.values(SolvedState).includes(solvedState as SolvedState)) {
-          throw new Error(`Invalid solved state: ${solvedState}, line: ${line}`);
-        }
-        return acc | (SolvedState as any)[solvedState];
-      }, 0);
+        const solvedStates = solved.toUpperCase().split('|').reduce((acc, state) => {
+          const solvedState = state.trim() as keyof typeof SolvedState;
+          if (!(solvedState in SolvedState)) {
+            throw new Error(`Invalid solved state: ${solvedState}, line: ${line}`);
+          }
+          return acc | SolvedState[solvedState];
+        }, 0);
 
         return { name: name.trim(), alg: algMoves, solved: solvedStates as SolvedState };
       });
