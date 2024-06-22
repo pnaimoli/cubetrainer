@@ -38,7 +38,10 @@ describe('SolveChecker', () => {
       }
     });
 
-    expect(isPatternSolved(pattern, SolvedState.F2LFR)).to.equal(false, "1");
-    expect(isPatternSolved(pattern, SolvedState.F2LFL)).to.equal(true, "2");
+    expect(isPatternSolved(pattern, SolvedState.F2LFR)).to.equal(false, "FR");
+    expect(isPatternSolved(pattern, SolvedState.F2LFL)).to.equal(true, "FL");
+    expect(isPatternSolved(pattern, SolvedState.F2LBL)).to.equal(true, "BL");
+    expect(isPatternSolved(pattern, SolvedState.F2LBR)).to.equal(true, "BR");
+    expect(isPatternSolved(pattern, SolvedState.OLL)).to.equal(false, "OLL");
   });
 });

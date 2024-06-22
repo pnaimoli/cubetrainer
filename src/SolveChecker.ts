@@ -103,25 +103,10 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
   const reidPieces = reidString.split(" ");
 
   // Check if the pattern matches the solved states
-  if (solvedStates & SolvedState.Cross) {
+  if (solvedStates & SolvedState.CROSS) {
     const crossEdges = ["DF", "DR", "DB", "DL"];
     for (const edge of crossEdges) {
       if (!isPieceCorrect(reidPieces, edge)) {
-        return false;
-      }
-    }
-  }
-
-  if (solvedStates & SolvedState.F2L) {
-    const f2lEdges = ["FR", "FL", "BR", "BL"];
-    const f2lCorners = ["DRF", "DFL", "DLB", "DBR"];
-    for (const edge of f2lEdges) {
-      if (!isPieceCorrect(reidPieces, edge)) {
-        return false;
-      }
-    }
-    for (const corner of f2lCorners) {
-      if (!isPieceCorrect(reidPieces, corner)) {
         return false;
       }
     }
@@ -151,16 +136,7 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
     }
   }
 
-  if (solvedStates & SolvedState.OLL) {
-    const ollEdges = ["UF", "UR", "UB", "UL", "UFR", "URB", "UBL", "ULF"];
-    for (const edge of ollEdges) {
-      if (!isStickerCorrect(reidPieces, edge)) {
-        return false;
-      }
-    }
-  }
-
-  if (solvedStates & SolvedState.EOLL) {
+  if (solvedStates & SolvedState.TOPEDGES) {
     const ollEdges = ["UF", "UR", "UB", "UL"];
     for (const edge of ollEdges) {
       if (!isStickerCorrect(reidPieces, edge)) {
@@ -169,7 +145,16 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
     }
   }
 
-  if (solvedStates & SolvedState.Full) {
+  if (solvedStates & SolvedState.TOPCORNERS) {
+    const ollCorners = ["UFR", "URB", "UBL", "ULF"];
+    for (const corner of ollCorners) {
+      if (!isStickerCorrect(reidPieces, corner)) {
+        return false;
+      }
+    }
+  }
+
+  if (solvedStates & SolvedState.FULL) {
     return reidString === "UFR URB UBL ULF DRF DFL DLB DBR UF UR UB UL DF DR DB DL FR FL BR BL ULFRBD";
   }
 
