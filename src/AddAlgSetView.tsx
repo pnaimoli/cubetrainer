@@ -54,7 +54,7 @@ const AddAlgSetView: React.FC = () => {
         if (line.length < 2) {
           throw new Error(`Invalid line format: ${line}`);
         }
-        const [name, alg, solved = 'full'] = line;
+        const [name, alg, solved = 'FULL'] = line;
         const algMoves = alg.split(/\s+/).map(move => {
           if (!Object.values(ValidMove).includes(move as ValidMove)) {
             throw new Error(`Invalid move found in algorithm: ${move}, line: ${line}`);
@@ -62,12 +62,15 @@ const AddAlgSetView: React.FC = () => {
           return move as ValidMove;
         });
 
-        const solvedLower = solved.trim().toLowerCase();
-        if (!Object.values(SolvedState).includes(solvedLower as SolvedState)) {
-          throw new Error(`Invalid solved state: ${solved}, line: ${line}`);
+      const solvedStates = solved.toUpperCase().split('|').reduce((acc, state) => {
+        const solvedState = state.trim();
+        if (!Object.values(SolvedState).includes(solvedState as SolvedState)) {
+          throw new Error(`Invalid solved state: ${solvedState}, line: ${line}`);
         }
+        return acc | (SolvedState as any)[solvedState];
+      }, 0);
 
-        return { name: name.trim(), alg: algMoves, solved: solvedLower as SolvedState };
+        return { name: name.trim(), alg: algMoves, solved: solvedStates as SolvedState };
       });
 
       setAlgSets([...algSets, { name: setName.trim(), algs }]);
@@ -113,9 +116,20 @@ const AddAlgSetView: React.FC = () => {
               </Box>
             </List.Item>
             <List.Item>
+              <Text><strong>Optionally, add a solved state as the third column, separated by a comma. The solved state can be a bitwise OR combination of the following states:</strong></Text>
+              <Box ml="md" my="xs">
+                <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>
+                  CROSS, F2L, F2LFR, F2LFL, F2LBL, F2LBR, OLL, PLL, EOLL, FULL
+                </Text>
+                <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>
+                  Example: Insert, R U R', F2LBR | F2LBL | F2LFL
+                </Text>
+              </Box>
+            </List.Item>
+            <List.Item>
               <Text><strong>Only use the following moves</strong> (', 2, or 3 can be added to the end, but nothing 4 or above):</Text>
               <Box ml="md" my="xs">
-                <Text style={{ fontFamily: 'monospace', color: '#3498db' }}>{uniqueValidMoves.join(' ')}</Text>
+                <Text style={{ fontFamily: 'monospace', color: '#3498db' }}>{uniqueValidMoves.join(', ')}</Text>
               </Box>
             </List.Item>
             <List.Item>
