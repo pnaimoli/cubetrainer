@@ -15,6 +15,7 @@ import WelcomeView from './WelcomeView';
 const App: React.FC = () => {
   const [view, setView] = useState<string>('Welcome');
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
+  const [settings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
@@ -84,7 +85,7 @@ const App: React.FC = () => {
       case 'AddAlgSetView':
         return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} />;
+        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} settings={settings}/>;
       default:
         return <WelcomeView />;
     }
