@@ -6,7 +6,7 @@ export const theme: MantineThemeOverride = createTheme({
     fontFamily: "Avenir, system-ui, Helvetica, Arial, sans-serif",
     fontWeight: 700,
   },
-  primaryColor: "green", // Change this to "red", "green", "orange", etc.
+  primaryColor: "orange", // Change this to "red", "green", "orange", etc.
   components: {
     Button: {
       styles: (theme) => ({
