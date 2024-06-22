@@ -60,6 +60,38 @@ function kpatternToReidString(pattern: KPattern): string {
   return pieces.join(" ");
 }
 
+function isPieceCorrect(reidPieces: string[], pieceName: string): boolean {
+  const pieceType = pieceName.length === 2 ? 'EDGES' : pieceName.length === 3 ? 'CORNERS' : null;
+  if (!pieceType) {
+    throw new Error('Invalid piece name');
+  }
+
+  if (pieceType === 'EDGES') {
+    const actualPiece = reidPieces[pieceNames['EDGES'].indexOf(pieceName)];
+    const expectedPiece = pieceName.split('').map(face => reidPieces[20 + pieceNames['CENTERS'].indexOf(face)]).join('');
+    return actualPiece === expectedPiece;
+  } else if (pieceType === 'CORNERS') {
+    const actualPiece = reidPieces[12 + pieceNames['CORNERS'].indexOf(pieceName)];
+    const expectedPiece = pieceName.split('').map(face => reidPieces[20 + pieceNames['CENTERS'].indexOf(face)]).join('');
+    return actualPiece === expectedPiece;
+  }
+  return false;
+}
+
+function isStickerCorrect(reidPieces: string[], stickerName: string): boolean {
+  const pieceType = stickerName.length === 2 ? 'EDGES' : stickerName.length === 3 ? 'CORNERS' : null;
+  if (!pieceType) {
+    throw new Error('Invalid sticker name');
+  }
+
+  const mainFace = stickerName[0];
+  const pieceIndex = pieceType === 'EDGES' ? pieceNames['EDGES'].indexOf(stickerName) : pieceNames['CORNERS'].indexOf(stickerName);
+  const actualSticker = reidPieces[pieceIndex][0];
+  const expectedSticker = reidPieces[20 + pieceNames['CENTERS'].indexOf(mainFace)];
+
+  return actualSticker === expectedSticker;
+}
+
 export function isPatternSolved(pattern: KPattern, solvedStates: number): boolean {
   if (pattern.kpuzzle.definition.name !== '3x3x3') {
     throw new Error('Unsupported puzzle type. Only 3x3x3 is supported.');
@@ -69,34 +101,77 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
 
   const reidString = kpatternToReidString(pattern);
   const reidPieces = reidString.split(" ");
-  console.log("REID:", reidString);
 
   // Check if the pattern matches the solved states
+  if (solvedStates & SolvedState.Cross) {
+    const crossEdges = ["DF", "DR", "DB", "DL"];
+    for (const edge of crossEdges) {
+      if (!isPieceCorrect(reidPieces, edge)) {
+        return false;
+      }
+    }
+  }
+
+  if (solvedStates & SolvedState.F2L) {
+    const f2lEdges = ["FR", "FL", "BR", "BL"];
+    const f2lCorners = ["DRF", "DFL", "DLB", "DBR"];
+    for (const edge of f2lEdges) {
+      if (!isPieceCorrect(reidPieces, edge)) {
+        return false;
+      }
+    }
+    for (const corner of f2lCorners) {
+      if (!isPieceCorrect(reidPieces, corner)) {
+        return false;
+      }
+    }
+  }
+
   if (solvedStates & SolvedState.F2LFR) {
-    const actualFRPiece = reidPieces[pieceNames["EDGES"].indexOf("FR")];
-    const expectedFRPiece = reidPieces[20+pieceNames["CENTERS"].indexOf("F")] + reidPieces[20+pieceNames["CENTERS"].indexOf("R")];
-    if (actualFRPiece != expectedFRPiece) {
-      return false;
-    }
-
-    const actualDRFPiece = reidPieces[12+pieceNames["CORNERS"].indexOf("DRF")];
-    const expectedDRFPiece = reidPieces[20+pieceNames["CENTERS"].indexOf("D")] + reidPieces[20+pieceNames["CENTERS"].indexOf("R")] + reidPieces[20+pieceNames["CENTERS"].indexOf("F")];
-    if (actualDRFPiece != expectedDRFPiece) {
+    if (!isPieceCorrect(reidPieces, "FR") || !isPieceCorrect(reidPieces, "DRF")) {
       return false;
     }
   }
+
   if (solvedStates & SolvedState.F2LFL) {
-    const actualFLPiece = reidPieces[pieceNames["EDGES"].indexOf("FL")];
-    const expectedFLPiece = reidPieces[20+pieceNames["CENTERS"].indexOf("F")] + reidPieces[20+pieceNames["CENTERS"].indexOf("L")];
-    if (actualFLPiece != expectedFLPiece) {
-      return false;
-    }
-
-    const actualDFLPiece = reidPieces[12+pieceNames["CORNERS"].indexOf("DFL")];
-    const expectedDFLPiece = reidPieces[20+pieceNames["CENTERS"].indexOf("D")] + reidPieces[20+pieceNames["CENTERS"].indexOf("F")] + reidPieces[20+pieceNames["CENTERS"].indexOf("L")];
-    if (actualDFLPiece != expectedDFLPiece) {
+    if (!isPieceCorrect(reidPieces, "FL") || !isPieceCorrect(reidPieces, "DFL")) {
       return false;
     }
   }
+
+  if (solvedStates & SolvedState.F2LBL) {
+    if (!isPieceCorrect(reidPieces, "BL") || !isPieceCorrect(reidPieces, "DLB")) {
+      return false;
+    }
+  }
+
+  if (solvedStates & SolvedState.F2LBR) {
+    if (!isPieceCorrect(reidPieces, "BR") || !isPieceCorrect(reidPieces, "DBR")) {
+      return false;
+    }
+  }
+
+  if (solvedStates & SolvedState.OLL) {
+    const ollEdges = ["UF", "UR", "UB", "UL", "UFR", "URB", "UBL", "ULF"];
+    for (const edge of ollEdges) {
+      if (!isStickerCorrect(reidPieces, edge)) {
+        return false;
+      }
+    }
+  }
+
+  if (solvedStates & SolvedState.EOLL) {
+    const ollEdges = ["UF", "UR", "UB", "UL"];
+    for (const edge of ollEdges) {
+      if (!isStickerCorrect(reidPieces, edge)) {
+        return false;
+      }
+    }
+  }
+
+  if (solvedStates & SolvedState.Full) {
+    return reidString === "UFR URB UBL ULF DRF DFL DLB DBR UF UR UB UL DF DR DB DL FR FL BR BL ULFRBD";
+  }
+
   return true;
 }
