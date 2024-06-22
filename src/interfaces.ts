@@ -2,15 +2,16 @@
 
 // Define an enumeration for the solved states
 export enum SolvedState {
-  Cross = 'cross',
-  F2L = 'f2l',
-  F2LFR = 'f2lfr',
-  F2LFL = 'f2lfl',
-  F2LBL = 'f2lbl',
-  F2LBR = 'f2lbr',
-  OLL = 'oll',
-  PLL = 'pll',
-  Full = 'full'
+  Cross = 1 << 0,
+  F2L = 1 << 1,
+  F2LFR = 1 << 2,
+  F2LFL = 1 << 3,
+  F2LBL = 1 << 4,
+  F2LBR = 1 << 5,
+  OLL = 1 << 6,
+  PLL = 1 << 7,
+  EOLL = 1 << 8,
+  Full = 1 << 9,
 }
 
 // Define an enumeration for the valid moves
