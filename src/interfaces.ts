@@ -11,7 +11,7 @@ export enum SolvedState {
   TOPCORNERS = 1 << 6,
   TOPEDGES   = 1 << 7,
 
-  F2L = F2LFR | F2LFL | F2LBL | F2LBR,
+  F2L = CROSS | F2LFR | F2LFL | F2LBL | F2LBR,
   EOLL  = F2L | TOPEDGES,
   OLL = F2L | TOPCORNERS | TOPEDGES,
 }

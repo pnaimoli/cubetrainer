@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
+import { Box, Stack, Text, Badge, List, Center, Flex } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
 import { CTAlg } from './CTAlg';
-import { AlgSet, Alg as Algorithm, Settings, CUBE_ROTATIONS } from './interfaces';
-import { Box, Stack, Text, Badge, List, Center } from '@mantine/core';
+import { AlgSet, Alg as Algorithm, Settings, SolvedState, CUBE_ROTATIONS } from './interfaces';
+import { isPatternSolved } from './SolveChecker';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -16,6 +17,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const [settings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
   const [isSolved, setIsSolved] = useState<boolean>(false);
+  const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
   const playerRef = useRef<TwistyPlayer>(null);
 
   const [randomAUF, setRandomAUF] = useState<string>('');
@@ -70,6 +72,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
       playerRef.current.alg = "";
     }
   }, [currentAlg, randomAUF, randomAdF, randomRotations1, fullColourNeutrality]);
+
+  useEffect(() => {
+    if (currentAlg) {
+      checkIfSolved();
+    }
+  }, [currentAlg]);
 
   useEffect(() => {
     if (conn) {
@@ -139,7 +147,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   const computeSetupAlg = () => {
     if (!currentAlg) return '';
 
-    let algString = currentAlg.alg;
+    let algString = currentAlg.alg.join(' ');
     let ctAlg = new CTAlg(algString);
 
     // Mirror across M if settings are enabled
@@ -185,20 +193,44 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
   };
 
   const checkIfSolved = async () => {
-    if (playerRef.current) {
+    if (playerRef.current && currentAlg) {
       const currentPattern = await playerRef.current.experimentalModel.currentPattern.get();
-      const isSolved = currentPattern.experimentalIsSolved({
-        ignoreCenterOrientation: true,
-        ignorePuzzleOrientation: true,
-      });
-      setIsSolved(isSolved);
+      const newSolvedStateMap: Record<string, boolean> = {};
+
+      Object.keys(SolvedState)
+        .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+        .forEach((key) => {
+          newSolvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+        });
+
+      setSolvedStateMap(newSolvedStateMap);
+      setIsSolved(isPatternSolved(currentPattern, currentAlg?.solved ?? SolvedState.FULL));
     }
   };
 
   return (
     <Box>
       <Stack align="center" spacing="md" style={{ marginBottom: '10px' }}>
-        <Badge color={isSolved ? 'green' : 'red'}>{isSolved ? 'Solved' : 'Not Solved'}</Badge>
+      <Flex gap="xs">
+        {Object.keys(SolvedState)
+          .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+          .map((key) => {
+            const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
+            const isActive = (solvedStateValue & (currentAlg?.solved || 0)) === solvedStateValue;
+            return (
+              <Badge
+                key={key}
+                color={solvedStateMap[key] ? 'green' : 'gray'}
+                style={{
+                  border: isActive ? '2px solid blue' : 'none',
+                  padding: '0 8px'
+                }}
+              >
+                {key}
+              </Badge>
+            );
+          })}
+      </Flex>
         <Text weight={500} size="lg">Algorithm Set: {currentAlgSet.name}</Text>
       </Stack>
       <Center style={{ marginBottom: '20px' }}>
@@ -220,7 +252,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn }) => {
           {currentAlg && (
             <Box>
               <Text>Current Algorithm: {currentAlg.name}</Text>
-              <Text>{currentAlg.alg}</Text>
+              <Text>{currentAlg.alg.join(' ')}</Text>
             </Box>
           )}
           <List>
