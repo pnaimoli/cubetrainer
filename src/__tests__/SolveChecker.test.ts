@@ -20,7 +20,7 @@ describe('SolveChecker', () => {
     } as KPuzzle;
   });
 
-  it('isPatternSolved should return true for solved F2LFR state', async () => {
+  it("Check the state of the cube for a 3 move insert (y R U R')", async () => {
     // This is y R U R'
     const pattern: KPattern = new KPattern(kpuzzle, {
       EDGES: {
@@ -43,5 +43,52 @@ describe('SolveChecker', () => {
     expect(isPatternSolved(pattern, SolvedState.F2LBL)).to.equal(true, "BL");
     expect(isPatternSolved(pattern, SolvedState.F2LBR)).to.equal(true, "BR");
     expect(isPatternSolved(pattern, SolvedState.OLL)).to.equal(false, "OLL");
+    expect(isPatternSolved(pattern, SolvedState.FULL)).to.equal(false, "FULL");
+  });
+
+  it("Check the state of the cube for a T OLL (z x F R U R' U' F')", async () => {
+    // This is y R U R'
+    const pattern: KPattern = new KPattern(kpuzzle, {
+      EDGES: {
+        pieces: [9, 8, 0, 4, 10, 2, 11, 6, 1, 5, 3, 7],
+        orientation: [1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1]
+      },
+      CORNERS: {
+        pieces: [4, 5, 3, 0, 1, 7, 6, 2],
+        orientation: [0, 0, 2, 1, 2, 1, 2, 1]
+      },
+      CENTERS: {
+        pieces: [2, 5, 3, 0, 1, 4],
+        orientation: [0, 0, 0, 0, 0, 0],
+        orientationMod: [1, 1, 1, 1, 1, 1]
+      }
+    });
+
+    expect(isPatternSolved(pattern, SolvedState.F2L)).to.equal(true, "F2L");
+    expect(isPatternSolved(pattern, SolvedState.OLL)).to.equal(false, "OLL");
+    expect(isPatternSolved(pattern, SolvedState.FULL)).to.equal(false, "FULL");
+  });
+
+  it("Check the state of the cube for an Aa Perm (z y x' R U' R' D R U R' D' R U R' D R U' R' D' x)", async () => {
+    // This is y R U R'
+    const pattern: KPattern = new KPattern(kpuzzle, {
+      EDGES: {
+        pieces: [3, 11, 7, 9, 1, 10, 5, 8, 2, 0, 6, 4],
+        orientation: [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+      },
+      CORNERS: {
+        pieces: [6, 2, 3, 5, 1, 0, 4, 7],
+        orientation: [1, 2, 1, 2, 1, 2, 1, 2]
+      },
+      CENTERS: {
+        pieces: [1, 2, 0, 4, 5, 3],
+        orientation: [0, 0, 0, 0, 0, 0],
+        orientationMod: [1, 1, 1, 1, 1, 1]
+      }
+    });
+
+    expect(isPatternSolved(pattern, SolvedState.F2L)).to.equal(true, "F2L");
+    expect(isPatternSolved(pattern, SolvedState.OLL)).to.equal(true, "OLL");
+    expect(isPatternSolved(pattern, SolvedState.FULL)).to.equal(false, "FULL");
   });
 });

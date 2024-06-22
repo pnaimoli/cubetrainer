@@ -155,7 +155,18 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
   }
 
   if (solvedStates & SolvedState.FULL) {
-    return reidString === "UFR URB UBL ULF DRF DFL DLB DBR UF UR UB UL DF DR DB DL FR FL BR BL ULFRBD";
+    const allEdges = pieceNames['EDGES'];
+    const allCorners = pieceNames['CORNERS'];
+    for (const edge of allEdges) {
+      if (!isPieceCorrect(reidPieces, edge)) {
+        return false;
+      }
+    }
+    for (const corner of allCorners) {
+      if (!isPieceCorrect(reidPieces, corner)) {
+        return false;
+      }
+    }
   }
 
   return true;
