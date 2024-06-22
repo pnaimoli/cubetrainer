@@ -3,7 +3,7 @@ import { Textarea, Button, TextInput, Group, Box, Text, List } from "@mantine/co
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { useForm } from "@mantine/form";
 import Papa from 'papaparse';
-import { Alg, AlgSet, ValidMove, SolvedState } from './interfaces';
+import { Alg, AlgSet, ValidMove, SolvedState, SOLVED_STATES } from './interfaces';
 import { ALG_PRESETS } from './algPresets';
 
 const AddAlgSetView: React.FC = () => {
@@ -119,7 +119,7 @@ const AddAlgSetView: React.FC = () => {
               <Text><strong>Optionally, add a solved state as the third column, separated by a comma. The solved state can be a bitwise OR combination of the following states:</strong></Text>
               <Box ml="md" my="xs">
                 <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>
-                  CROSS, F2L, F2LFR, F2LFL, F2LBL, F2LBR, OLL, PLL, EOLL, FULL
+                  {SOLVED_STATES.join(', ')}
                 </Text>
                 <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>
                   Example: Insert, R U R', F2LBR | F2LBL | F2LFL
