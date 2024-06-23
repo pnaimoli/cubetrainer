@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { CTAlg } from '../CTAlg';
+import { CTAlg } from './CTAlg';
 
 describe('CTAlg', () => {
   it('should mirror moves correctly', () => {

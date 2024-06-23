@@ -3,7 +3,7 @@ import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, ActionI
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
 import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
-import { Settings, CUBE_ROTATIONS, cycleSetting } from './interfaces';
+import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
 
 const defaultSettings: Settings = {
   randomAUF: false,

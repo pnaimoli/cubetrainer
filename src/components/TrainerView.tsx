@@ -6,9 +6,9 @@ import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
-import { CTAlg } from './CTAlg';
-import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from './interfaces';
-import { isPatternSolved } from './SolveChecker';
+import { CTAlg } from '../util/CTAlg';
+import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from '../util/interfaces';
+import { isPatternSolved } from '../util/SolveChecker';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;

@@ -3,8 +3,8 @@ import { Textarea, Button, TextInput, Group, Box, Text, List } from "@mantine/co
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { useForm } from "@mantine/form";
 import Papa from 'papaparse';
-import { Alg, AlgSet, ValidMove, SolvedState, SOLVED_STATES } from './interfaces';
-import { ALG_PRESETS } from './algPresets';
+import { Alg, AlgSet, ValidMove, SolvedState, SOLVED_STATES } from '../util/interfaces';
+import { ALG_PRESETS } from '../util/algPresets';
 
 const AddAlgSetView: React.FC = () => {
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });

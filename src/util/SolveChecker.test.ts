@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
-import { isPatternSolved } from '../SolveChecker';
-import { SolvedState } from '../interfaces';
+import { isPatternSolved } from './SolveChecker';
+import { SolvedState } from './interfaces';
 
 describe('SolveChecker', () => {
   let kpuzzle: KPuzzle;
