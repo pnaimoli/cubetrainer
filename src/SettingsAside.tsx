@@ -24,6 +24,12 @@ const SettingsAside: React.FC = () => {
 
   return (
     <Stack>
+      <Checkbox
+        label="Go in Order"
+        checked={settings.goInOrder}
+        onChange={(event) => setSettings({ ...settings, goInOrder: event.currentTarget.checked })}
+      />
+      <Divider label="Symmetries"/>
       <Group position="apart">
         <Checkbox
           label="Random AUF"
@@ -43,11 +49,6 @@ const SettingsAside: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
         />
       </Group>
-      <Checkbox
-        label="Go in Order"
-        checked={settings.goInOrder}
-        onChange={(event) => setSettings({ ...settings, goInOrder: event.currentTarget.checked })}
-      />
       <Group position="apart">
         <Checkbox
           label="Mirror Across M"
@@ -72,7 +73,7 @@ const SettingsAside: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossS: event.currentTarget.checked })}
         />
       </Group>
-      <Divider />
+      <Divider label="Display Settings"/>
       <Checkbox
         label="Show Hint Facelets"
         checked={settings.showHintFacelets}
@@ -90,32 +91,30 @@ const SettingsAside: React.FC = () => {
         checked={settings.useMaskings}
         onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
       />
-      <Divider />
+      <Divider label="Preorientation"/>
       <Group>
-        <Text>Full Colour Neutrality</Text>
         <Checkbox
           checked={settings.fullColourNeutrality}
           onChange={(event) => setSettings({ ...settings, fullColourNeutrality: event.currentTarget.checked })}
         />
+        <Text>Full Colour Neutrality</Text>
       </Group>
       <Collapse in={!settings.fullColourNeutrality}>
         <Stack gap="xs">
-          <Center>
-            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>First Rotation</Text>
             <Select
+              label="Initial Rotation"
               value={settings.firstRotation}
+              maw="175px"
               onChange={(value) => setSettings({ ...settings, firstRotation: value })}
               data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
             />
-          </Center>
-          <Center>
-            <Text style={{ whiteSpace: 'nowrap', marginRight: '8px' }}>Random Rotations</Text>
             <Select
+              label="Subsequent Rotation(s)"
               value={settings.randomRotations1}
+              maw="175px"
               onChange={(value) => setSettings({ ...settings, randomRotations1: value })}
-              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
+              data={["x", "y", "z"]}
             />
-          </Center>
         </Stack>
       </Collapse>
     </Stack>

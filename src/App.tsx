@@ -63,7 +63,7 @@ const App: React.FC = () => {
       </Accordion.Control>
       <Menu>
         <Menu.Target>
-          <ActionIcon size="lg" variant="subtle" color="gray" mr="xs">
+          <ActionIcon size="lg" variant="subtle" color="gray" mr="7px">
             <FaEllipsisH size="1rem" />
           </ActionIcon>
         </Menu.Target>
@@ -145,17 +145,19 @@ const App: React.FC = () => {
                   <AccordionControl set={set} expanded={expandedItem === set.name} />
                   <Accordion.Panel>
                     {set.algs.map((alg, index) => (
-                      <Flex
+                      <Group
+                        gap="xs"
+                        wrap="nowrap"
                         padding={0}
                         ff="monospace"
                         bg={index % 2 === 0 ? theme.colors.dark[6] : "inherit"}
                         key={`${set.name}-${alg.name}`}
                         style={{ whiteSpace: 'nowrap' }}
                       >
-                        <Text span size="xs" fw={700} ml="xs" mr="xs"><FaStar style={{ marginRight: "8px", width: '10px', height: '10px'}} />{alg.name}:</Text>
+                        <Text span size="xs" fw={700} ml="xs"><FaStar style={{ marginRight: "8px", width: '10px', height: '10px'}} />{alg.name}:</Text>
                         <Text span size="xs" w="100%" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{alg.alg.join(' ')}</Text>
-                        <Text span size="xs" ml="xs" mr="xs">({alg.solved})</Text>
-                      </Flex>
+                        <Text span size="xs" mr="xs">({alg.solved})</Text>
+                      </Group>
                     ))}
                   </Accordion.Panel>
                 </Accordion.Item>
