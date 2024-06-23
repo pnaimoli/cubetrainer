@@ -32,12 +32,12 @@ const SettingsAside: React.FC = () => {
         />
         <Checkbox
           label={
-            <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Center>
               Random y's
               <Tooltip label="Do a random number of y rotation after the setup" withArrow>
                 <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
               </Tooltip>
-            </div>
+            </Center>
           }
           checked={settings.randomYs}
           onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}

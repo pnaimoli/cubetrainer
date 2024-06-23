@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppShell, Group, Button, Text, Accordion, ActionIcon, Center, Menu, Flex, Stack } from '@mantine/core';
+import { useMantineTheme, AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
@@ -13,6 +13,7 @@ import SettingsAside from './SettingsAside';
 import WelcomeView from './WelcomeView';
 
 const App: React.FC = () => {
+  const theme = useMantineTheme();
   const [view, setView] = useState<string>('Welcome');
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const [settings] = useLocalStorage<Settings>({ key: 'settings' });
@@ -55,14 +56,14 @@ const App: React.FC = () => {
   }
 
   const AccordionControl: React.FC<AccordionControlProps> = ({ set, expanded }) => (
-    <Center style={{ justifyContent: 'space-between' }}>
+    <Flex align="center">
       <Accordion.Control>
         {expanded ? <FaFolderOpen style={{ marginRight: 8 }} /> : <FaFolder style={{ marginRight: 8 }} />}
         {set.name}
       </Accordion.Control>
       <Menu>
         <Menu.Target>
-          <ActionIcon size="lg" variant="subtle" color="gray">
+          <ActionIcon size="lg" variant="subtle" color="gray" mr="xs">
             <FaEllipsisH size="1rem" />
           </ActionIcon>
         </Menu.Target>
@@ -75,7 +76,7 @@ const App: React.FC = () => {
           <Menu.Item onClick={() => handleDeleteAlgSet(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
       </Menu>
-    </Center>
+    </Flex>
   );
 
   const renderView = (): React.ReactNode => {
@@ -99,7 +100,7 @@ const App: React.FC = () => {
       aside={{ width: 300, collapsed: { mobile: !asideOpened, desktop: !asideOpened }, breakpoint: 'sm' }}
     >
       <AppShell.Header>
-        <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+        <Flex justify="space-between" align="center">
           <Group h="100%" px="md">
             <ReactLogo width="65px" height="100%" style={{ paddingTop: '10px' }}/>
             <Stack align="center">
@@ -107,12 +108,11 @@ const App: React.FC = () => {
                 leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}
                 onClick={handleBluetoothConnect}
                 color={conn ? '' : 'red'}
-                style={{ position: 'relative' }}
                 loading={loading}
               >
                 {conn ? 'Disconnect Gan 12 Cube' : 'Connect Gan 12 Cube'}
               </Button>
-              <Text color="red" size="xs" style={{ position: 'absolute', top: '0px' }}>{error}</Text>
+              <Text color="red" size="xs" pos="absolute" top={0}>{error}</Text>
             </Stack>
           </Group>
           <Group mr="md">
@@ -124,37 +124,45 @@ const App: React.FC = () => {
         </Flex>
       </AppShell.Header>
       <AppShell.Navbar>
-        <div style={{ width: "300px" }}>
+        <ScrollArea scrollbars="y">
           <Button
             leftSection={<FaPlus />}
             fullWidth
             onClick={() => setView('AddAlgSetView')}
-            style={{ borderRadius: '0px', marginBottom: '10px' }}
+            style={{ borderRadius: '0px' }}
           >
             New Algorithm Set
           </Button>
-          <Accordion
-            value={expandedItem}
-            chevronSize="0px"
-            onChange={setExpandedItem}
-          >
-            {algSets.sort((a, b) => a.name.localeCompare(b.name)).map((set) => (
-              <Accordion.Item key={set.name} value={set.name}>
-                <AccordionControl set={set} expanded={expandedItem === set.name} />
-                <Accordion.Panel>
-                  <div>
-                    {set.algs.map(alg => (
-                      <Text key={`${set.name}-${alg.name}`} style={{ display: 'flex', alignItems: 'center' }}>
-                        <FaStar style={{ marginRight: 8 }} />
-                        {alg.name}: {alg.alg} ({alg.solved})
-                      </Text>
+          <Box w={300}>
+            <Accordion
+              value={expandedItem}
+              chevronSize="0px"
+              onChange={setExpandedItem}
+              styles={{ content: { padding: '0px' } }}
+            >
+              {algSets.sort((a, b) => a.name.localeCompare(b.name)).map((set) => (
+                <Accordion.Item key={set.name} value={set.name}>
+                  <AccordionControl set={set} expanded={expandedItem === set.name} />
+                  <Accordion.Panel>
+                    {set.algs.map((alg, index) => (
+                      <Flex
+                        padding={0}
+                        ff="monospace"
+                        bg={index % 2 === 0 ? theme.colors.dark[6] : "inherit"}
+                        key={`${set.name}-${alg.name}`}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        <Text span size="xs" fw={700} ml="xs" mr="xs"><FaStar style={{ marginRight: "8px", width: '10px', height: '10px'}} />{alg.name}:</Text>
+                        <Text span size="xs" w="100%" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{alg.alg.join(' ')}</Text>
+                        <Text span size="xs" ml="xs" mr="xs">({alg.solved})</Text>
+                      </Flex>
                     ))}
-                  </div>
-                </Accordion.Panel>
-              </Accordion.Item>
-            ))}
-          </Accordion>
-        </div>
+                  </Accordion.Panel>
+                </Accordion.Item>
+              ))}
+            </Accordion>
+          </Box>
+        </ScrollArea>
       </AppShell.Navbar>
       <AppShell.Aside p="md">
         <SettingsAside />
