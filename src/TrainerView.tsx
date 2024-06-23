@@ -18,7 +18,7 @@ interface TrainerViewProps {
 }
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
-  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(initialAlg || null); // Set initialAlg as the initial state
+  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null); // Set initialAlg as the initial state
   const [isSolved, setIsSolved] = useState<boolean>(false);
   const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
   const [moves, setMoves] = useState<string[]>([]);
@@ -79,15 +79,17 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // settings related useEffects
   /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
+    // This logics is wrong.  We should check to see if there's a currentAlg yet
+    // and branch off of that
     if (initialAlg) {
       setCurrentAlg(initialAlg);
-    } else if (settings.goInOrder) {
+    } else if (settings.playlistMode === 'ordered') {
       setCurrentAlg(currentAlgSet.algs[0]);
     } else {
       const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
       setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
-  }, [currentAlgSet, settings.goInOrder, initialAlg]);
+  }, [currentAlgSet, settings.playlistMode, initialAlg]);
 
   useEffect(() => {
     if (settings.randomAUF) {
@@ -249,7 +251,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     if (!isSolved) return;
 
-    if (settings.goInOrder) {
+    if (settings.playlistMode === 'ordered') {
       const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg?.name);
       const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
       setCurrentAlg(currentAlgSet.algs[nextIndex]);

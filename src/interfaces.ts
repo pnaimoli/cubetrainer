@@ -55,11 +55,18 @@ export enum CubeRotation {
   x = 'x', x2 = 'x2', xPrime = "x'", y = 'y', y2 = 'y2', yPrime = "y'", z = 'z', z2 = 'z2', zPrime = "z'"
 }
 
-// Extend the Settings interface to include cube rotation settings
+// https://danielbarta.com/literal-iteration-typescript/
+const PlaylistModes = ['ordered', 'shuffle', 'random'];
+type PlaylistMode = typeof PlaylistMode[number];
+
+const LoopModes = ['no loop', 'loop', 'loop1'];
+type LoopMode = typeof LoopMode[number];
+
 export interface Settings {
   randomAUF: boolean;
   randomYs: boolean;
-  goInOrder: boolean;
+  playlistMode: PlaylistMode;
+  loopMode: LoopMode;
   mirrorAcrossM: boolean;
   mirrorAcrossS: boolean;
   randomizeMirrorAcrossM: boolean;
@@ -67,10 +74,22 @@ export interface Settings {
   showHintFacelets: boolean;
   useMaskings: boolean;
   fullColourNeutrality: boolean;
-  firstRotation: CubeRotation | '';
-  randomRotations1: CubeRotation | '';
+  firstRotation: string;
+  randomRotations1: string;
 }
 
 // Export arrays of enum values for easy usage
 export const SOLVED_STATES: SolvedState[] = Object.values(SolvedState).filter(value => typeof value === 'string') as SolvedState[];
 export const CUBE_ROTATIONS: CubeRotation[] = Object.values(CubeRotation).filter(value => typeof value === 'string') as CubeRotation[];
+
+export function cycleSetting<T extends keyof Settings>(settings: Settings, key: T): Settings {
+  const possibleValues = {
+    playlistMode: PlaylistModes,
+    loopMode: LoopModes,
+  } as const;
+
+  const currentIndex = possibleValues[key].indexOf(settings[key]);
+  const nextIndex = (currentIndex + 1) % possibleValues[key].length;
+  const newSettings = { ...settings, [key]: possibleValues[key][nextIndex] };
+  return newSettings;
+}

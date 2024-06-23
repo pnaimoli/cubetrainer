@@ -1,13 +1,15 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, Text, Divider } from '@mantine/core';
+import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, ActionIcon, Text, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaInfoCircle } from 'react-icons/fa';
-import { Settings, CUBE_ROTATIONS } from './interfaces';
+import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
+import { Settings, CUBE_ROTATIONS, cycleSetting } from './interfaces';
 
 const defaultSettings: Settings = {
   randomAUF: false,
   randomYs: false,
-  goInOrder: false,
+  playlistMode: 'ordered',
+  loopMode: 'loop',
   mirrorAcrossM: false,
   mirrorAcrossS: false,
   randomizeMirrorAcrossM: false,
@@ -24,12 +26,26 @@ const SettingsAside: React.FC = () => {
 
   return (
     <Stack>
-      <Checkbox
-        label="Go in Order"
-        checked={settings.goInOrder}
-        onChange={(event) => setSettings({ ...settings, goInOrder: event.currentTarget.checked })}
-      />
-      <Divider label="Symmetries"/>
+      <Divider label="Alg Selection" />
+      <Group>
+        <Group gap="xs" onClick={() => setSettings(cycleSetting(settings, "playlistMode"))} style={{ cursor: 'pointer' }}>
+          <Text fz="sm">Order:</Text>
+          <ActionIcon variant="subtle">
+            {settings.playlistMode === 'ordered' && <TbListNumbers style={{ color: 'gray' }} />}
+            {settings.playlistMode === 'shuffle' && <TbArrowsShuffle style={{ color: 'green' }} />}
+            {settings.playlistMode === 'random' && <TbArrowsRandom style={{ color: 'green' }} />}
+          </ActionIcon>
+        </Group>
+        <Group gap="xs" onClick={() => setSettings(cycleSetting(settings, "loopMode"))} style={{ cursor: 'pointer' }}>
+          <Text fz="sm">Loop:</Text>
+          <ActionIcon variant="subtle">
+            {settings.loopMode === 'no loop' && <TbRepeatOff style={{ color: 'gray' }} />}
+            {settings.loopMode === 'loop' && <TbRepeat style={{ color: 'green' }} />}
+            {settings.loopMode === 'loop1' && <TbRepeatOnce style={{ color: 'green' }} />}
+          </ActionIcon>
+        </Group>
+      </Group>
+      <Divider label="Symmetries" />
       <Group position="apart">
         <Checkbox
           label="Random AUF"
@@ -94,10 +110,10 @@ const SettingsAside: React.FC = () => {
       <Divider label="Preorientation"/>
       <Group>
         <Checkbox
+          label="Full Colour Neutrality"
           checked={settings.fullColourNeutrality}
           onChange={(event) => setSettings({ ...settings, fullColourNeutrality: event.currentTarget.checked })}
         />
-        <Text>Full Colour Neutrality</Text>
       </Group>
       <Collapse in={!settings.fullColourNeutrality}>
         <Stack gap="xs">
