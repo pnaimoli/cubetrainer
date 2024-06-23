@@ -75,21 +75,23 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setSetupAlg("");
   }, [currentAlg]);
 
+  useEffect(() => {
+    if (initialAlg) {
+      setCurrentAlg(initialAlg);
+    }
+  }, [initialAlg]);
+
   /////////////////////////////////////////////////////////////////////////////
   // settings related useEffects
   /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    // This logics is wrong.  We should check to see if there's a currentAlg yet
-    // and branch off of that
-    if (initialAlg) {
-      setCurrentAlg(initialAlg);
-    } else if (settings.playlistMode === 'ordered') {
+    if (settings.playlistMode === 'ordered') {
       setCurrentAlg(currentAlgSet.algs[0]);
     } else {
       const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
       setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
-  }, [currentAlgSet, settings.playlistMode, initialAlg]);
+  }, [currentAlgSet, settings.playlistMode]);
 
   useEffect(() => {
     if (settings.randomAUF) {

@@ -88,7 +88,7 @@ const App: React.FC = () => {
       case 'AddAlgSetView':
         return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+        return <TrainerView key={currentAlgSet.name} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
       default:
         return <WelcomeView />;
     }
