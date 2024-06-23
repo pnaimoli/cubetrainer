@@ -12,6 +12,7 @@ const defaultSettings: Settings = {
   mirrorAcrossS: false,
   randomizeMirrorAcrossM: false,
   randomizeMirrorAcrossS: false,
+  showHintFacelets: false,
   useMaskings: false,
   fullColourNeutrality: false,
   firstRotation: '',
@@ -71,6 +72,12 @@ const SettingsAside: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossS: event.currentTarget.checked })}
         />
       </Group>
+      <Divider />
+      <Checkbox
+        label="Show Hint Facelets"
+        checked={settings.showHintFacelets}
+        onChange={(event) => setSettings({ ...settings, showHintFacelets: event.currentTarget.checked })}
+      />
       <Checkbox
         label={
           <Center>

@@ -298,13 +298,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       <Center style={{ marginBottom: '20px' }}>
         <twisty-player
           ref={playerRef}
-          class="cube"
           visualization="PG3D"
           control-panel="none"
           background="none"
           puzzle="3x3x3"
           tempo-scale="4"
-          hint-facelets="none"
+          hint-facelets={settings.showHintFacelets ? "true" : "none"}
           experimental-setup-alg={setupAlg??''}
           style={{ width: "300px", height: "300px" }}
         />

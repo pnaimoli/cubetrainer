@@ -64,6 +64,7 @@ export interface Settings {
   mirrorAcrossS: boolean;
   randomizeMirrorAcrossM: boolean;
   randomizeMirrorAcrossS: boolean;
+  showHintFacelets: boolean;
   useMaskings: boolean;
   fullColourNeutrality: boolean;
   firstRotation: CubeRotation | '';
