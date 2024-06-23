@@ -6,7 +6,7 @@ import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../package.json';
 import ReactLogo from './assets/logo.svg?react';
-import { AlgSet } from './interfaces';
+import { AlgSet, Settings } from './interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
 import SettingsAside from './SettingsAside';
@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const [settings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
+  const [initialAlg, setInitialAlg] = useState<Algorithm | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
@@ -69,6 +70,7 @@ const App: React.FC = () => {
         </Menu.Target>
         <Menu.Dropdown>
           <Menu.Item onClick={() => {
+            setInitialAlg(null);
             setCurrentAlgSet(set);
             setView('TrainerView');
           }}>Train</Menu.Item>
@@ -86,7 +88,7 @@ const App: React.FC = () => {
       case 'AddAlgSetView':
         return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
       case 'TrainerView':
-        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} settings={settings}/>;
+        return <TrainerView currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
       default:
         return <WelcomeView />;
     }
@@ -152,7 +154,12 @@ const App: React.FC = () => {
                         ff="monospace"
                         bg={index % 2 === 0 ? theme.colors.dark[6] : "inherit"}
                         key={`${set.name}-${alg.name}`}
-                        style={{ whiteSpace: 'nowrap' }}
+                        style={{ whiteSpace: 'nowrap', cursor: 'pointer' }}
+                        onDoubleClick={() => {
+                          setCurrentAlgSet(set);
+                          setInitialAlg(alg);
+                          setView('TrainerView');
+                        }}
                       >
                         <Text span size="xs" fw={700} ml="xs"><FaStar style={{ marginRight: "8px", width: '10px', height: '10px'}} />{alg.name}:</Text>
                         <Text span size="xs" w="100%" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{alg.alg.join(' ')}</Text>

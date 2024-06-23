@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Box, Stack, Text, Badge, List, Center, Flex } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
+import { Box, Stack, Text, Badge, Title, Center, Group } from '@mantine/core';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { CTAlg } from './CTAlg';
-import { AlgSet, Alg as Algorithm, settings, SolvedState, CUBE_ROTATIONS } from './interfaces';
+import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from './interfaces';
 import { isPatternSolved } from './SolveChecker';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
   conn: GanCubeConnection | null;
+  settings: Settings;
+  initialAlg?: Algorithm; // Add initialAlg prop
 }
 
-const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings }) => {
-  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null);
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
+  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(initialAlg || null); // Set initialAlg as the initial state
   const [isSolved, setIsSolved] = useState<boolean>(false);
   const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
   const [moves, setMoves] = useState<string[]>([]);
@@ -29,6 +30,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [randomYs, setRandomYs] = useState<string>('');
   const [randomRotations1, setRandomRotations1] = useState<string>('');
   const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
+
+  // ... (other useEffects and functions)
 
   /////////////////////////////////////////////////////////////////////////////
   // mounting useEffects
@@ -44,13 +47,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     };
 
     fetchPuzzle();
-  }, []); // Empty dependency array to run once on mount
+  }, []);
 
   useEffect(() => {
     if (conn) {
       const handleCubeEvent = async (event: GanCubeEvent) => {
         if (event.type === "MOVE") {
-          // Need to do this because of animation reasons.
           playerRef.current.experimentalAddMove(event.move);
           setMoves(prevMoves => [...prevMoves, event.move]);
         }
@@ -64,19 +66,28 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
   }, [conn]);
 
+  // This needs to be really high up here so it gets called first
+  useEffect(() => {
+    if (playerRef.current) {
+      playerRef.current.alg = "";
+    }
+    setMoves([]);
+    setSetupAlg("");
+  }, [currentAlg]);
+
   /////////////////////////////////////////////////////////////////////////////
   // settings related useEffects
   /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    if (currentAlgSet && currentAlgSet.algs.length > 0) {
-      if (settings.goInOrder) {
-        setCurrentAlg(currentAlgSet.algs[0]);
-      } else {
-        const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-        setCurrentAlg(currentAlgSet.algs[randomIndex]);
-      }
+    if (initialAlg) {
+      setCurrentAlg(initialAlg);
+    } else if (settings.goInOrder) {
+      setCurrentAlg(currentAlgSet.algs[0]);
+    } else {
+      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+      setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
-  }, [currentAlgSet, settings.goInOrder]);
+  }, [currentAlgSet, settings.goInOrder, initialAlg]);
 
   useEffect(() => {
     if (settings.randomAUF) {
@@ -170,61 +181,55 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       settings.firstRotation, settings.fullColourNeutrality, settings.mirrorAcrossM,
       settings.mirrorAcrossS, settings.randomizeMirrorAcrossM, settings.randomizeMirrorAcrossS]);
 
-  useEffect(() => {
-    const fetchStickerMask = async () => {
-      if (playerRef.current) {
-        if (!kpuzzle) return;
+  // useEffect(() => {
+  //   const fetchStickerMask = async () => {
+  //     if (playerRef.current) {
+  //       if (!kpuzzle) return;
 
-        const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
+  //       const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
 
-        const stickerMask = await playerRef.current.experimentalModel.twistySceneModel.stickeringMask.get();
+  //       const stickerMask = await playerRef.current.experimentalModel.twistySceneModel.stickeringMask.get();
 
-        // There are 5 facelets, because that's the maximum we need for any built-in puzzles.
-        // Since we're using the 3x3x3, only the first three are used for corners and first
-        // two for edges.
-        const R = { facelets: new Array(5).fill("regular") };
-        const D = { facelets: new Array(5).fill("dim") };
-        const I = { facelets: new Array(5).fill("ignored") };
-        const R1 = { facelets: ["regular", "ignored",  "ignored",  "ignored", "ignored"] };
-        const R2 = { facelets: ["ignored", "regular",  "ignored",  "ignored", "ignored"] };
-        const R3 = { facelets: ["ignored", "ignored",  "regular",  "ignored", "ignored"] };
-        const R4 = { facelets: ["ignored", "ignored",  "ignored",  "regular", "ignored"] };
-        const R5 = { facelets: ["ignored", "ignored",  "ignored",  "ignored", "regular"] };
-        const I1 = { facelets: ["ignored", "regular",  "regular",  "regular", "regular"] };
-        const I2 = { facelets: ["regular", "ignored",  "regular",  "regular", "regular"] };
-        const I3 = { facelets: ["regular", "regular",  "ignored",  "regular", "regular"] };
-        const I4 = { facelets: ["regular", "regular",  "regular",  "ignored", "regular"] };
-        const I5 = { facelets: ["regular", "regular",  "regular",  "regular", "ignored"] };
-        const testStickering = {
-          orbits: {
-            EDGES: {
-              pieces: [R, R, R, R, R, R, R, R, R, R, R, R],
-            },
-            CORNERS: {
-              pieces: [R, R, R, R, R, R, R, R],
-            },
-            CENTERS: {
-              pieces: [I, R, R, R, R, R],
-            },
-          },
-        }
-        //playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(testStickering);
-        //console.log("Sticker Mask:", stickerMask);
-      }
-    };
+  //       // There are 5 facelets, because that's the maximum we need for any built-in puzzles.
+  //       // Since we're using the 3x3x3, only the first three are used for corners and first
+  //       // two for edges.
+  //       const R = { facelets: new Array(5).fill("regular") };
+  //       const D = { facelets: new Array(5).fill("dim") };
+  //       const I = { facelets: new Array(5).fill("ignored") };
+  //       const R1 = { facelets: ["regular", "ignored",  "ignored",  "ignored", "ignored"] };
+  //       const R2 = { facelets: ["ignored", "regular",  "ignored",  "ignored", "ignored"] };
+  //       const R3 = { facelets: ["ignored", "ignored",  "regular",  "ignored", "ignored"] };
+  //       const R4 = { facelets: ["ignored", "ignored",  "ignored",  "regular", "ignored"] };
+  //       const R5 = { facelets: ["ignored", "ignored",  "ignored",  "ignored", "regular"] };
+  //       const I1 = { facelets: ["ignored", "regular",  "regular",  "regular", "regular"] };
+  //       const I2 = { facelets: ["regular", "ignored",  "regular",  "regular", "regular"] };
+  //       const I3 = { facelets: ["regular", "regular",  "ignored",  "regular", "regular"] };
+  //       const I4 = { facelets: ["regular", "regular",  "regular",  "ignored", "regular"] };
+  //       const I5 = { facelets: ["regular", "regular",  "regular",  "regular", "ignored"] };
+  //       const testStickering = {
+  //         orbits: {
+  //           EDGES: {
+  //             pieces: [R, R, R, R, R, R, R, R, R, R, R, R],
+  //           },
+  //           CORNERS: {
+  //             pieces: [R, R, R, R, R, R, R, R],
+  //           },
+  //           CENTERS: {
+  //             pieces: [I, R, R, R, R, R],
+  //           },
+  //         },
+  //       }
+  //       //playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(testStickering);
+  //       //console.log("Sticker Mask:", stickerMask);
+  //     }
+  //   };
 
-    fetchStickerMask();
-  }, [setupAlg, currentAlg]);
+  //   fetchStickerMask();
+  // }, [setupAlg, currentAlg]);
 
   /////////////////////////////////////////////////////////////////////////////
   // solution-related useEffects
   /////////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    if (playerRef.current && moves.length == 0) {
-      playerRef.current.alg = "";
-    }
-  }, [moves]);
-
   useEffect(() => {
     if (!currentAlg || setupAlg === "" || !kpuzzle) return;
 
@@ -242,20 +247,15 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [kpuzzle, currentAlg, moves, setupAlg]);
 
   useEffect(() => {
-    if (isSolved) {
-      if (settings.goInOrder) {
-        const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg?.name);
-        const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
-        setCurrentAlg(currentAlgSet.algs[nextIndex]);
-      } else {
-        const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-        setCurrentAlg(currentAlgSet.algs[randomIndex]);
-      }
+    if (!isSolved) return;
 
-      // Reset moves when cycling to a new algorithm
-      setMoves([]);
-      setSetupAlg("");
-      setIsSolved(false);
+    if (settings.goInOrder) {
+      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg?.name);
+      const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
+      setCurrentAlg(currentAlgSet.algs[nextIndex]);
+    } else {
+      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+      setCurrentAlg(currentAlgSet.algs[randomIndex]);
     }
   }, [isSolved]);
 
@@ -272,8 +272,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
   return (
     <Box>
+      <Center><Title>Algorithm Set: {currentAlgSet.name}</Title></Center>
       <Stack align="center" spacing="md" style={{ marginBottom: '10px' }}>
-        <Flex gap="xs">
+        <Group gap="xs">
           {Object.keys(SolvedState)
             .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
             .map((key) => {
@@ -283,17 +284,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
                 <Badge
                   key={key}
                   color={solvedStateMap[key] ? 'green' : 'gray'}
-                  style={{
-                    border: isActive ? '2px solid blue' : 'none',
-                    padding: '0 8px'
-                  }}
+                  bd={isActive ? '1px solid var(--mantine-primary-color-5)': 'none'}
                 >
                   {key}
                 </Badge>
               );
             })}
-        </Flex>
-        <Text weight={500} size="lg">Algorithm Set: {currentAlgSet.name}</Text>
+        </Group>
       </Stack>
       <Center style={{ marginBottom: '20px' }}>
         <twisty-player
@@ -308,22 +305,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           style={{ width: "300px", height: "300px" }}
         />
       </Center>
-      {currentAlgSet && (
-        <Stack>
-          {currentAlg && (
-            <Box>
-              <Text>Current Algorithm: {currentAlg.name}</Text>
-              <Text>{currentAlg.alg.join(' ')}</Text>
-            </Box>
-          )}
-          <List>
-            {currentAlgSet.algs.map((alg) => (
-              <List.Item key={alg.name} onClick={() => setCurrentAlg(alg)}>
-                {alg.name}
-              </List.Item>
-            ))}
-          </List>
-        </Stack>
+      {currentAlg && (
+        <Box>
+          <Text>Current Algorithm: {currentAlg.name}</Text>
+          <Text>{currentAlg.alg.join(' ')}</Text>
+        </Box>
       )}
     </Box>
   );
