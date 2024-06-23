@@ -21,12 +21,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [isSolved, setIsSolved] = useState<boolean>(false);
   const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
   const [moves, setMoves] = useState<string[]>([]);
-  const [setupAlg, setSetupAlg] = useState<string | null>(null);
+  const [setupAlg, setSetupAlg] = useState<string>("");
   const playerRef = useRef<TwistyPlayer>(null);
   const [kpuzzle, setKPuzzle] = useState<KPuzzle | null>(null);
 
   const [randomAUF, setRandomAUF] = useState<string>('');
-  const [randomAdF, setRandomAdF] = useState<string>('');
+  const [randomYs, setRandomYs] = useState<string>('');
   const [randomRotations1, setRandomRotations1] = useState<string>('');
   const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
 
@@ -87,12 +87,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.randomAUF, currentAlg]);
 
   useEffect(() => {
-    if (settings.randomAdF) {
-      setRandomAdF(getRandomRotations('d', Math.floor(Math.random() * 4) + 1));
+    if (settings.randomYs) {
+      setRandomYs(getRandomRotations('y', Math.floor(Math.random() * 4) + 1));
     } else {
-      setRandomAdF('');
+      setRandomYs('');
     }
-  }, [settings.randomAdF, currentAlg]);
+  }, [settings.randomYs, currentAlg]);
 
   useEffect(() => {
     if (settings.randomRotations1) {
@@ -117,8 +117,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
   useEffect(() => {
     const computeSetupAlg = () => {
-      if (!currentAlg) return '';
-
       let algString = currentAlg.alg.join(' ');
       let ctAlg = new CTAlg(algString);
 
@@ -159,7 +157,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         setupAlg += ` ${randomRotations1}`;
       }
 
-      setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomAdF}`.trim();
+      setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYs}`.trim();
 
       return setupAlg;
     };
@@ -168,9 +166,55 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       const newSetupAlg = computeSetupAlg();
       setSetupAlg(newSetupAlg);
     }
-  }, [currentAlg, randomAUF, randomAdF, randomRotations1, fullColourNeutrality,
+  }, [currentAlg, randomAUF, randomYs, randomRotations1, fullColourNeutrality,
       settings.firstRotation, settings.fullColourNeutrality, settings.mirrorAcrossM,
       settings.mirrorAcrossS, settings.randomizeMirrorAcrossM, settings.randomizeMirrorAcrossS]);
+
+  useEffect(() => {
+    const fetchStickerMask = async () => {
+      if (playerRef.current) {
+        if (!kpuzzle) return;
+
+        const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
+
+        const stickerMask = await playerRef.current.experimentalModel.twistySceneModel.stickeringMask.get();
+
+        // There are 5 facelets, because that's the maximum we need for any built-in puzzles.
+        // Since we're using the 3x3x3, only the first three are used for corners and first
+        // two for edges.
+        const R = { facelets: new Array(5).fill("regular") };
+        const D = { facelets: new Array(5).fill("dim") };
+        const I = { facelets: new Array(5).fill("ignored") };
+        const R1 = { facelets: ["regular", "ignored",  "ignored",  "ignored", "ignored"] };
+        const R2 = { facelets: ["ignored", "regular",  "ignored",  "ignored", "ignored"] };
+        const R3 = { facelets: ["ignored", "ignored",  "regular",  "ignored", "ignored"] };
+        const R4 = { facelets: ["ignored", "ignored",  "ignored",  "regular", "ignored"] };
+        const R5 = { facelets: ["ignored", "ignored",  "ignored",  "ignored", "regular"] };
+        const I1 = { facelets: ["ignored", "regular",  "regular",  "regular", "regular"] };
+        const I2 = { facelets: ["regular", "ignored",  "regular",  "regular", "regular"] };
+        const I3 = { facelets: ["regular", "regular",  "ignored",  "regular", "regular"] };
+        const I4 = { facelets: ["regular", "regular",  "regular",  "ignored", "regular"] };
+        const I5 = { facelets: ["regular", "regular",  "regular",  "regular", "ignored"] };
+        const testStickering = {
+          orbits: {
+            EDGES: {
+              pieces: [R, R, R, R, R, R, R, R, R, R, R, R],
+            },
+            CORNERS: {
+              pieces: [R, R, R, R, R, R, R, R],
+            },
+            CENTERS: {
+              pieces: [I, R, R, R, R, R],
+            },
+          },
+        }
+        //playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(testStickering);
+        //console.log("Sticker Mask:", stickerMask);
+      }
+    };
+
+    fetchStickerMask();
+  }, [setupAlg, currentAlg]);
 
   /////////////////////////////////////////////////////////////////////////////
   // solution-related useEffects
@@ -182,7 +226,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [moves]);
 
   useEffect(() => {
-    if (!currentAlg || !setupAlg) return;
+    if (!currentAlg || setupAlg === "" || !kpuzzle) return;
+
     const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
     const newSolvedStateMap: Record<string, boolean> = {};
 
@@ -209,7 +254,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
       // Reset moves when cycling to a new algorithm
       setMoves([]);
-      setSetupAlg(null);
+      setSetupAlg("");
       setIsSolved(false);
     }
   }, [isSolved]);

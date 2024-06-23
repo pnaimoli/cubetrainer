@@ -6,7 +6,7 @@ import { Settings, CUBE_ROTATIONS } from './interfaces';
 
 const defaultSettings: Settings = {
   randomAUF: false,
-  randomAdF: false,
+  randomYs: false,
   goInOrder: false,
   mirrorAcrossM: false,
   mirrorAcrossS: false,
@@ -32,14 +32,14 @@ const SettingsAside: React.FC = () => {
         <Checkbox
           label={
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              Random AdF
-              <Tooltip label="Do a random number of 'd' moves after the setup" withArrow>
+              Random y's
+              <Tooltip label="Do a random number of y rotation after the setup" withArrow>
                 <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
               </Tooltip>
             </div>
           }
-          checked={settings.randomAdF}
-          onChange={(event) => setSettings({ ...settings, randomAdF: event.currentTarget.checked })}
+          checked={settings.randomYs}
+          onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
         />
       </Group>
       <Checkbox

@@ -1,6 +1,9 @@
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
 import { SolvedState } from './interfaces';
 
+// Much of the inspiration here came from
+// cubing.js/src/sites/experiments.cubing.net/cubing.js/3x3x3-formats/convert.ts
+
 const pieceNames: Record<string, string[]> = {
   "EDGES": "UF UR UB UL DF DR DB DL FR FL BR BL".split(" "),
   "CORNERS": "UFR URB UBL ULF DRF DFL DLB DBR".split(" "),

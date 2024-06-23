@@ -58,7 +58,7 @@ export enum CubeRotation {
 // Extend the Settings interface to include cube rotation settings
 export interface Settings {
   randomAUF: boolean;
-  randomAdF: boolean;
+  randomYs: boolean;
   goInOrder: boolean;
   mirrorAcrossM: boolean;
   mirrorAcrossS: boolean;
