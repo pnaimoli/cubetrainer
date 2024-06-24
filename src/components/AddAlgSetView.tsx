@@ -122,7 +122,7 @@ const AddAlgSetView: React.FC = () => {
                   {SOLVED_STATES.join(', ')}
                 </Text>
                 <Text style={{ fontFamily: 'monospace', color: '#e67e22' }}>
-                  Example: Insert, R U R', F2LBR | F2LBL | F2LFL
+                  Example: Insert, R U R', CROSS | F2LFR
                 </Text>
               </Box>
             </List.Item>
