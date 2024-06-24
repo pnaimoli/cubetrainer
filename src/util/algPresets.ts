@@ -65,6 +65,70 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 39, R U R' U2 R U' R' U R U R', F2L
 40, R U' R' F R U R' U' F' R U' R', F2L
 41, R U R' U' R U' R' U2 y' R' U' R, F2L
+`,
 
-`
+	"OLL": `
+1, R U2 R2' F R F' U2 R' F R F', OLL
+2, F R U R' U' F' f R U R' U' f', OLL
+3, U' f R U R' U' f' U' F R U R' U' F', OLL
+4, U' f R U R' U' f' U F R U R' U' F', OLL
+5, r' U2 R U R' U r, OLL
+6, r U2 R' U' R U' r', OLL
+7, r U R' U R U2 r', OLL
+8, U2 r' U' R U' R' U2 r, OLL
+9, U R U R' U' R' F R2 U R' U' F', OLL
+10, R U R' U R' F R F' R U2 R', OLL
+11, r' R2 U R' U R U2 R' U M', OLL
+12, F R U R' U' F' U F R U R' U' F', OLL
+13, r U' r' U' r U r' F' U F, OLL
+14, R' F R U R' F' R F U' F', OLL
+15, U2 l' U' l L' U' L U l' U l, OLL
+16, r U r' R U R' U' r U' r', OLL
+17, R U R' U R' F R F' U2 R' F R F', OLL
+18, r U R' U R U2 r2 U' R U' R' U2 r, OLL
+19, M U R U R' U' M' R' F R F', OLL
+20, M U R U R' U' M2 U R U' r', OLL
+21, U R U2 R' U' R U R' U' R U' R', OLL
+22, R U2 R2 U' R2 U' R2 U2 R, OLL
+23, R2 D R' U2 R D' R' U2 R', OLL
+24, r U R' U' r' F R F', OLL
+25, U F' r U R' U' r' F R, OLL
+26, U R U2 R' U' R U' R', OLL
+27, R U R' U R U2 R', OLL
+28, r U R' U' M U R U' R', OLL
+29, M U R U R' U' R' F R F' M', OLL
+30, U' r' D' r U' r' D r2 U' r' U r U r', OLL
+31, R' U' F U R U' R' F' R, OLL
+32, S R U R' U' R' F R f', OLL
+33, R U R' U' R' F R F', OLL
+34, U2 R U R' U' B' R' F R F' B, OLL
+35, R U2 R2' F R F' R U2 R', OLL
+36, U2 L' U' L U' L' U L U L F' L' F, OLL
+37, F R U' R' U' R U R' F', OLL
+38, R U R' U R U' R' U' R' F R F', OLL
+39, U L F' L' U' L U F U' L', OLL
+40, U R' F R U R' U' F' U R, OLL
+41, U2 R U R' U R U2' R' F R U R' U' F', OLL
+42, R' U' R U' R' U2 R F R U R' U' F', OLL
+43, f' L' U' L U f, OLL
+44, f R U R' U' f', OLL
+45, F R U R' U' F', OLL
+46, R' U' R' F R F' U R, OLL
+47, F' L' U' L U L' U' L U F, OLL
+48, F R U R' U' R U R' U' F', OLL
+49, U2 r U' r2 U r2 U r2 U' r, OLL
+50, r' U r2 U' r2' U' r2 U r', OLL
+51, f R U R' U' R U R' U' f', OLL
+52, R U R' U R d' R U' R' F', OLL
+53, r' U' R U' R' U R U' R' U2 r, OLL
+54, r U R' U R U' R' U R U2 r', OLL
+55, R U2 R2 U' R U' R' U2 F R F', OLL
+56, r U r' U R U' R' U R U' R' r U' r', OLL
+57, R U R' U' M' U R U' r', OLL
+`,
+
+	"Advanced F2L": `
+1, R' D' F' D R, CROSS | F2LFR
+2, F D R D' F', CROSS | F2LFR
+`,
 };
