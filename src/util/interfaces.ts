@@ -57,10 +57,10 @@ export enum CubeRotation {
 
 // https://danielbarta.com/literal-iteration-typescript/
 const PlaylistModes = ['ordered', 'shuffle', 'random'];
-type PlaylistMode = typeof PlaylistMode[number];
+type PlaylistMode = typeof PlaylistModes[number];
 
 const LoopModes = ['no loop', 'loop', 'loop1'];
-type LoopMode = typeof LoopMode[number];
+type LoopMode = typeof LoopModes[number];
 
 export interface Settings {
   randomAUF: boolean;
@@ -88,8 +88,10 @@ export function cycleSetting<T extends keyof Settings>(settings: Settings, key: 
     loopMode: LoopModes,
   } as const;
 
-  const currentIndex = possibleValues[key].indexOf(settings[key]);
-  const nextIndex = (currentIndex + 1) % possibleValues[key].length;
-  const newSettings = { ...settings, [key]: possibleValues[key][nextIndex] };
+  // Ensure TypeScript understands that `possibleValues` can be indexed by `key`
+  const values = possibleValues[key as keyof typeof possibleValues] as unknown as string[];
+  const currentIndex = values.indexOf(settings[key] as unknown as string);
+  const nextIndex = (currentIndex + 1) % values.length;
+  const newSettings = { ...settings, [key]: values[nextIndex] };
   return newSettings;
 }

@@ -2,7 +2,7 @@
   "require": ["esm", "ts-node/register"],
 
   "extension": ["ts"],
-  "spec": "src/__tests__/*.test.ts",
+  "spec": "src/**/*.test.ts",
   "node-option": [
     "experimental-specifier-resolution=node",
     "loader=ts-node/esm"
