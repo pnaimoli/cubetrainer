@@ -1,23 +1,14 @@
 import { expect } from 'chai';
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
+import { cube3x3x3 } from 'cubing/puzzles';
 import { isPatternSolved } from './SolveChecker';
 import { SolvedState } from './interfaces';
 
 describe('SolveChecker', () => {
   let kpuzzle: KPuzzle;
 
-  before(() => {
-    // Create a dummy KPuzzle with the name '3x3x3'
-    kpuzzle = {
-      definition: {
-        name: '3x3x3',
-        orbits: [
-          { orbitName: 'EDGES', numPieces: 12, numOrientations: 2 },
-          { orbitName: 'CORNERS', numPieces: 8, numOrientations: 3 },
-          { orbitName: 'CENTERS', numPieces: 6, numOrientations: 1 },
-        ],
-      },
-    } as KPuzzle;
+  before(async () => {
+    kpuzzle = await cube3x3x3.kpuzzle() as unknown as KPuzzle;
   });
 
   it("Check the state of the cube for a 3 move insert (y R U R')", async () => {

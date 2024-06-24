@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
+import { cube3x3x3 } from 'cubing/puzzles';
 import { SolvedState } from './interfaces';
 import { generateStickerMask } from './StickerMask';
 
@@ -19,18 +20,8 @@ const I3 = { ...R, facelets: [...R.facelets] }; I3.facelets[2] = "ignored";
 describe('StickerMask Test', () => {
   let kpuzzle: KPuzzle;
 
-  before(() => {
-    // Create a dummy KPuzzle with the name '3x3x3'
-    kpuzzle = {
-      definition: {
-        name: '3x3x3',
-        orbits: [
-          { orbitName: 'EDGES', numPieces: 12, numOrientations: 2 },
-          { orbitName: 'CORNERS', numPieces: 8, numOrientations: 3 },
-          { orbitName: 'CENTERS', numPieces: 6, numOrientations: 1 },
-        ],
-      },
-    } as KPuzzle;
+  before(async () => {
+    kpuzzle = await cube3x3x3.kpuzzle() as unknown as KPuzzle;
   });
 
   it("WCA Starting position + sune", async () => {
