@@ -2,7 +2,7 @@ import { expect } from 'chai';
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 import { SolvedState } from './interfaces';
-import { generateStickeringMask } from './StickerMask';
+import { generateStickeringMask } from './StickeringMask';
 
 const R = { facelets: new Array(5).fill("regular") };
 //const D = { facelets: new Array(5).fill("dim") };

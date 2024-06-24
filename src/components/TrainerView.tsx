@@ -9,7 +9,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
-import { generateStickeringMask } from '../util/StickerMask';
+import { generateStickeringMask } from '../util/StickeringMask';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
