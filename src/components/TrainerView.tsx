@@ -9,7 +9,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
-import { generateStickerMask } from '../util/StickerMask';
+import { generateStickeringMask } from '../util/StickerMask';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -195,7 +195,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (!kpuzzle) return;
     if (!currentAlg) return;
     const setupPattern = kpuzzle.defaultPattern().applyAlg(setupAlg);
-    const stickerMask = generateStickerMask(setupPattern, currentAlg.solved);
+    const stickerMask = generateStickeringMask(setupPattern, currentAlg.solved);
     playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickerMask);
    }, [setupAlg, currentAlg, kpuzzle, settings.useMaskings]);
 

@@ -139,7 +139,7 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
     }
   }
 
-  if (solvedStates & SolvedState.TOPEDGES) {
+  if (solvedStates & SolvedState.UEDGEFACES) {
     const ollEdges = ["UF", "UR", "UB", "UL"];
     for (const edge of ollEdges) {
       if (!isStickerCorrect(reidPieces, edge)) {
@@ -148,7 +148,7 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
     }
   }
 
-  if (solvedStates & SolvedState.TOPCORNERS) {
+  if (solvedStates & SolvedState.UCORNERFACES) {
     const ollCorners = ["UFR", "URB", "UBL", "ULF"];
     for (const corner of ollCorners) {
       if (!isStickerCorrect(reidPieces, corner)) {
