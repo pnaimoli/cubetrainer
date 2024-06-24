@@ -9,6 +9,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
+import { generateStickerMask } from '../util/StickerMask';
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -185,51 +186,18 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       settings.firstRotation, settings.fullColourNeutrality, settings.mirrorAcrossM,
       settings.mirrorAcrossS, settings.randomizeMirrorAcrossM, settings.randomizeMirrorAcrossS]);
 
-  // useEffect(() => {
-  //   const fetchStickerMask = async () => {
-  //     if (playerRef.current) {
-  //       if (!kpuzzle) return;
-
-  //       const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
-
-  //       const stickerMask = await playerRef.current.experimentalModel.twistySceneModel.stickeringMask.get();
-
-  //       // There are 5 facelets, because that's the maximum we need for any built-in puzzles.
-  //       // Since we're using the 3x3x3, only the first three are used for corners and first
-  //       // two for edges.
-  //       const R = { facelets: new Array(5).fill("regular") };
-  //       const D = { facelets: new Array(5).fill("dim") };
-  //       const I = { facelets: new Array(5).fill("ignored") };
-  //       const R1 = { facelets: ["regular", "ignored",  "ignored",  "ignored", "ignored"] };
-  //       const R2 = { facelets: ["ignored", "regular",  "ignored",  "ignored", "ignored"] };
-  //       const R3 = { facelets: ["ignored", "ignored",  "regular",  "ignored", "ignored"] };
-  //       const R4 = { facelets: ["ignored", "ignored",  "ignored",  "regular", "ignored"] };
-  //       const R5 = { facelets: ["ignored", "ignored",  "ignored",  "ignored", "regular"] };
-  //       const I1 = { facelets: ["ignored", "regular",  "regular",  "regular", "regular"] };
-  //       const I2 = { facelets: ["regular", "ignored",  "regular",  "regular", "regular"] };
-  //       const I3 = { facelets: ["regular", "regular",  "ignored",  "regular", "regular"] };
-  //       const I4 = { facelets: ["regular", "regular",  "regular",  "ignored", "regular"] };
-  //       const I5 = { facelets: ["regular", "regular",  "regular",  "regular", "ignored"] };
-  //       const testStickering = {
-  //         orbits: {
-  //           EDGES: {
-  //             pieces: [R, R, R, R, R, R, R, R, R, R, R, R],
-  //           },
-  //           CORNERS: {
-  //             pieces: [R, R, R, R, R, R, R, R],
-  //           },
-  //           CENTERS: {
-  //             pieces: [I, R, R, R, R, R],
-  //           },
-  //         },
-  //       }
-  //       //playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(testStickering);
-  //       //console.log("Sticker Mask:", stickerMask);
-  //     }
-  //   };
-
-  //   fetchStickerMask();
-  // }, [setupAlg, currentAlg]);
+  useEffect(() => {
+    if (!settings.useMaskings) {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(null);
+      return;
+    }
+    if (!playerRef.current) return;
+    if (!kpuzzle) return;
+    if (!currentAlg) return;
+    const setupPattern = kpuzzle.defaultPattern().applyAlg(setupAlg);
+    const stickerMask = generateStickerMask(setupPattern, currentAlg.solved);
+    playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickerMask);
+   }, [setupAlg, currentAlg, kpuzzle, settings.useMaskings]);
 
   /////////////////////////////////////////////////////////////////////////////
   // solution-related useEffects
