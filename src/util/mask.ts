@@ -11,53 +11,19 @@ export type FaceletMeshStickeringMask =
   | "ignored"
   | "invisible";
 
-export type FaceletStickeringMask = {
-  mask: FaceletMeshStickeringMask;
-  hintMask?: FaceletMeshStickeringMask;
-};
+export type FaceletStickeringMask = FaceletMeshStickeringMask;
 
 export type PieceStickeringMask = {
-  // TODO: foundation?
-  facelets: (FaceletMeshStickeringMask | FaceletStickeringMask | null)[];
+  facelets: FaceletStickeringMask[];
 };
 
 export type OrbitStickeringMask = {
-  pieces: (PieceStickeringMask | null)[];
+  pieces: PieceStickeringMask[];
 };
 
 export type StickeringMask = {
   orbits: Record<string, OrbitStickeringMask>;
 };
-
-export function getFaceletStickeringMask(
-  stickeringMask: StickeringMask,
-  orbitName: string,
-  pieceIdx: number,
-  faceletIdx: number,
-  hint: boolean,
-): FaceletMeshStickeringMask {
-  const orbitStickeringMask = stickeringMask.orbits[orbitName];
-  const pieceStickeringMask: PieceStickeringMask | null =
-    orbitStickeringMask.pieces[pieceIdx];
-  if (pieceStickeringMask === null) {
-    return regular;
-  }
-  const faceletStickeringMask:
-    | FaceletMeshStickeringMask
-    | FaceletStickeringMask
-    | null = pieceStickeringMask.facelets?.[faceletIdx];
-  if (faceletStickeringMask === null) {
-    return regular;
-  }
-  if (typeof faceletStickeringMask === "string") {
-    return faceletStickeringMask;
-  }
-  if (hint) {
-    return faceletStickeringMask.hintMask ?? faceletStickeringMask.mask;
-  }
-  console.log(faceletStickeringMask);
-  return faceletStickeringMask.mask;
-}
 
 // TODO: Revert this to a normal enum, or write a standard to codify the names?
 export enum PieceStickering {
@@ -74,8 +40,10 @@ export enum PieceStickering {
 }
 
 export class PieceAnnotation<T> {
+  kpuzzle: KPuzzle;
   stickerings: Map<string, T[]> = new Map();
   constructor(kpuzzle: KPuzzle, defaultValue: T) {
+    this.kpuzzle = kpuzzle;
     for (const orbitDefinition of kpuzzle.definition.orbits) {
       this.stickerings.set(
         orbitDefinition.orbitName,
@@ -172,6 +140,57 @@ export class PuzzleStickering extends PieceAnnotation<PieceStickering> {
       }
     }
     return this;
+  }
+
+rotate(moveSource: Move | string | (Move | string)[]): StickeringMask {
+  const moves = Array.isArray(moveSource) ? moveSource : [moveSource];
+  const stickeringMask: StickeringMask = this.toStickeringMask();
+
+  for (const move of moves) {
+    // console.log("Processing", move, "rotation");
+    // console.log("Before", this.stickerings);
+    const transformation = this.kpuzzle.moveToTransformation(move);
+
+    for (const orbitName in stickeringMask.orbits) {
+      if (stickeringMask.orbits.hasOwnProperty(orbitName)) {
+        const pieces = stickeringMask.orbits[orbitName].pieces;
+
+        const newPieces: { facelets: FaceletMeshStickeringMask[], permIndex: number }[] = pieces.map((piece, i) => {
+          if (!piece) {
+            return { facelets: new Array(5).fill("ignored" as FaceletMeshStickeringMask), permIndex: i };
+          }
+          const permIndex = transformation.transformationData[orbitName].permutation[i];
+          const oriDelta = transformation.transformationData[orbitName].orientationDelta[i];
+          return {
+            facelets: this.rotateFacelets(piece.facelets.slice(), oriDelta),
+            permIndex,
+          };
+        });
+
+        // console.log(orbitName, newPieces)
+        for (let i = 0; i < newPieces.length; i++) {
+          // Which piece is going in the new [i] location?  Whatever was in newPieces[i].permIndex before.
+          pieces[i] = { facelets: newPieces[newPieces[i].permIndex].facelets.slice() };
+        }
+        // console.log(orbitName, pieces)
+      }
+    }
+  }
+
+  return stickeringMask;
+}
+
+  private rotateFacelets(facelets: FaceletStickeringMask[], orientationDelta: number): FaceletStickeringMask[] {
+    if (orientationDelta === 0) {
+      return facelets;
+    }
+    const newFacelets = facelets.slice();
+    //const len = facelets.length;
+    const len = 3;  // We're a 3x3x3
+    for (let i = 0; i < len; i++) {
+      newFacelets[(i + orientationDelta) % len] = facelets[i];
+    }
+    return newFacelets;
   }
 
   toStickeringMask(): StickeringMask {

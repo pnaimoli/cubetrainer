@@ -8,17 +8,16 @@ import {
   StickeringManager,
 } from "./mask";
 
-// @ts-ignore
-const getRotationsFromInitialState = (kpattern: KPattern): [number, number, number] => {
+const getRotationsToInitialState = (kpattern: KPattern): [number, number, number] => {
   // Centers in WCA state: [U, L, F, R, B, D]
   const WCA_CENTERS = kpattern.kpuzzle.defaultPattern().patternData.CENTERS.pieces;
 
-  // Try up to 4 z' rotations to get 0 to the U face.
+  // Try up to 4 z rotations to get 0 to the U face.
   let z = 0;
   let rotatedPattern = kpattern;
   if (rotatedPattern.patternData.CENTERS.pieces[0] !== WCA_CENTERS[0]) {
     for (z = 1; z < 5; z++) {
-      rotatedPattern = rotatedPattern.applyAlg("z'");
+      rotatedPattern = rotatedPattern.applyAlg("z");
       if (rotatedPattern.patternData.CENTERS.pieces[0] === WCA_CENTERS[0]) break;
     }
   }
@@ -27,11 +26,11 @@ const getRotationsFromInitialState = (kpattern: KPattern): [number, number, numb
     // We were able to get the U face on top using z rotations.
     // Now figure out how many y's we need to get the L face on the left.
 
-    // Try up to 4 y' rotations to get 1 to the L face.
+    // Try up to 4 y rotations to get 1 to the L face.
     let y = 0;
     if (rotatedPattern.patternData.CENTERS.pieces[1] !== WCA_CENTERS[1]) {
       for (y = 1; y < 4; y++) {
-        rotatedPattern = rotatedPattern.applyAlg("y'");
+        rotatedPattern = rotatedPattern.applyAlg("y");
         if (rotatedPattern.patternData.CENTERS.pieces[1] === WCA_CENTERS[1]) break;
       }
     }
@@ -41,28 +40,28 @@ const getRotationsFromInitialState = (kpattern: KPattern): [number, number, numb
 
   // If we were unable to get the U face on top using z rotations, try x rotations.
 
-  // Try up to 4 x' rotations to get 1 to the L face.
-  let x = 0;
-  if (rotatedPattern.patternData.CENTERS.pieces[0] !== WCA_CENTERS[0]) {
-    for (x = 1; x < 4; x++) {
-      rotatedPattern = rotatedPattern.applyAlg("x'");
-      if (rotatedPattern.patternData.CENTERS.pieces[0] === WCA_CENTERS[0]) break;
-    }
-  }
-
-  // Try up to 4 y' rotations to get 0 to the U face.
+  // Try up to 4 y rotations to get 1 to the L face.
   let y = 0;
   if (rotatedPattern.patternData.CENTERS.pieces[1] !== WCA_CENTERS[1]) {
     for (y = 1; y < 4; y++) {
-      rotatedPattern = rotatedPattern.applyAlg("y'");
+      rotatedPattern = rotatedPattern.applyAlg("y");
       if (rotatedPattern.patternData.CENTERS.pieces[1] === WCA_CENTERS[1]) break;
     }
   }
 
+  // Try up to 4 x rotations to get 0 to the U face.
+  let x = 0;
+  if (rotatedPattern.patternData.CENTERS.pieces[0] !== WCA_CENTERS[0]) {
+    for (x = 1; x < 4; x++) {
+      rotatedPattern = rotatedPattern.applyAlg("x");
+      if (rotatedPattern.patternData.CENTERS.pieces[0] === WCA_CENTERS[0]) break;
+    }
+  }
+
+
   return [x, y, 0];
 };
 
-// @ts-ignore
 export const generateStickeringMask = (kpattern: KPattern, solvedState: number): StickeringMask => {
   const kpuzzle = kpattern.kpuzzle;
   const puzzleStickering = new PuzzleStickering(kpuzzle);
@@ -138,8 +137,23 @@ export const generateStickeringMask = (kpattern: KPattern, solvedState: number):
     puzzleStickering.set(m.and([LL(), CORNERS()]), PieceStickering.IgnoreNonPrimary);
   }
 
-  // console.log(JSON.stringify(puzzleStickering.toStickeringMask()));
+  const rotationsNeeded = getRotationsToInitialState(kpattern);
+  if (rotationsNeeded[0] !== 0 || rotationsNeeded[1] !== 0 || rotationsNeeded[2] !== 0) {
+    let rotationString = "";
+    if (rotationsNeeded[2] !== 0) {
+      rotationString += `z${rotationsNeeded[2]} `;
+    }
+    if (rotationsNeeded[1] !== 0) {
+      rotationString += `y${rotationsNeeded[1]} `;
+    }
+    if (rotationsNeeded[0] !== 0) {
+      rotationString += `x${rotationsNeeded[0]} `;
+    }
+
+    // if there's a move like z1, just replace it with z
+    rotationString = rotationString.replace(/(\w)1/g, "$1");
+    return puzzleStickering.rotate(rotationString.trim().split(" "));
+  }
 
   return puzzleStickering.toStickeringMask();
-  //return {"orbits":{"EDGES":{"pieces":[{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]}]},"CORNERS":{"pieces":[{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]}]},"CENTERS":{"pieces":[{"facelets":["regular","regular","regular","regular","regular"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]},{"facelets":["ignored","ignored","ignored","ignored","ignored"]}]}}};
 };
