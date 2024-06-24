@@ -152,5 +152,19 @@ describe('StickeringMask Test', () => {
         },
       }
     }), "CROSS");
+
+    expect(JSON.stringify(generateStickeringMask(pattern, SolvedState.OLL))).to.equal(JSON.stringify({
+      orbits: {
+        EDGES: {
+          pieces: [R2, R, R, R, R2, R, R, R, R1, R1, R, R],
+        },
+        CORNERS: {
+          pieces: [R3, R, R, R2, R2, R3, R, R],
+        },
+        CENTERS: {
+          pieces: [R, R, R, R, R, R],
+        },
+      }
+    }), "OLL");
   });
 });

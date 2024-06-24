@@ -151,44 +151,40 @@ rotate(moveSource: Move | string | (Move | string)[]): StickeringMask {
     // console.log("Before", this.stickerings);
     const transformation = this.kpuzzle.moveToTransformation(move);
 
-    for (const orbitName in stickeringMask.orbits) {
-      if (stickeringMask.orbits.hasOwnProperty(orbitName)) {
-        const pieces = stickeringMask.orbits[orbitName].pieces;
+    for (const orbitDefinition of this.kpuzzle.definition.orbits) {
+      const pieces = stickeringMask.orbits[orbitDefinition.orbitName].pieces;
 
-        const newPieces: { facelets: FaceletMeshStickeringMask[], permIndex: number }[] = pieces.map((piece, i) => {
-          if (!piece) {
-            return { facelets: new Array(5).fill("ignored" as FaceletMeshStickeringMask), permIndex: i };
-          }
-          const permIndex = transformation.transformationData[orbitName].permutation[i];
-          const oriDelta = transformation.transformationData[orbitName].orientationDelta[i];
-          return {
-            facelets: this.rotateFacelets(piece.facelets.slice(), oriDelta),
-            permIndex,
-          };
-        });
-
-        // console.log(orbitName, newPieces)
-        for (let i = 0; i < newPieces.length; i++) {
-          // Which piece is going in the new [i] location?  Whatever was in newPieces[i].permIndex before.
-          pieces[i] = { facelets: newPieces[newPieces[i].permIndex].facelets.slice() };
+      const newPieces: { facelets: FaceletMeshStickeringMask[], permIndex: number }[] = pieces.map((piece, i) => {
+        if (!piece) {
+          return { facelets: new Array(5).fill("ignored" as FaceletMeshStickeringMask), permIndex: i };
         }
-        // console.log(orbitName, pieces)
+        const permIndex = transformation.transformationData[orbitDefinition.orbitName].permutation[i];
+        const oriDelta = transformation.transformationData[orbitDefinition.orbitName].orientationDelta[i];
+        return {
+          facelets: this.rotateFacelets(piece.facelets.slice(), oriDelta, orbitDefinition.numOrientations),
+          permIndex,
+        };
+      });
+
+      // console.log(orbitDefinition.orbitName, newPieces)
+      for (let i = 0; i < newPieces.length; i++) {
+        // Which piece is going in the new [i] location?  Whatever was in newPieces[i].permIndex before.
+        pieces[i] = { facelets: newPieces[newPieces[i].permIndex].facelets.slice() };
       }
+      // console.log(orbitDefinition.orbitName, pieces)
     }
   }
 
   return stickeringMask;
 }
 
-  private rotateFacelets(facelets: FaceletStickeringMask[], orientationDelta: number): FaceletStickeringMask[] {
+  private rotateFacelets(facelets: FaceletStickeringMask[], orientationDelta: number, numOrientations: number): FaceletStickeringMask[] {
     if (orientationDelta === 0) {
       return facelets;
     }
     const newFacelets = facelets.slice();
-    //const len = facelets.length;
-    const len = 3;  // We're a 3x3x3
-    for (let i = 0; i < len; i++) {
-      newFacelets[(i + orientationDelta) % len] = facelets[i];
+    for (let i = 0; i < numOrientations; i++) {
+      newFacelets[(i - orientationDelta + numOrientations) % numOrientations] = facelets[i];
     }
     return newFacelets;
   }
