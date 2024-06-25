@@ -62,6 +62,7 @@ const SettingsAside: React.FC = () => {
             </Center>
           }
           checked={settings.randomYs}
+          disabled={true}
           onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
         />
       </Group>

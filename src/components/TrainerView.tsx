@@ -226,7 +226,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       return mirroredState;
     };
 
-
     let newEffectiveSolvedState = currentAlg?.solved ?? SolvedState.FULL;
     if (mirrorAcrossM)
       newEffectiveSolvedState = mirrorSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
