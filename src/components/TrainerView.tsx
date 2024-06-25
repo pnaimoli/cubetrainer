@@ -24,6 +24,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
   const [moves, setMoves] = useState<string[]>([]);
   const [setupAlg, setSetupAlg] = useState<string>("");
+  const [effectiveSolvedState, setEffectiveSolvedState] = useState<SolvedState>(SolvedState.FULL)
   const playerRef = useRef<TwistyPlayer>(null);
   const [kpuzzle, setKPuzzle] = useState<KPuzzle | null>(null);
 
@@ -31,6 +32,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [randomYs, setRandomYs] = useState<string>('');
   const [randomRotations1, setRandomRotations1] = useState<string>('');
   const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
+  const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(settings.mirrorAcrossM);
+  const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(settings.mirrorAcrossS);
 
   // ... (other useEffects and functions)
 
@@ -119,6 +122,26 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.randomRotations1, currentAlg]);
 
   useEffect(() => {
+    if (!settings.mirrorAcrossM) {
+      setMirrorAcrossM(false);
+    } else if (settings.randomizeMirrorAcrossM) {
+      setMirrorAcrossM(Math.random() < 0.5);
+    } else {
+      setMirrorAcrossM(true);
+    }
+  }, [settings.mirrorAcrossM, settings.randomizeMirrorAcrossM, currentAlg]);
+
+  useEffect(() => {
+    if (!settings.mirrorAcrossS) {
+      setMirrorAcrossS(false);
+    } else if (settings.randomizeMirrorAcrossS) {
+      setMirrorAcrossS(Math.random() < 0.5);
+    } else {
+      setMirrorAcrossS(true);
+    }
+  }, [settings.mirrorAcrossS, settings.randomizeMirrorAcrossS, , currentAlg]);
+
+  useEffect(() => {
     if (settings.fullColourNeutrality) {
       let rotations = '';
       for (let i = 0; i < 6; i++) {
@@ -132,59 +155,89 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.fullColourNeutrality, currentAlg]);
 
   useEffect(() => {
-    const computeSetupAlg = () => {
-      let algString = currentAlg.alg.join(' ');
-      let ctAlg = new CTAlg(algString);
+    if (!currentAlg) return;
 
-      // Mirror across M if settings are enabled
-      if (settings.mirrorAcrossM) {
-        if (settings.randomizeMirrorAcrossM) {
-          if (Math.random() < 0.5) {
-            algString = ctAlg.mirror().toString();
-          }
-        } else {
-          algString = ctAlg.mirror().toString();
-        }
+    let algString = currentAlg.alg.join(' ');
+    let ctAlg = new CTAlg(algString);
+
+    // Mirror across M if settings are enabled
+    if (mirrorAcrossM) {
+        algString = ctAlg.mirror().toString();
+    }
+
+    ctAlg = new CTAlg(algString); // Recreate CTAlg with potentially mirrored moves
+
+    // Mirror across S if settings are enabled
+    if (mirrorAcrossS) {
+        algString = ctAlg.mirrorOverS().toString();
+    }
+
+    const parsedAlg = CTAlg.fromString(algString);
+    const inverseAlg = parsedAlg.invert().toString();
+    let newSetupAlg = '';
+
+    if (settings.fullColourNeutrality) {
+      newSetupAlg = fullColourNeutrality;
+    } else {
+      if (settings.firstRotation) {
+        newSetupAlg += ` ${settings.firstRotation}`;
       }
+      newSetupAlg += ` ${randomRotations1}`;
+    }
 
-      ctAlg = new CTAlg(algString); // Recreate CTAlg with potentially mirrored moves
+    newSetupAlg = `${newSetupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYs}`.trim();
 
-      // Mirror across S if settings are enabled
-      if (settings.mirrorAcrossS) {
-        if (settings.randomizeMirrorAcrossS) {
-          if (Math.random() < 0.5) {
-            algString = ctAlg.mirrorOverS().toString();
-          }
-        } else {
-          algString = ctAlg.mirrorOverS().toString();
-        }
-      }
-
-      const parsedAlg = CTAlg.fromString(algString);
-      const inverseAlg = parsedAlg.invert().toString();
-      let setupAlg = '';
-
-      if (settings.fullColourNeutrality) {
-        setupAlg = fullColourNeutrality;
-      } else {
-        if (settings.firstRotation) {
-          setupAlg += ` ${settings.firstRotation}`;
-        }
-        setupAlg += ` ${randomRotations1}`;
-      }
-
-      setupAlg = `${setupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYs}`.trim();
-
-      return setupAlg;
+    const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LFL,
+      [SolvedState.F2LFL]: SolvedState.F2LFR,
+      [SolvedState.F2LBR]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LBR,
+      // Add other solved states if necessary
     };
 
-    if (currentAlg) {
-      const newSetupAlg = computeSetupAlg();
-      setSetupAlg(newSetupAlg);
-    }
+    const MIRROR_ACROSS_S_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LBR,
+      [SolvedState.F2LBR]: SolvedState.F2LFR,
+      [SolvedState.F2LFL]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LFL,
+      // Add other solved states if necessary
+    };
+
+    const mirrorSolvedState = (solvedState: number, mapping: Record<number, number>): number => {
+      let mirroredState = solvedState;
+
+      // first subtract off anything that might need to be mapped
+      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
+        const originalStateNum = Number(originalState);
+        mirroredState = mirroredState &~ originalStateNum;
+      }
+
+      // Now add back in the mapped states
+      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
+        const originalStateNum = Number(originalState);
+
+        // Check if the solvedState includes the original state
+        if (solvedState & originalStateNum) {
+          // Remove the original state and add the mirrored state
+          mirroredState = mirroredState | mirroredStateValue;
+        }
+      }
+
+      return mirroredState;
+    };
+
+
+    let newEffectiveSolvedState = currentAlg?.solved ?? SolvedState.FULL;
+    if (mirrorAcrossM)
+      newEffectiveSolvedState = mirrorSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
+    if (mirrorAcrossS)
+      newEffectiveSolvedState = mirrorSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
+
+    setEffectiveSolvedState(newEffectiveSolvedState);
+    setSetupAlg(newSetupAlg);
   }, [currentAlg, randomAUF, randomYs, randomRotations1, fullColourNeutrality,
       settings.firstRotation, settings.fullColourNeutrality, settings.mirrorAcrossM,
-      settings.mirrorAcrossS, settings.randomizeMirrorAcrossM, settings.randomizeMirrorAcrossS]);
+      mirrorAcrossM, mirrorAcrossS]);
 
   useEffect(() => {
     if (!settings.useMaskings) {
@@ -195,9 +248,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (!kpuzzle) return;
     if (!currentAlg) return;
     const setupPattern = kpuzzle.defaultPattern().applyAlg(setupAlg);
-    const stickerMask = generateStickeringMask(setupPattern, currentAlg.solved);
+    const stickerMask = generateStickeringMask(setupPattern, effectiveSolvedState);
     playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickerMask);
-   }, [setupAlg, currentAlg, kpuzzle, settings.useMaskings]);
+   }, [setupAlg, currentAlg, kpuzzle, effectiveSolvedState, settings.useMaskings]);
 
   /////////////////////////////////////////////////////////////////////////////
   // solution-related useEffects
@@ -215,8 +268,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       });
 
     setSolvedStateMap(newSolvedStateMap);
-    setIsSolved(isPatternSolved(currentPattern, currentAlg?.solved ?? SolvedState.FULL));
-  }, [kpuzzle, currentAlg, moves, setupAlg]);
+    setIsSolved(isPatternSolved(currentPattern, effectiveSolvedState));
+  }, [kpuzzle, currentAlg, moves, setupAlg, effectiveSolvedState]);
 
   useEffect(() => {
     if (!isSolved) return;
@@ -251,7 +304,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
             .map((key) => {
               const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
-              const isActive = (solvedStateValue & (currentAlg?.solved || 0)) === solvedStateValue;
+              const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
               return (
                 <Badge
                   key={key}
