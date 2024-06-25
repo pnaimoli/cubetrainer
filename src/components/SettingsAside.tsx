@@ -74,6 +74,7 @@ const SettingsAside: React.FC = () => {
         <Checkbox
           label="Randomize"
           checked={settings.randomizeMirrorAcrossM}
+          disabled={!settings.mirrorAcrossM}
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossM: event.currentTarget.checked })}
         />
       </Group>
@@ -86,6 +87,7 @@ const SettingsAside: React.FC = () => {
         <Checkbox
           label="Randomize"
           checked={settings.randomizeMirrorAcrossS}
+          disabled={!settings.mirrorAcrossS}
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossS: event.currentTarget.checked })}
         />
       </Group>
