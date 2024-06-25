@@ -29,7 +29,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [kpuzzle, setKPuzzle] = useState<KPuzzle | null>(null);
 
   const [randomAUF, setRandomAUF] = useState<string>('');
-  const [randomYs, setRandomYs] = useState<string>('');
+  const [randomYs, setRandomYs] = useState<number>(0);
   const [randomRotations1, setRandomRotations1] = useState<string>('');
   const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
   const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(settings.mirrorAcrossM);
@@ -107,9 +107,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
   useEffect(() => {
     if (settings.randomYs) {
-      setRandomYs(getRandomRotations('y', Math.floor(Math.random() * 4) + 1));
+      setRandomYs(Math.floor(Math.random() * 4) + 1);
     } else {
-      setRandomYs('');
+      setRandomYs(0);
     }
   }, [settings.randomYs, currentAlg]);
 
@@ -185,7 +185,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       newSetupAlg += ` ${randomRotations1}`;
     }
 
-    newSetupAlg = `${newSetupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYs}`.trim();
+    let randomYsString = '';
+    if (randomYs > 0) {
+      randomYsString = getRandomRotations('y', randomYs);
+    }
+
+    newSetupAlg = `${newSetupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYsString}`.trim();
 
     const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
       [SolvedState.F2LFR]: SolvedState.F2LFL,
@@ -203,7 +208,15 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       // Add other solved states if necessary
     };
 
-    const mirrorSolvedState = (solvedState: number, mapping: Record<number, number>): number => {
+    const Y_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LFL,
+      [SolvedState.F2LFL]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LBR,
+      [SolvedState.F2LBR]: SolvedState.F2LFR,
+      // Add other solved states if necessary
+    };
+
+    const mapSolvedState = (solvedState: number, mapping: Record<number, number>): number => {
       let mirroredState = solvedState;
 
       // first subtract off anything that might need to be mapped
@@ -228,9 +241,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     let newEffectiveSolvedState = currentAlg?.solved ?? SolvedState.FULL;
     if (mirrorAcrossM)
-      newEffectiveSolvedState = mirrorSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
+      newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
     if (mirrorAcrossS)
-      newEffectiveSolvedState = mirrorSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
+      newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
+    if (randomYs > 0) {
+      for (let i = 0; i < randomYs; ++i)
+        newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, Y_MAPPING);
+    }
 
     setEffectiveSolvedState(newEffectiveSolvedState);
     setSetupAlg(newSetupAlg);
