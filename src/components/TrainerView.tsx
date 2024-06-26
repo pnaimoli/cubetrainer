@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useReducer, useState, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { Box, Stack, Text, Badge, Title, Center, Group } from '@mantine/core';
 import 'cubing/twisty';
@@ -15,36 +15,287 @@ interface TrainerViewProps {
   currentAlgSet: AlgSet;
   conn: GanCubeConnection | null;
   settings: Settings;
-  initialAlg?: Algorithm; // Add initialAlg prop
+  initialAlg?: Algorithm;
 }
 
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
-  const [currentAlg, setCurrentAlg] = useState<Algorithm | null>(null); // Set initialAlg as the initial state
-  const [isSolved, setIsSolved] = useState<boolean>(false);
-  const [solvedStateMap, setSolvedStateMap] = useState<Record<string, boolean>>({});
-  const [moves, setMoves] = useState<string[]>([]);
-  const [setupAlg, setSetupAlg] = useState<string>("");
-  const [effectiveSolvedState, setEffectiveSolvedState] = useState<SolvedState>(SolvedState.FULL)
-  const playerRef = useRef<TwistyPlayer>(null);
-  const [kpuzzle, setKPuzzle] = useState<KPuzzle | null>(null);
+  /////////////////////////////////////////////////////////////////////////////
+  // State initialization
+  /////////////////////////////////////////////////////////////////////////////
+  interface State {
+    kpuzzle: KPuzzle | null;
+    currentAlg: Algorithm | null;
+    solvedStateMap: Record<string, boolean>;
+    moves: string[];
 
-  const [randomAUF, setRandomAUF] = useState<string>('');
-  const [randomYs, setRandomYs] = useState<number>(0);
-  const [randomRotations1, setRandomRotations1] = useState<string>('');
-  const [fullColourNeutrality, setFullColourNeutrality] = useState<string>('');
-  const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(settings.mirrorAcrossM);
-  const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(settings.mirrorAcrossS);
+    setupAlg: string;
+    effectiveSolvedState: SolvedState;
+    stickeringMask: StickeringMask,
+    randomUs: number;
+    randomYs: number;
+    randomRotations: number;
+    mirrorAcrossM: boolean;
+    mirrorAcrossS: boolean;
+  };
 
-  // ... (other useEffects and functions)
+  const initialState: State = {
+    kpuzzle: null,
+    currentAlg:  null,
+    solvedStateMap: {},
+    moves: [],
+
+    setupAlg: "",
+    effectiveSolvedState: SolvedState.FULL,
+    stickeringMask: { },
+    randomUs: 0,
+    randomYs: 0,
+    randomRotations: 0,
+    mirrorAcrossM: false,
+    mirrorAcrossS: false
+  };
+
+  const initializeState = (initialAlg: Algorithm | undefined, currentAlgSet: AlgSet, settings: Settings): State => {
+    let currentAlg: Algorithm | null = null;
+
+    if (initialAlg) {
+      currentAlg = initialAlg;
+    } else if (settings.playlistMode === 'ordered') {
+      currentAlg = currentAlgSet.algs[0];
+    } else {
+      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+      currentAlg = currentAlgSet.algs[randomIndex];
+    }
+
+    return recomputeSetup({
+      ...initialState,
+      currentAlg,
+    });
+  };
 
   /////////////////////////////////////////////////////////////////////////////
-  // mounting useEffects
+  // This is the heavy lifting
+  /////////////////////////////////////////////////////////////////////////////
+  type Action =
+      { type: 'ADD_MOVE'; payload: string }
+    | { type: 'SET_KPUZZLE'; payload: KPuzzle }
+    | { type: 'SET_CURRENT_ALG'; payload: Algorithm }
+    | { type: 'RECOMPUTE_SETUP'; }
+    | { type: 'RECOMPUTE_RANDOM_AUF'; }
+    | { type: 'RECOMPUTE_RANDOM_YS'; }
+    | { type: 'RECOMPUTE_FIRST_ROTATION'; }
+    | { type: 'RECOMPUTE_RANDOM_ROTATIONS'; }
+    | { type: 'RECOMPUTE_PREORIENTATION'; }
+    | { type: 'RECOMPUTE_MIRROR_ACROSS_M'; }
+    | { type: 'RECOMPUTE_MIRROR_ACROSS_S'; };
+
+  const recomputeSetup = (state: State): State => {
+    // First compute what the inverse of our alg needs to be,
+    // subject to potentially mirroring across a couple axes
+    let algString = state.currentAlg.alg.join(' ');
+    let ctAlg = new CTAlg(algString);
+
+    if (state.mirrorAcrossM) {
+      algString = ctAlg.mirror().toString();
+    }
+
+    ctAlg = new CTAlg(algString);
+
+    if (state.mirrorAcrossS) {
+      algString = ctAlg.mirrorOverS().toString();
+    }
+
+    const parsedAlg = CTAlg.fromString(algString);
+    const inverseAlg = parsedAlg.invert().toString();
+
+    // Next, compute preorientation
+    let preorientation = '';
+    if (settings.fullColourNeutrality) {
+      let rotations = '';
+      for (let i = 0; i < 6; i++) {
+        const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
+        rotations += ` ${randomRotation}`;
+      }
+      preorientation = rotations;
+    } else {
+      if (settings.firstRotation) {
+        preorientation += ` ${settings.firstRotation}`;
+      }
+      if (state.randomRotations === 0) {
+      } else if (state.randomRotations === 1) {
+        preorientation += ` ${settings.randomRotations1}`;
+      } else {
+        preorientation += ` ${settings.randomRotations1}${state.randomRotations}`;
+      }
+    }
+
+    let postMoves = '';
+    if (state.randomUs === 0) {
+    } else if (state.randomUs === 1) {
+      postMoves += ' U';
+    } else {
+      postMoves += ` U${state.randomUs}`;
+    }
+    if (state.randomYs === 0) {
+    } else if (state.randomYs === 1) {
+      postMoves += ' y';
+    } else {
+      postMoves += ` y${state.randomYs}`;
+    }
+
+    const finalSetupAlg = `${preorientation} ${inverseAlg} ${postMoves}`.trim();
+    // TODO: replace duplicate whitespace
+
+    // We also need to recompute our effectiveSolvedState and stickeringMask
+    const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LFL,
+      [SolvedState.F2LFL]: SolvedState.F2LFR,
+      [SolvedState.F2LBR]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LBR,
+    };
+
+    const MIRROR_ACROSS_S_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LBR,
+      [SolvedState.F2LBR]: SolvedState.F2LFR,
+      [SolvedState.F2LFL]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LFL,
+    };
+
+    const Y_ROTATION_MAPPING: Record<number, number> = {
+      [SolvedState.F2LFR]: SolvedState.F2LFL,
+      [SolvedState.F2LFL]: SolvedState.F2LBL,
+      [SolvedState.F2LBL]: SolvedState.F2LBR,
+      [SolvedState.F2LBR]: SolvedState.F2LFR,
+    };
+
+    const mapSolvedState = (solvedState: number, mapping: Record<number, number>): number => {
+      let mirroredState = solvedState;
+
+      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
+        const originalStateNum = Number(originalState);
+        mirroredState &= ~originalStateNum;
+      }
+
+      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
+        const originalStateNum = Number(originalState);
+
+        if (solvedState & originalStateNum) {
+          mirroredState |= mirroredStateValue;
+        }
+      }
+
+      return mirroredState;
+    };
+
+    let effectiveSolvedState = state.currentAlg.solved ?? SolvedState.FULL;
+    if (state.mirrorAcrossM)
+      effectiveSolvedState = mapSolvedState(effectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
+    if (state.mirrorAcrossS)
+      effectiveSolvedState = mapSolvedState(effectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
+    if (state.randomYs > 0) {
+      for (let i = 0; i < state.randomYs; ++i)
+        effectiveSolvedState = mapSolvedState(effectiveSolvedState, Y_ROTATION_MAPPING);
+    }
+
+    let stickeringMask = null;
+    if (state.kpuzzle) {
+      const setupPattern = state.kpuzzle.defaultPattern().applyAlg(finalSetupAlg);
+      stickeringMask = generateStickeringMask(setupPattern, effectiveSolvedState);
+    }
+
+    return { ...state, setupAlg: finalSetupAlg, effectiveSolvedState: effectiveSolvedState, stickeringMask: stickeringMask };
+  };
+
+  const setCurrentAlg = (state: State, currentAlg: Algorithm): State => {
+    const newState = {...state, currentAlg };
+
+    // Is this pure??
+    newState.moves = [];
+
+    if (settings.randomAUF)
+      newState.randomUs = Math.floor(Math.random() * 4);
+    else
+      newState.randomUs = 0;
+
+    if (settings.randomYs)
+      newState.randomYs = Math.floor(Math.random() * 4);
+    else
+      newState.randomYs = 0;
+
+    if (settings.randomRotations1)
+      newState.randomRotations = Math.floor(Math.random() * 4);
+    else
+      newState.randomRotations = 0;
+
+    if (!settings.mirrorAcrossM)
+      newState.mirrorAcrossM = false;
+    else if (settings.randomizeMirrorAcrossM)
+      newState.mirrorAcrossM = Math.random() < 0.5;
+    else
+      newState.mirrorAcrossM = true;
+
+    if (!settings.mirrorAcrossS)
+      newState.mirrorAcrossS = false;
+    else if (settings.randomizeMirrorAcrossS)
+      newState.mirrorAcrossS = Math.random() < 0.5;
+    else
+      newState.mirrorAcrossS = true;
+
+    return recomputeSetup(newState);
+  };
+
+  const reducer = (state: State, action: Action): State => {
+    switch (action.type) {
+      case 'SET_KPUZZLE':
+        return recomputeSetup({ ...state, kpuzzle: action.payload });
+      case 'SET_CURRENT_ALG':
+        return setCurrentAlg(state, action.payload);
+      case 'ADD_MOVE':
+        const moves = [...state.moves, action.payload];
+        const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moves.join(' '));
+        const isSolved = isPatternSolved(currentPattern, state.effectiveSolvedState);
+
+        if (isSolved) {
+          // We need to reset everything and move to the next alg
+          if (settings.playlistMode === 'ordered') {
+            const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === state.currentAlg.name);
+            const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
+            return setCurrentAlg(state, currentAlgSet.algs[nextIndex]);
+          } else {
+            const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+            return setCurrentAlg(state, currentAlgSet.algs[randomIndex]);
+          }
+        } else {
+          const solvedState = {};
+          Object.keys(SolvedState)
+            .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+            .forEach((key) => {
+              solvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+            });
+          return { ...state, moves, solvedStateMap };
+        }
+      case 'RECOMPUTE_SETUP':
+      case 'RECOMPUTE_RANDOM_AUF':
+      case 'RECOMPUTE_RANDOM_YS':
+      case 'RECOMPUTE_FIRST_ROTATION':
+      case 'RECOMPUTE_RANDOM_ROTATIONS':
+      case 'RECOMPUTE_PREORIENTATION':
+      case 'RECOMPUTE_MIRROR_ACROSS_M':
+      case 'RECOMPUTE_MIRROR_ACROSS_S':
+        return state;
+    }
+  };
+
+  const [state, dispatch] = useReducer(reducer, initialState, () => initializeState(initialAlg, currentAlgSet, settings));
+  const playerRef = useRef<TwistyPlayer>(null);
+
+  /////////////////////////////////////////////////////////////////////////////
+  // useEffects
   /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
     const fetchPuzzle = async () => {
       try {
         const loadedKPuzzle: KPuzzle = await cube3x3x3.kpuzzle();
-        setKPuzzle(loadedKPuzzle);
+        dispatch({ type: 'SET_KPUZZLE', payload: loadedKPuzzle });
       } catch (error) {
         console.error("Error loading puzzle:", error);
       }
@@ -58,7 +309,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       const handleCubeEvent = async (event: GanCubeEvent) => {
         if (event.type === "MOVE") {
           playerRef.current.experimentalAddMove(event.move);
-          setMoves(prevMoves => [...prevMoves, event.move]);
+          dispatch({ type: 'ADD_MOVE', payload: event.move });
         }
       };
 
@@ -70,247 +321,41 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
   }, [conn]);
 
-  // This needs to be really high up here so it gets called first
   useEffect(() => {
-    if (playerRef.current) {
-      playerRef.current.alg = "";
-    }
-    setMoves([]);
-    setSetupAlg("");
-  }, [currentAlg]);
-
-  useEffect(() => {
-    if (initialAlg) {
-      setCurrentAlg(initialAlg);
-    }
+    dispatch({ type: 'SET_CURRENT_ALG', payload: initialAlg });
   }, [initialAlg]);
 
-  /////////////////////////////////////////////////////////////////////////////
-  // settings related useEffects
-  /////////////////////////////////////////////////////////////////////////////
   useEffect(() => {
-    if (settings.playlistMode === 'ordered') {
-      setCurrentAlg(currentAlgSet.algs[0]);
-    } else {
-      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-      setCurrentAlg(currentAlgSet.algs[randomIndex]);
-    }
-  }, [currentAlgSet, settings.playlistMode]);
+    dispatch({ type: 'RECOMPUTE_RANDOM_AUF' });
+  }, [settings.randomAUF]);
 
   useEffect(() => {
-    if (settings.randomAUF) {
-      setRandomAUF(getRandomRotations('U', Math.floor(Math.random() * 4) + 1));
-    } else {
-      setRandomAUF('');
-    }
-  }, [settings.randomAUF, currentAlg]);
+    dispatch({ type: 'RECOMPUTE_RANDOM_YS' });
+  }, [settings.randomYs]);
 
   useEffect(() => {
-    if (settings.randomYs) {
-      setRandomYs(Math.floor(Math.random() * 4) + 1);
-    } else {
-      setRandomYs(0);
-    }
-  }, [settings.randomYs, currentAlg]);
+    dispatch({ type: 'RECOMPUTE_PREORIENTATION' });
+  }, [settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1]);
 
   useEffect(() => {
-    if (settings.randomRotations1) {
-      setRandomRotations1(getRandomRotations(settings.randomRotations1, Math.floor(Math.random() * 4) + 1));
-    } else {
-      setRandomRotations1('');
-    }
-  }, [settings.randomRotations1, currentAlg]);
+    dispatch({ type: 'RECOMPUTE_MIRROR_ACROSS_M' });
+  }, [settings.mirrorAcrossM, settings.randomizeMirrorAcrossM]);
 
   useEffect(() => {
-    if (!settings.mirrorAcrossM) {
-      setMirrorAcrossM(false);
-    } else if (settings.randomizeMirrorAcrossM) {
-      setMirrorAcrossM(Math.random() < 0.5);
-    } else {
-      setMirrorAcrossM(true);
-    }
-  }, [settings.mirrorAcrossM, settings.randomizeMirrorAcrossM, currentAlg]);
-
-  useEffect(() => {
-    if (!settings.mirrorAcrossS) {
-      setMirrorAcrossS(false);
-    } else if (settings.randomizeMirrorAcrossS) {
-      setMirrorAcrossS(Math.random() < 0.5);
-    } else {
-      setMirrorAcrossS(true);
-    }
-  }, [settings.mirrorAcrossS, settings.randomizeMirrorAcrossS, , currentAlg]);
-
-  useEffect(() => {
-    if (settings.fullColourNeutrality) {
-      let rotations = '';
-      for (let i = 0; i < 6; i++) {
-        const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
-        rotations += ` ${randomRotation}`;
-      }
-      setFullColourNeutrality(rotations.trim());
-    } else {
-      setFullColourNeutrality('');
-    }
-  }, [settings.fullColourNeutrality, currentAlg]);
-
-  useEffect(() => {
-    if (!currentAlg) return;
-
-    let algString = currentAlg.alg.join(' ');
-    let ctAlg = new CTAlg(algString);
-
-    // Mirror across M if settings are enabled
-    if (mirrorAcrossM) {
-        algString = ctAlg.mirror().toString();
-    }
-
-    ctAlg = new CTAlg(algString); // Recreate CTAlg with potentially mirrored moves
-
-    // Mirror across S if settings are enabled
-    if (mirrorAcrossS) {
-        algString = ctAlg.mirrorOverS().toString();
-    }
-
-    const parsedAlg = CTAlg.fromString(algString);
-    const inverseAlg = parsedAlg.invert().toString();
-    let newSetupAlg = '';
-
-    if (settings.fullColourNeutrality) {
-      newSetupAlg = fullColourNeutrality;
-    } else {
-      if (settings.firstRotation) {
-        newSetupAlg += ` ${settings.firstRotation}`;
-      }
-      newSetupAlg += ` ${randomRotations1}`;
-    }
-
-    let randomYsString = '';
-    if (randomYs > 0) {
-      randomYsString = getRandomRotations('y', randomYs);
-    }
-
-    newSetupAlg = `${newSetupAlg.trim()} ${inverseAlg} ${randomAUF} ${randomYsString}`.trim();
-
-    const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
-      [SolvedState.F2LFR]: SolvedState.F2LFL,
-      [SolvedState.F2LFL]: SolvedState.F2LFR,
-      [SolvedState.F2LBR]: SolvedState.F2LBL,
-      [SolvedState.F2LBL]: SolvedState.F2LBR,
-      // Add other solved states if necessary
-    };
-
-    const MIRROR_ACROSS_S_MAPPING: Record<number, number> = {
-      [SolvedState.F2LFR]: SolvedState.F2LBR,
-      [SolvedState.F2LBR]: SolvedState.F2LFR,
-      [SolvedState.F2LFL]: SolvedState.F2LBL,
-      [SolvedState.F2LBL]: SolvedState.F2LFL,
-      // Add other solved states if necessary
-    };
-
-    const Y_MAPPING: Record<number, number> = {
-      [SolvedState.F2LFR]: SolvedState.F2LFL,
-      [SolvedState.F2LFL]: SolvedState.F2LBL,
-      [SolvedState.F2LBL]: SolvedState.F2LBR,
-      [SolvedState.F2LBR]: SolvedState.F2LFR,
-      // Add other solved states if necessary
-    };
-
-    const mapSolvedState = (solvedState: number, mapping: Record<number, number>): number => {
-      let mirroredState = solvedState;
-
-      // first subtract off anything that might need to be mapped
-      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
-        const originalStateNum = Number(originalState);
-        mirroredState = mirroredState &~ originalStateNum;
-      }
-
-      // Now add back in the mapped states
-      for (const [originalState, mirroredStateValue] of Object.entries(mapping)) {
-        const originalStateNum = Number(originalState);
-
-        // Check if the solvedState includes the original state
-        if (solvedState & originalStateNum) {
-          // Remove the original state and add the mirrored state
-          mirroredState = mirroredState | mirroredStateValue;
-        }
-      }
-
-      return mirroredState;
-    };
-
-    let newEffectiveSolvedState = currentAlg?.solved ?? SolvedState.FULL;
-    if (mirrorAcrossM)
-      newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
-    if (mirrorAcrossS)
-      newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
-    if (randomYs > 0) {
-      for (let i = 0; i < randomYs; ++i)
-        newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, Y_MAPPING);
-    }
-
-    setEffectiveSolvedState(newEffectiveSolvedState);
-    setSetupAlg(newSetupAlg);
-  }, [currentAlg, randomAUF, randomYs, randomRotations1, fullColourNeutrality,
-      settings.firstRotation, settings.fullColourNeutrality, settings.mirrorAcrossM,
-      mirrorAcrossM, mirrorAcrossS]);
+    dispatch({ type: 'RECOMPUTE_MIRROR_ACROSS_S' });
+  }, [settings.mirrorAcrossS, settings.randomizeMirrorAcrossS]);
 
   useEffect(() => {
     if (!settings.useMaskings) {
       playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(null);
-      return;
-    }
-    if (!playerRef.current) return;
-    if (!kpuzzle) return;
-    if (!currentAlg) return;
-    const setupPattern = kpuzzle.defaultPattern().applyAlg(setupAlg);
-    const stickerMask = generateStickeringMask(setupPattern, effectiveSolvedState);
-    playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickerMask);
-   }, [setupAlg, currentAlg, kpuzzle, effectiveSolvedState, settings.useMaskings]);
-
-  /////////////////////////////////////////////////////////////////////////////
-  // solution-related useEffects
-  /////////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    if (!currentAlg || setupAlg === "" || !kpuzzle) return;
-
-    const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moves.join(' '));
-    const newSolvedStateMap: Record<string, boolean> = {};
-
-    Object.keys(SolvedState)
-      .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
-      .forEach((key) => {
-        newSolvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
-      });
-
-    setSolvedStateMap(newSolvedStateMap);
-    setIsSolved(isPatternSolved(currentPattern, effectiveSolvedState));
-  }, [kpuzzle, currentAlg, moves, setupAlg, effectiveSolvedState]);
-
-  useEffect(() => {
-    if (!isSolved) return;
-
-    if (settings.playlistMode === 'ordered') {
-      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg?.name);
-      const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
-      setCurrentAlg(currentAlgSet.algs[nextIndex]);
     } else {
-      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-      setCurrentAlg(currentAlgSet.algs[randomIndex]);
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(state.stickeringMask);
     }
-  }, [isSolved]);
+   }, [settings.useMaskings, state.stickeringMask]);
 
   /////////////////////////////////////////////////////////////////////////////
-  // helper functions
+  // Rendering
   /////////////////////////////////////////////////////////////////////////////
-  const getRandomRotations = (rotation: string, count: number): string => {
-    let rotations = '';
-    for (let i = 0; i < count; i++) {
-      rotations += ` ${rotation}`;
-    }
-    return rotations.trim();
-  };
-
   return (
     <Box>
       <Center><Title>Algorithm Set: {currentAlgSet.name}</Title></Center>
@@ -320,11 +365,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
             .map((key) => {
               const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
-              const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
+              const isActive = (solvedStateValue & state.effectiveSolvedState) === solvedStateValue;
               return (
                 <Badge
                   key={key}
-                  color={solvedStateMap[key] ? 'green' : 'gray'}
+                  color={state.solvedStateMap[key] ? 'green' : 'gray'}
                   bd={isActive ? '1px solid var(--mantine-primary-color-5)': 'none'}
                 >
                   {key}
@@ -342,14 +387,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           puzzle="3x3x3"
           tempo-scale="4"
           hint-facelets={settings.showHintFacelets ? "true" : "none"}
-          experimental-setup-alg={setupAlg??''}
+          experimental-setup-alg={state.setupAlg ?? ''}
           style={{ width: "300px", height: "300px" }}
         />
       </Center>
-      {currentAlg && (
+      {state.currentAlg && (
         <Box>
-          <Text>Current Algorithm: {currentAlg.name}</Text>
-          <Text>{currentAlg.alg.join(' ')}</Text>
+          <Text>Current Algorithm: {state.currentAlg.name}</Text>
+          <Text>{state.currentAlg.alg.join(' ')}</Text>
         </Box>
       )}
     </Box>
