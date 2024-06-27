@@ -79,11 +79,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       { type: 'ADD_MOVE'; payload: string }
     | { type: 'SET_KPUZZLE'; payload: KPuzzle }
     | { type: 'SET_CURRENT_ALG'; payload: Algorithm }
-    | { type: 'RECOMPUTE_SETUP'; }
     | { type: 'RECOMPUTE_RANDOM_AUF'; }
     | { type: 'RECOMPUTE_RANDOM_YS'; }
-    | { type: 'RECOMPUTE_FIRST_ROTATION'; }
-    | { type: 'RECOMPUTE_RANDOM_ROTATIONS'; }
     | { type: 'RECOMPUTE_PREORIENTATION'; }
     | { type: 'RECOMPUTE_MIRROR_ACROSS_M'; }
     | { type: 'RECOMPUTE_MIRROR_ACROSS_S'; };
@@ -196,6 +193,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         effectiveSolvedState = mapSolvedState(effectiveSolvedState, Y_ROTATION_MAPPING);
     }
 
+    // Don't attempt to apply a stickering mask if our kpuzzle isn't ready yet.
     let stickeringMask = null;
     if (state.kpuzzle) {
       const setupPattern = state.kpuzzle.defaultPattern().applyAlg(finalSetupAlg);
@@ -273,18 +271,50 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             });
           return { ...state, moves, solvedStateMap };
         }
-      case 'RECOMPUTE_SETUP':
+
       case 'RECOMPUTE_RANDOM_AUF':
+        let randomUs = 0;
+        if (settings.randomUs)
+          randomUs = Math.floor(Math.random() * 4);
+        return recomputeSetup({ ...state, randomUs});
+
       case 'RECOMPUTE_RANDOM_YS':
-      case 'RECOMPUTE_FIRST_ROTATION':
-      case 'RECOMPUTE_RANDOM_ROTATIONS':
+        let randomYs = 0;
+        if (settings.randomYs)
+          randomYs = Math.floor(Math.random() * 4);
+        return recomputeSetup({ ...state, randomYs});
+
       case 'RECOMPUTE_PREORIENTATION':
+        let randomRotations = 0;
+        if (settings.randomRotations1)
+          randomRotations = Math.floor(Math.random() * 4);
+        return recomputeSetup({ ...state, randomRotations});
+
       case 'RECOMPUTE_MIRROR_ACROSS_M':
+        let mirrorAcrossM;
+        if (!settings.mirrorAcrossM)
+          mirrorAcrossM = false;
+        else if (settings.randomizeMirrorAcrossM)
+          mirrorAcrossM = Math.random() < 0.5;
+        else
+          mirrorAcrossM = true;
+        return recomputeSetup({ ...state, mirrorAcrossM});
+
       case 'RECOMPUTE_MIRROR_ACROSS_S':
-        return state;
+        let mirrorAcrossS;
+        if (!settings.mirrorAcrossS)
+          mirrorAcrossS = false;
+        else if (settings.randomizeMirrorAcrossS)
+          mirrorAcrossS = Math.random() < 0.5;
+        else
+          mirrorAcrossS = true;
+        return recomputeSetup({ ...state, mirrorAcrossS});
     }
   };
 
+  /////////////////////////////////////////////////////////////////////////////
+  // finally, our state variables
+  /////////////////////////////////////////////////////////////////////////////
   const [state, dispatch] = useReducer(reducer, initialState, () => initializeState(initialAlg, currentAlgSet, settings));
   const playerRef = useRef<TwistyPlayer>(null);
 
@@ -387,7 +417,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           puzzle="3x3x3"
           tempo-scale="4"
           hint-facelets={settings.showHintFacelets ? "true" : "none"}
-          experimental-setup-alg={state.setupAlg ?? ''}
+          experimental-setup-alg={state.setupAlg}
           style={{ width: "300px", height: "300px" }}
         />
       </Center>
