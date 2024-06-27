@@ -200,7 +200,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       stickeringMask = generateStickeringMask(setupPattern, effectiveSolvedState);
     }
 
-    return { ...state, setupAlg: finalSetupAlg, effectiveSolvedState: effectiveSolvedState, stickeringMask: stickeringMask };
+    return { ...state, setupAlg: finalSetupAlg, effectiveSolvedState, stickeringMask };
   };
 
   const setCurrentAlg = (state: State, currentAlg: Algorithm): State => {
@@ -241,12 +241,25 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     return recomputeSetup(newState);
   };
 
+  const recomputeSolvedState = (state: State): State => {
+    if (!state.kpuzzle) return state;
+
+    const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(state.moves.join(' '));
+    const solvedStateMap = {};
+    Object.keys(SolvedState)
+      .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+      .forEach((key) => {
+        solvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+      });
+    return { ...state, solvedStateMap };
+  }
+
   const reducer = (state: State, action: Action): State => {
     switch (action.type) {
       case 'SET_KPUZZLE':
-        return recomputeSetup({ ...state, kpuzzle: action.payload });
+        return recomputeSolvedState(recomputeSetup({ ...state, kpuzzle: action.payload }));
       case 'SET_CURRENT_ALG':
-        return setCurrentAlg(state, action.payload);
+        return recomputeSolvedState(setCurrentAlg(state, action.payload));
       case 'ADD_MOVE':
         const moves = [...state.moves, action.payload];
         const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moves.join(' '));
@@ -263,13 +276,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             return setCurrentAlg(state, currentAlgSet.algs[randomIndex]);
           }
         } else {
-          const solvedState = {};
-          Object.keys(SolvedState)
-            .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
-            .forEach((key) => {
-              solvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
-            });
-          return { ...state, moves, solvedStateMap };
+          return recomputeSolvedState({ ...state, moves });
         }
 
       case 'RECOMPUTE_RANDOM_AUF':
@@ -376,12 +383,25 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.mirrorAcrossS, settings.randomizeMirrorAcrossS]);
 
   useEffect(() => {
+    if (!playerRef.current) return;
     if (!settings.useMaskings) {
       playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(null);
     } else {
       playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(state.stickeringMask);
     }
    }, [settings.useMaskings, state.stickeringMask]);
+
+  useEffect(() => {
+    if (!playerRef.current) return;
+    if (state.moves.length !== 0) return;
+
+    playerRef.current.alg = '';
+    if (!settings.useMaskings) {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(null);
+    } else {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(state.stickeringMask);
+    }
+   }, [state.moves, playerRef]);
 
   /////////////////////////////////////////////////////////////////////////////
   // Rendering
