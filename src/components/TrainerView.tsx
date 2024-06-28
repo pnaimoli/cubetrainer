@@ -359,6 +359,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [conn]);
 
   useEffect(() => {
+    if (initialAlg === null) return;
     dispatch({ type: 'SET_CURRENT_ALG', payload: initialAlg });
   }, [initialAlg]);
 
