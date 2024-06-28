@@ -56,7 +56,7 @@ const SettingsAside: React.FC = () => {
           label={
             <Center>
               Random y's
-              <Tooltip label="Do a random number of y rotation after the setup" withArrow>
+              <Tooltip label="Do a random number of y rotation(s) after the setup" withArrow>
                 <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
               </Tooltip>
             </Center>
