@@ -142,41 +142,41 @@ export class PuzzleStickering extends PieceAnnotation<PieceStickering> {
     return this;
   }
 
-rotate(moveSource: Move | string | (Move | string)[]): StickeringMask {
-  const moves = Array.isArray(moveSource) ? moveSource : [moveSource];
-  const stickeringMask: StickeringMask = this.toStickeringMask();
+  rotate(moveSource: Move | string | (Move | string)[]): StickeringMask {
+    const moves = Array.isArray(moveSource) ? moveSource : [moveSource];
+    const stickeringMask: StickeringMask = this.toStickeringMask();
 
-  for (const move of moves) {
-    // console.log("Processing", move, "rotation");
-    // console.log("Before", this.stickerings);
-    const transformation = this.kpuzzle.moveToTransformation(move);
+    for (const move of moves) {
+      // console.log("Processing", move, "rotation");
+      // console.log("Before", this.stickerings);
+      const transformation = this.kpuzzle.moveToTransformation(move);
 
-    for (const orbitDefinition of this.kpuzzle.definition.orbits) {
-      const pieces = stickeringMask.orbits[orbitDefinition.orbitName].pieces;
+      for (const orbitDefinition of this.kpuzzle.definition.orbits) {
+        const pieces = stickeringMask.orbits[orbitDefinition.orbitName].pieces;
 
-      const newPieces: { facelets: FaceletMeshStickeringMask[], permIndex: number }[] = pieces.map((piece, i) => {
-        if (!piece) {
-          return { facelets: new Array(5).fill("ignored" as FaceletMeshStickeringMask), permIndex: i };
+        const newPieces: { facelets: FaceletMeshStickeringMask[], permIndex: number }[] = pieces.map((piece, i) => {
+          if (!piece) {
+            return { facelets: new Array(5).fill("ignored" as FaceletMeshStickeringMask), permIndex: i };
+          }
+          const permIndex = transformation.transformationData[orbitDefinition.orbitName].permutation[i];
+          const oriDelta = transformation.transformationData[orbitDefinition.orbitName].orientationDelta[i];
+          return {
+            facelets: this.rotateFacelets(piece.facelets.slice(), oriDelta, orbitDefinition.numOrientations),
+            permIndex,
+          };
+        });
+
+        // console.log(orbitDefinition.orbitName, newPieces)
+        for (let i = 0; i < newPieces.length; i++) {
+          // Which piece is going in the new [i] location?  Whatever was in newPieces[i].permIndex before.
+          pieces[i] = { facelets: newPieces[newPieces[i].permIndex].facelets.slice() };
         }
-        const permIndex = transformation.transformationData[orbitDefinition.orbitName].permutation[i];
-        const oriDelta = transformation.transformationData[orbitDefinition.orbitName].orientationDelta[i];
-        return {
-          facelets: this.rotateFacelets(piece.facelets.slice(), oriDelta, orbitDefinition.numOrientations),
-          permIndex,
-        };
-      });
-
-      // console.log(orbitDefinition.orbitName, newPieces)
-      for (let i = 0; i < newPieces.length; i++) {
-        // Which piece is going in the new [i] location?  Whatever was in newPieces[i].permIndex before.
-        pieces[i] = { facelets: newPieces[newPieces[i].permIndex].facelets.slice() };
+        // console.log(orbitDefinition.orbitName, pieces)
       }
-      // console.log(orbitDefinition.orbitName, pieces)
     }
-  }
 
-  return stickeringMask;
-}
+    return stickeringMask;
+  }
 
   private rotateFacelets(facelets: FaceletStickeringMask[], orientationDelta: number, numOrientations: number): FaceletStickeringMask[] {
     if (orientationDelta === 0) {
