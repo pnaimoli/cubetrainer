@@ -9,7 +9,7 @@ import ReactLogo from '../assets/logo.svg?react';
 import { AlgSet, Settings } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
-import SettingsAside from './SettingsAside';
+import SettingsView from './SettingsView';
 import WelcomeView from './WelcomeView';
 
 const App: React.FC = () => {
@@ -174,7 +174,7 @@ const App: React.FC = () => {
         </ScrollArea>
       </AppShell.Navbar>
       <AppShell.Aside p="md">
-        <SettingsAside />
+        <SettingsView />
       </AppShell.Aside>
       <AppShell.Main>
         {renderView()}

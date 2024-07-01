@@ -21,7 +21,7 @@ const defaultSettings: Settings = {
   randomRotations1: ''
 };
 
-const SettingsAside: React.FC = () => {
+const SettingsView: React.FC = () => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
 
   return (
@@ -139,4 +139,4 @@ const SettingsAside: React.FC = () => {
   );
 };
 
-export default SettingsAside;
+export default SettingsView;
