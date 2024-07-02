@@ -33,7 +33,7 @@ export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
     <Card withBorder={true}>
       <Card.Section withBorder={true} px="xs">
         <Group justify="space-between">
-          <Title order={2}>Summary Statistics</Title>
+          <Title order={2}>Summary Stats</Title>
           <Menu withinPortal position="bottom-end" shadow="sm">
             <Menu.Target>
               <ActionIcon variant="subtle" color="gray">
@@ -104,7 +104,7 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
 
   return (
     <Card withBorder={true} h="200px" padding={0}>
-        <ScrollArea scrollbars="y">
+      <ScrollArea scrollbars="y">
         <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0} withColumnBorders={true}>
           <Table.Thead bg="var(--mantine-color-dark-6)">
             <Table.Tr>

@@ -13,7 +13,6 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { SummaryStatsView, TimesListView } from './StatsViews';
 import TimerView from './TimerView';
-import styles from './TrainerView.module.css'
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -491,7 +490,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Card.Section withBorder={true}>
             <Center>
               <Title order={2} >
-                Case Name: <Text display="inline" className={styles.spoilerblur}>{state.currentAlg.name}</Text>
+                Case Name: {state.currentAlg.name}
               </Title>
             </Center>
           </Card.Section>

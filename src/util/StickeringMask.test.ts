@@ -26,6 +26,8 @@ describe('StickeringMask Test', () => {
 
   it("WCA Starting position + sune", async () => {
     // This is a sune
+    // generated from:
+    // https://experiments.cubing.net/cubing.js/3x3x3-formats/
     const pattern: KPattern = new KPattern(kpuzzle, {
       EDGES: {
         pieces: [0, 3, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11],
