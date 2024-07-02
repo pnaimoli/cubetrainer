@@ -7,8 +7,8 @@ interface TimerViewProps {
 
 // hahahahahahaha
 const formatTime = (time) => {
-    let minutes = Math.floor(time / 60000);
-    let remainingMiliseconds = time % 60000;
+    const minutes = Math.floor(time / 60000);
+    const remainingMiliseconds = time % 60000;
     let seconds = Math.floor(remainingMiliseconds / 1000);
     let miliseconds = remainingMiliseconds % 1000;
 
