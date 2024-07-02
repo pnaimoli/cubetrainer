@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Center, Title, Table, ScrollArea } from '@mantine/core';
+import { Card, Center, Title, Table, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { TbDots, TbTrash } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 
 interface StatsViewProps {
@@ -30,10 +31,28 @@ export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
 
   return (
     <Card withBorder={true}>
-      <Card.Section withBorder={true}>
-        <Center><Title order={2}>Summary Statistics</Title></Center>
+      <Card.Section withBorder={true} px="xs">
+        <Group justify="space-between">
+          <Title order={2}>Summary Statistics</Title>
+          <Menu withinPortal position="bottom-end" shadow="sm">
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray">
+                <TbDots style={{ width: rem(16), height: rem(16) }} />
+              </ActionIcon>
+            </Menu.Target>
+
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
+                color="red"
+              >
+                Delete all
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
       </Card.Section>
-      <Table ta="center" ff="monospace">
+      <Table ta="center" ff="monospace" withColumnBorders={true}>
         <Table.Thead>
           <Table.Tr>
             <Table.Th>n</Table.Th>
@@ -86,8 +105,8 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
   return (
     <Card withBorder={true} h="200px" padding={0}>
         <ScrollArea scrollbars="y">
-        <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0}>
-          <Table.Thead>
+        <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0} withColumnBorders={true}>
+          <Table.Thead bg="var(--mantine-color-dark-6)">
             <Table.Tr>
               <Table.Th ta="center">#</Table.Th>
               <Table.Th ta="center">name</Table.Th>
@@ -101,7 +120,10 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
           </Table.Thead>
           <Table.Tbody>
             { stats.toReversed().map((stat, index) => (
-              <Table.Tr key={index}>
+              <Table.Tr
+                key={index}
+                bg={index % 2 === 0 ? "var(--mantine-color-dark-7)" : undefined}
+              >
                 <Table.Td>{stats.length - index}</Table.Td>
                 <Table.Td>{stat.name}</Table.Td>
                 <Table.Td>{Math.ceil(stat.recognitionTime / 10) / 100}</Table.Td>
