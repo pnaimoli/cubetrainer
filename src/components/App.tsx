@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMantineTheme, AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack } from '@mantine/core';
+import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
@@ -13,7 +13,6 @@ import SettingsView from './SettingsView';
 import WelcomeView from './WelcomeView';
 
 const App: React.FC = () => {
-  const theme = useMantineTheme();
   const [view, setView] = useState<string>('Welcome');
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const [settings] = useLocalStorage<Settings>({ key: 'settings' });
@@ -152,7 +151,7 @@ const App: React.FC = () => {
                         wrap="nowrap"
                         padding={0}
                         ff="monospace"
-                        bg={index % 2 === 0 ? theme.colors.dark[6] : "inherit"}
+                        bg={index % 2 === 0 ? "var(--mantine-color-dark-6)" : undefined}
                         key={`${set.name}-${alg.name}`}
                         style={{ whiteSpace: 'nowrap', cursor: 'pointer' }}
                         onDoubleClick={() => {
