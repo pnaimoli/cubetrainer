@@ -70,20 +70,33 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
   // useEffect(() => {
   // }, [stats])
 
+  const getMoveName = (move: string, n: number) => {
+    if (n === 0)
+      return "-";
+    else if (n === 1)
+      return move;
+    else if (n === 2)
+      return move + "2";
+    else if (n === 3)
+      return move + "'";
+    else
+      return "?";
+  };
+
   return (
     <Card withBorder={true} h="200px" padding={0}>
-        <ScrollArea>
-        <Table ta="center" ff="monospace" verticalSpacing={0}>
+        <ScrollArea scrollbars="y">
+        <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0}>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>#</Table.Th>
-              <Table.Th>name</Table.Th>
-              <Table.Th>rec</Table.Th>
-              <Table.Th>exec</Table.Th>
-              <Table.Th>AUFs</Table.Th>
-              <Table.Th>y's</Table.Th>
-              <Table.Th>M</Table.Th>
-              <Table.Th>S</Table.Th>
+              <Table.Th ta="center">#</Table.Th>
+              <Table.Th ta="center">name</Table.Th>
+              <Table.Th ta="center">rec</Table.Th>
+              <Table.Th ta="center">exec</Table.Th>
+              <Table.Th ta="center">AUFs</Table.Th>
+              <Table.Th ta="center">y's</Table.Th>
+              <Table.Th ta="center">M</Table.Th>
+              <Table.Th ta="center">S</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -93,8 +106,8 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
                 <Table.Td>{stat.name}</Table.Td>
                 <Table.Td>{Math.ceil(stat.recognitionTime / 10) / 100}</Table.Td>
                 <Table.Td>{Math.ceil(stat.executionTime / 10) / 100}</Table.Td>
-                <Table.Td>{stat.AUFs}</Table.Td>
-                <Table.Td>{stat.Ys}</Table.Td>
+                <Table.Td>{getMoveName("U", stat.AUFs)}</Table.Td>
+                <Table.Td>{getMoveName("y", stat.Ys)}</Table.Td>
                 <Table.Td>{stat.mirroredOverM ? 'T' : 'F'}</Table.Td>
                 <Table.Td>{stat.mirroredOverS ? 'T' : 'F'}</Table.Td>
               </Table.Tr>
