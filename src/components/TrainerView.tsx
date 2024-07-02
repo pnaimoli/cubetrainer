@@ -11,7 +11,7 @@ import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { SummaryStatsView } from './StatsViews';
+import { SummaryStatsView, TimesListView } from './StatsViews';
 import TimerView from './TimerView';
 import styles from './TrainerView.module.css'
 
@@ -257,7 +257,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const recomputeSolvedState = (state: State): State => {
     if (!state.kpuzzle) return state;
 
-    const moveString = state.moves.map((move) => {return move.move}).join(' '); // Is there a better way?
+    const moveString = state.moves.map((move) => (move.move)).join(' '); // Is there a better way?
     const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
     const solvedStateMap = {};
     Object.keys(SolvedState)
@@ -277,7 +277,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       case 'ADD_MOVE':
       {
         const moves = [...state.moves, action.payload];
-        const moveString = moves.map((move) => {return move.move}).join(' '); // Is there a better way?
+        const moveString = moves.map((move) => (move.move)).join(' '); // Is there a better way?
         const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
         const isSolved = isPatternSolved(currentPattern, state.effectiveSolvedState);
 
@@ -485,7 +485,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           </Group>
         </Card>
       </Grid.Col>
-      <Grid.Col span={6}>
+      <Grid.Col span={4}>
       {state.currentAlg ? (
         <Card withBorder={true}>
           <Card.Section withBorder={true}>
@@ -517,11 +517,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         <Skeleton />
       )}
       </Grid.Col>
-      <Grid.Col span={6}>
+      <Grid.Col span={8}>
         <Grid>
         <Grid.Col span={6}><SummaryStatsView algSetName={currentAlgSet.name}/></Grid.Col>
         <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
-        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
+        <Grid.Col span={6}><TimesListView algSetName={currentAlgSet.name}/></Grid.Col>
         <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
         </Grid>
       </Grid.Col>
