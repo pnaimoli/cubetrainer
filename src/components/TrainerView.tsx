@@ -1,6 +1,6 @@
 import React, { useReducer, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Skeleton, Text, Badge, Title, Center, Group } from '@mantine/core';
+import { Grid, Card, Skeleton, Text, Badge, Title, Center, Group, Stack } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
@@ -11,7 +11,8 @@ import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { StatsView } from './StatsViews';
+import { SummaryStatsView } from './StatsViews';
+import TimerView from './TimerView';
 import styles from './TrainerView.module.css'
 
 interface TrainerViewProps {
@@ -497,19 +498,20 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Card.Section withBorder={true}>
             <Center><Text>{state.currentAlg.alg.join(' ')}</Text></Center>
           </Card.Section>
-          <Center style={{ marginBottom: '20px' }}>
-            <twisty-player
-              ref={playerRef}
-              visualization="PG3D"
-              control-panel="none"
-              background="none"
-              puzzle="3x3x3"
-              tempo-scale="4"
-              hint-facelets={settings.showHintFacelets ? "true" : "none"}
-              experimental-setup-alg={state.setupAlg}
-              style={{ width: "300px", height: "300px" }}
-            />
-          </Center>
+            <Stack align="center" gap={0}>
+              <TimerView key={state.startTime} startTime={state.startTime}/>
+              <twisty-player
+                ref={playerRef}
+                visualization="PG3D"
+                control-panel="none"
+                background="none"
+                puzzle="3x3x3"
+                tempo-scale="4"
+                hint-facelets={settings.showHintFacelets ? "true" : "none"}
+                experimental-setup-alg={state.setupAlg}
+                style={{ width: "300px", height: "300px" }}
+              />
+            </Stack>
         </Card>
       ) : (
         <Skeleton />
@@ -517,7 +519,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       </Grid.Col>
       <Grid.Col span={6}>
         <Grid>
-        <Grid.Col span={6}><StatsView algSetName={currentAlgSet.name}/></Grid.Col>
+        <Grid.Col span={6}><SummaryStatsView algSetName={currentAlgSet.name}/></Grid.Col>
         <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
         <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
         <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>

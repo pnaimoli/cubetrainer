@@ -7,7 +7,7 @@ interface StatsViewProps {
   algName: string;
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
+export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
   const [stats, setStats] = useLocalStorage<SolveStat[]>({ key: 'stats' , defaultValue: {} });
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
         <Table>
           <thead>
             <tr>
-              <th>Count</th>
+              <th>n</th>
               <th>Best</th>
               <th>ao5</th>
               <th>ao12</th>
