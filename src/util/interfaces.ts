@@ -99,7 +99,7 @@ export function cycleSetting<T extends keyof Settings>(settings: Settings, key: 
   return newSettings;
 }
 
-interface SolveStat {
+export interface SolveStat {
   name: string;
   timeOfSolve: string; // ISO string
   moves: string[];
