@@ -191,7 +191,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         }
       }
 
-      return recomputeSolvedState(mirroredState);
+      return mirroredState;
     };
 
     let effectiveSolvedState = state.currentAlg.solved ?? SolvedState.FULL;
@@ -211,7 +211,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       stickeringMask = generateStickeringMask(setupPattern, effectiveSolvedState);
     }
 
-    return { ...state, setupAlg: finalSetupAlg, effectiveSolvedState, stickeringMask };
+    return recomputeSolvedState({ ...state, setupAlg: finalSetupAlg, effectiveSolvedState, stickeringMask });
   };
 
   const setCurrentAlg = (state: State, currentAlg: Algorithm): State => {
