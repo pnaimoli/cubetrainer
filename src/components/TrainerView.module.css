@@ -1,0 +1,11 @@
+.spoilerblur {
+	filter: blur(3px);
+    opacity: 0.8;
+    transition: filter 1s linear, opacity 1s linear, text-shadow 1s linear;
+    &:hover {
+	    filter: blur(0px);
+    	opacity: 1;
+    	text-shadow: 0 0 0 transparent;
+    	transition-delay: 500ms;
+    }
+}

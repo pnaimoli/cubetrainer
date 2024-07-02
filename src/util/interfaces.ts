@@ -98,3 +98,15 @@ export function cycleSetting<T extends keyof Settings>(settings: Settings, key: 
   const newSettings = { ...settings, [key]: values[nextIndex] };
   return newSettings;
 }
+
+interface SolveStat {
+  name: string;
+  timeOfSolve: string; // ISO string
+  moves: string[];
+  executionTime: number; // in milliseconds
+  recognitionTime: number; // in milliseconds
+  AUFs: number; // Number of AUF moves
+  Ys: number; // Number of Y rotations
+  mirroredOverM: boolean;
+  mirroredOverS: boolean;
+}

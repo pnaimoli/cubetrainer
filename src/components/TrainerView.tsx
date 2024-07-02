@@ -1,6 +1,7 @@
-import React, { useReducer, useState, useEffect, useRef } from 'react';
+import React, { useReducer, useEffect, useRef } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Box, Stack, Text, Badge, Title, Center, Group } from '@mantine/core';
+import { Grid, Card, Skeleton, Text, Badge, Title, Center, Group } from '@mantine/core';
+import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle } from 'cubing/kpuzzle';
@@ -10,6 +11,8 @@ import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
+import { StatsView } from './StatsViews';
+import styles from './TrainerView.module.css'
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
@@ -22,11 +25,19 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   /////////////////////////////////////////////////////////////////////////////
   // State initialization
   /////////////////////////////////////////////////////////////////////////////
+  interface Move {
+    move: string;
+    timeOfMove: number;
+  }
+
   interface State {
     kpuzzle: KPuzzle | null;
     currentAlg: Algorithm | null;
     solvedStateMap: Record<string, boolean>;
-    moves: string[];
+    moves: Move[];
+
+    startTime: number,
+    sessionStats: SolveStat[],
 
     setupAlg: string;
     effectiveSolvedState: SolvedState;
@@ -36,13 +47,16 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     randomRotations: number;
     mirrorAcrossM: boolean;
     mirrorAcrossS: boolean;
-  };
+  }
 
   const initialState: State = {
     kpuzzle: null,
     currentAlg:  null,
     solvedStateMap: {},
     moves: [],
+
+    startTime: 0,
+    sessionStats: [],
 
     setupAlg: "",
     effectiveSolvedState: SolvedState.FULL,
@@ -66,10 +80,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       currentAlg = currentAlgSet.algs[randomIndex];
     }
 
-    return recomputeSetup({
-      ...initialState,
-      currentAlg,
-    });
+    return setCurrentAlg(initialState, currentAlg);
   };
 
   /////////////////////////////////////////////////////////////////////////////
@@ -180,7 +191,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         }
       }
 
-      return mirroredState;
+      return recomputeSolvedState(mirroredState);
     };
 
     let effectiveSolvedState = state.currentAlg.solved ?? SolvedState.FULL;
@@ -208,6 +219,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     // Is this pure??
     newState.moves = [];
+    newState.startTime = Date.now();
 
     if (settings.randomAUF)
       newState.randomUs = Math.floor(Math.random() * 4);
@@ -244,7 +256,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const recomputeSolvedState = (state: State): State => {
     if (!state.kpuzzle) return state;
 
-    const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(state.moves.join(' '));
+    const moveString = state.moves.map((move) => {return move.move}).join(' '); // Is there a better way?
+    const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
     const solvedStateMap = {};
     Object.keys(SolvedState)
       .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
@@ -257,47 +270,67 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const reducer = (state: State, action: Action): State => {
     switch (action.type) {
       case 'SET_KPUZZLE':
-        return recomputeSolvedState(recomputeSetup({ ...state, kpuzzle: action.payload }));
+        return recomputeSetup({ ...state, kpuzzle: action.payload });
       case 'SET_CURRENT_ALG':
-        return recomputeSolvedState(setCurrentAlg(state, action.payload));
+        return setCurrentAlg(state, action.payload);
       case 'ADD_MOVE':
+      {
         const moves = [...state.moves, action.payload];
-        const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moves.join(' '));
+        const moveString = moves.map((move) => {return move.move}).join(' '); // Is there a better way?
+        const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
         const isSolved = isPatternSolved(currentPattern, state.effectiveSolvedState);
 
         if (isSolved) {
+          const solveStat: SolveStat = {
+            name: state.currentAlg.name,
+            timeOfSolve: new Date().toISOString(),
+            moves,
+            executionTime: moves[moves.length-1].timeOfMove - moves[0].timeOfMove,
+            recognitionTime: moves[0].timeOfMove - state.startTime,
+            AUFs: state.randomUs,
+            Ys: state.randomYs,
+            mirroredOverM: state.mirrorAcrossM,
+            mirroredOverS: state.mirrorAcrossS,
+          };
+
+          const newState = { ...state, sessionStats: state.sessionStats.concat(solveStat) };
+
           // We need to reset everything and move to the next alg
           if (settings.playlistMode === 'ordered') {
             const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === state.currentAlg.name);
             const nextIndex = (currentIndex + 1) % currentAlgSet.algs.length;
-            return setCurrentAlg(state, currentAlgSet.algs[nextIndex]);
+            return setCurrentAlg(newState, currentAlgSet.algs[nextIndex]);
           } else {
             const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-            return setCurrentAlg(state, currentAlgSet.algs[randomIndex]);
+            return setCurrentAlg(newState, currentAlgSet.algs[randomIndex]);
           }
         } else {
           return recomputeSolvedState({ ...state, moves });
         }
-
+      }
       case 'RECOMPUTE_RANDOM_AUF':
+      {
         let randomUs = 0;
-        if (settings.randomUs)
+        if (settings.randomAUF)
           randomUs = Math.floor(Math.random() * 4);
         return recomputeSetup({ ...state, randomUs});
-
+      }
       case 'RECOMPUTE_RANDOM_YS':
+      {
         let randomYs = 0;
         if (settings.randomYs)
           randomYs = Math.floor(Math.random() * 4);
         return recomputeSetup({ ...state, randomYs});
-
+      }
       case 'RECOMPUTE_PREORIENTATION':
+      {
         let randomRotations = 0;
         if (settings.randomRotations1)
           randomRotations = Math.floor(Math.random() * 4);
         return recomputeSetup({ ...state, randomRotations});
-
+      }
       case 'RECOMPUTE_MIRROR_ACROSS_M':
+      {
         let mirrorAcrossM;
         if (!settings.mirrorAcrossM)
           mirrorAcrossM = false;
@@ -306,8 +339,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         else
           mirrorAcrossM = true;
         return recomputeSetup({ ...state, mirrorAcrossM});
-
+      }
       case 'RECOMPUTE_MIRROR_ACROSS_S':
+      {
         let mirrorAcrossS;
         if (!settings.mirrorAcrossS)
           mirrorAcrossS = false;
@@ -316,6 +350,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         else
           mirrorAcrossS = true;
         return recomputeSetup({ ...state, mirrorAcrossS});
+      }
     }
   };
 
@@ -323,6 +358,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // finally, our state variables
   /////////////////////////////////////////////////////////////////////////////
   const [state, dispatch] = useReducer(reducer, initialState, () => initializeState(initialAlg, currentAlgSet, settings));
+  const [stats, setStats] = useLocalStorage<SolveStat[]>({ key: 'stats' , defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
   /////////////////////////////////////////////////////////////////////////////
@@ -346,7 +382,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       const handleCubeEvent = async (event: GanCubeEvent) => {
         if (event.type === "MOVE") {
           playerRef.current.experimentalAddMove(event.move);
-          dispatch({ type: 'ADD_MOVE', payload: event.move });
+          dispatch({ type: 'ADD_MOVE', payload: { move: event.move, timeOfMove: Date.now() }});
         }
       };
 
@@ -362,6 +398,22 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (initialAlg === null) return;
     dispatch({ type: 'SET_CURRENT_ALG', payload: initialAlg });
   }, [initialAlg]);
+
+  // This isn't pure - will it ever get called twice in a row?
+  // Do i need to make sure I don't dupicate update?  No, just like this:
+  //            setSavedTimes((prev) => [...prev, data]);
+  //          saveTime([...savedTimes, data]);
+  // I also need to make sessionStats just whatever it is in localStorage
+  useEffect(() => {
+    if (state.sessionStats.length === 0) return;
+    const recentSolve = state.sessionStats[state.sessionStats.length - 1];
+    const newStats = stats;
+    if (!(currentAlgSet.name in newStats))
+      newStats[currentAlgSet.name] = [recentSolve];
+    else
+      newStats[currentAlgSet.name].push(recentSolve);
+    setStats(newStats);
+  }, [state.sessionStats]);
 
   useEffect(() => {
     dispatch({ type: 'RECOMPUTE_RANDOM_AUF' });
@@ -394,7 +446,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
   useEffect(() => {
     if (!playerRef.current) return;
-    if (state.moves.length !== 0) return;
 
     playerRef.current.alg = '';
     if (!settings.useMaskings) {
@@ -402,53 +453,77 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     } else {
       playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(state.stickeringMask);
     }
-   }, [state.moves, playerRef]);
+   }, [state.stickeringMask, playerRef, settings.useMaskings]);
 
   /////////////////////////////////////////////////////////////////////////////
   // Rendering
   /////////////////////////////////////////////////////////////////////////////
   return (
-    <Box>
-      <Center><Title>Algorithm Set: {currentAlgSet.name}</Title></Center>
-      <Stack align="center" spacing="md" style={{ marginBottom: '10px' }}>
-        <Group gap="xs">
-          {Object.keys(SolvedState)
-            .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
-            .map((key) => {
-              const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
-              const isActive = (solvedStateValue & state.effectiveSolvedState) === solvedStateValue;
-              return (
-                <Badge
-                  key={key}
-                  color={state.solvedStateMap[key] ? 'green' : 'gray'}
-                  bd={isActive ? '1px solid var(--mantine-primary-color-5)': 'none'}
-                >
-                  {key}
-                </Badge>
-              );
-            })}
-        </Group>
-      </Stack>
-      <Center style={{ marginBottom: '20px' }}>
-        <twisty-player
-          ref={playerRef}
-          visualization="PG3D"
-          control-panel="none"
-          background="none"
-          puzzle="3x3x3"
-          tempo-scale="4"
-          hint-facelets={settings.showHintFacelets ? "true" : "none"}
-          experimental-setup-alg={state.setupAlg}
-          style={{ width: "300px", height: "300px" }}
-        />
-      </Center>
-      {state.currentAlg && (
-        <Box>
-          <Text>Current Algorithm: {state.currentAlg.name}</Text>
-          <Text>{state.currentAlg.alg.join(' ')}</Text>
-        </Box>
+    <Grid>
+      <Grid.Col span={12}>
+        <Card withBorder={true} padding="xs">
+          <Card.Section withBorder={true}>
+            <Center><Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title></Center>
+          </Card.Section>
+          <Group gap="xs" mt="xs" justify="center">
+            {Object.keys(SolvedState)
+              .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+              .map((key) => {
+                const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
+                const isActive = (solvedStateValue & state.effectiveSolvedState) === solvedStateValue;
+                return (
+                  <Badge
+                    key={key}
+                    color={state.solvedStateMap[key] ? 'green' : 'gray'}
+                    bd={isActive ? '1px solid var(--mantine-primary-color-5)': 'none'}
+                  >
+                    {key}
+                  </Badge>
+                );
+              })}
+          </Group>
+        </Card>
+      </Grid.Col>
+      <Grid.Col span={6}>
+      {state.currentAlg ? (
+        <Card withBorder={true}>
+          <Card.Section withBorder={true}>
+            <Center>
+              <Title order={2} >
+                Case Name: <Text display="inline" className={styles.spoilerblur}>{state.currentAlg.name}</Text>
+              </Title>
+            </Center>
+          </Card.Section>
+          <Card.Section withBorder={true}>
+            <Center><Text>{state.currentAlg.alg.join(' ')}</Text></Center>
+          </Card.Section>
+          <Center style={{ marginBottom: '20px' }}>
+            <twisty-player
+              ref={playerRef}
+              visualization="PG3D"
+              control-panel="none"
+              background="none"
+              puzzle="3x3x3"
+              tempo-scale="4"
+              hint-facelets={settings.showHintFacelets ? "true" : "none"}
+              experimental-setup-alg={state.setupAlg}
+              style={{ width: "300px", height: "300px" }}
+            />
+          </Center>
+        </Card>
+      ) : (
+        <Skeleton />
       )}
-    </Box>
+      </Grid.Col>
+      <Grid.Col span={6}>
+        <Grid>
+        <Grid.Col span={6}><StatsView algSetName={currentAlgSet.name}/></Grid.Col>
+        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
+        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
+        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
+        </Grid>
+      </Grid.Col>
+    </Grid>
   );
 };
 
