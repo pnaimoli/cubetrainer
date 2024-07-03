@@ -25,26 +25,38 @@ const initializeCurrentAlg = (initialAlg: Algorithm | undefined, currentAlgSet: 
   }
 };
 
-const recomputePreorientationMoves = (settings: Settings): Move[] => {
+const recomputeRandomUs = (randomAUF: boolean): number => {
+  return randomAUF ? Math.floor(Math.random() * 4) : 0;
+};
+
+const recomputeRandomYs = (randomYs: boolean): number => {
+  return randomYs ? Math.floor(Math.random() * 4) : 0;
+};
+
+const recomputePreorientationMoves = (
+  fullColourNeutrality: boolean,
+  firstRotation: string | undefined,
+  randomRotations1: string | undefined
+): Move[] => {
   const preorientationMoves: Move[] = [];
 
-  if (settings.fullColourNeutrality) {
+  if (fullColourNeutrality) {
     for (let i = 0; i < 6; i++) {
       const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
       preorientationMoves.push({ move: randomRotation, timeOfMove: Date.now() });
     }
   } else {
-    if (settings.firstRotation) {
-      preorientationMoves.push({ move: settings.firstRotation, timeOfMove: Date.now() });
+    if (firstRotation) {
+      preorientationMoves.push({ move: firstRotation, timeOfMove: Date.now() });
     }
-    if (settings.randomRotations1) {
+    if (randomRotations1) {
       const randomRotations = Math.floor(Math.random() * 4);
       if (randomRotations === 0) {
         // Do nothing
       } else if (randomRotations === 1) {
-        preorientationMoves.push({ move: settings.randomRotations1, timeOfMove: Date.now() });
+        preorientationMoves.push({ move: randomRotations1, timeOfMove: Date.now() });
       } else {
-        preorientationMoves.push({ move: `${settings.randomRotations1}${randomRotations}`, timeOfMove: Date.now() });
+        preorientationMoves.push({ move: `${randomRotations1}${randomRotations}`, timeOfMove: Date.now() });
       }
     }
   }
@@ -52,36 +64,20 @@ const recomputePreorientationMoves = (settings: Settings): Move[] => {
   return preorientationMoves;
 };
 
-const recomputeRandomUs = (settings: Settings): number => {
-  if (settings.randomAUF) {
-    return Math.floor(Math.random() * 4);
-  } else {
-    return 0;
-  }
-};
-
-const recomputeRandomYs = (settings: Settings): number => {
-  if (settings.randomYs) {
-    return Math.floor(Math.random() * 4);
-  } else {
-    return 0;
-  }
-};
-
-const recomputeMirrorAcrossM = (settings: Settings): boolean => {
-  if (!settings.mirrorAcrossM) {
+const recomputeMirrorAcrossM = (mirrorAcrossM: boolean, randomizeMirrorAcrossM: boolean): boolean => {
+  if (!mirrorAcrossM) {
     return false;
-  } else if (settings.randomizeMirrorAcrossM) {
+  } else if (randomizeMirrorAcrossM) {
     return Math.random() < 0.5;
   } else {
     return true;
   }
 };
 
-const recomputeMirrorAcrossS = (settings: Settings): boolean => {
-  if (!settings.mirrorAcrossS) {
+const recomputeMirrorAcrossS = (mirrorAcrossS: boolean, randomizeMirrorAcrossS: boolean): boolean => {
+  if (!mirrorAcrossS) {
     return false;
-  } else if (settings.randomizeMirrorAcrossS) {
+  } else if (randomizeMirrorAcrossS) {
     return Math.random() < 0.5;
   } else {
     return true;
@@ -113,6 +109,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings));
   const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings));
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
@@ -262,15 +259,17 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
 
     setCurrentAlg(newCurrentAlg);
-    setPreorientationMoves(recomputePreorientationMoves(settings));
-    setRandomUs(recomputeRandomUs(settings));
-    setRandomYs(recomputeRandomYs(settings));
-    setMirrorAcrossM(recomputeMirrorAcrossM(settings));
-    setMirrorAcrossS(recomputeMirrorAcrossS(settings));
+    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+    setRandomUs(recomputeRandomUs(settings.randomAUF));
+    setRandomYs(recomputeRandomYs(settings.randomYs));
+    setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+    setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
     setMoves([]);
     setStartTime(Date.now());
     playerRef.current.alg = '';
-  }, [currentAlg, moves, setupAlg, startTime, currentAlgSet, effectiveSolvedState, kpuzzle, mirrorAcrossM, mirrorAcrossS, preorientationMoves, randomUs, randomYs, settings]);
+  }, [currentAlg, moves, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
+      kpuzzle, mirrorAcrossM, mirrorAcrossS, randomUs, randomYs, settings,
+      setStats]);
 
   /////////////////////////////////////////////////////////////////////////////
   // useEffects
@@ -304,35 +303,30 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     if (initialAlg === null) return;
     setCurrentAlg(initialAlg);
-    setPreorientationMoves(recomputePreorientationMoves(settings));
-    setRandomUs(recomputeRandomUs(settings));
-    setRandomYs(recomputeRandomYs(settings));
-    setMirrorAcrossM(recomputeMirrorAcrossM(settings));
-    setMirrorAcrossS(recomputeMirrorAcrossS(settings));
     setMoves([]);
     setStartTime(Date.now());
     playerRef.current.alg = '';
   }, [initialAlg]);
 
   useEffect(() => {
-    setRandomUs(recomputeRandomUs(settings));
-  }, [settings.randomAUF]);
+    setRandomUs(recomputeRandomUs(settings.randomAUF));
+  }, [initialAlg, settings.randomAUF]);
 
   useEffect(() => {
-    setRandomYs(recomputeRandomYs(settings));
-  }, [settings.randomYs]);
+    setRandomYs(recomputeRandomYs(settings.randomYs));
+  }, [initialAlg, settings.randomYs]);
 
   useEffect(() => {
-    setPreorientationMoves(recomputePreorientationMoves(settings));
-  }, [settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1]);
+    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+  }, [initialAlg, settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1]);
 
   useEffect(() => {
-    setMirrorAcrossM(recomputeMirrorAcrossM(settings));
-  }, [settings.mirrorAcrossM, settings.randomizeMirrorAcrossM]);
+    setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+  }, [initialAlg, settings.mirrorAcrossM, settings.randomizeMirrorAcrossM]);
 
   useEffect(() => {
-    setMirrorAcrossS(recomputeMirrorAcrossS(settings));
-  }, [settings.mirrorAcrossS, settings.randomizeMirrorAcrossS]);
+    setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+  }, [initialAlg, settings.mirrorAcrossS, settings.randomizeMirrorAcrossS]);
 
   useEffect(() => {
     if (!playerRef.current) return;
