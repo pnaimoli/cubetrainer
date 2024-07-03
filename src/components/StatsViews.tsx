@@ -103,7 +103,7 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
   };
 
   return (
-    <Card withBorder={true} h="200px" padding={0}>
+    <Card withBorder={true} padding={0} h="100%">
       <ScrollArea scrollbars="y">
         <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0} withColumnBorders={true}>
           <Table.Thead bg="var(--mantine-color-dark-6)">

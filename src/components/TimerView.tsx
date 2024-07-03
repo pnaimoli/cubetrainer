@@ -26,7 +26,7 @@ const TimerView: React.FC<TimerViewProps> = ({ startTime }) => {
   useEffect(() => {
     timerCallbackId.current = setInterval(() => {
       setCurrentTime(Date.now());
-    }, 63);
+    }, 13);
 
     return () => {clearInterval(timerCallbackId)};
   }, []);

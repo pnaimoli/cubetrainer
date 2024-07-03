@@ -486,7 +486,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       </Grid.Col>
       <Grid.Col span={4}>
       {state.currentAlg ? (
-        <Card withBorder={true}>
+        <Card withBorder={true} h="500">
           <Card.Section withBorder={true}>
             <Center>
               <Title order={2} >
@@ -516,13 +516,17 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         <Skeleton />
       )}
       </Grid.Col>
-      <Grid.Col span={8}>
-        <Grid>
-        <Grid.Col span={6}><SummaryStatsView algSetName={currentAlgSet.name}/></Grid.Col>
-        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
-        <Grid.Col span={6}><TimesListView algSetName={currentAlgSet.name}/></Grid.Col>
-        <Grid.Col span={6}><Skeleton visible={true} height={200}/></Grid.Col>
-        </Grid>
+      <Grid.Col span={4}>
+        <Stack h="500">
+        <SummaryStatsView algSetName={currentAlgSet.name}/>
+        <TimesListView algSetName={currentAlgSet.name}/>
+        </Stack>
+      </Grid.Col>
+      <Grid.Col span={4}>
+        <Stack h="500">
+        <Skeleton visible={true} h="100%"/>
+        <Skeleton visible={true} h={200}/>
+        </Stack>
       </Grid.Col>
     </Grid>
   );
