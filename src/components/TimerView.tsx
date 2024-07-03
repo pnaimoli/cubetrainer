@@ -5,18 +5,18 @@ interface TimerViewProps {
   startTime: number;
 }
 
-// hahahahahahaha
-const formatTime = (time) => {
-    const minutes = Math.floor(time / 60000);
-    const remainingMiliseconds = time % 60000;
-    let seconds = Math.floor(remainingMiliseconds / 1000);
-    let miliseconds = remainingMiliseconds % 1000;
+const formatTime = (time: number): string => {
+  const minutes = Math.floor(time / 60000);
+  const remainingMilliseconds = time % 60000;
+  let seconds: string | number = Math.floor(remainingMilliseconds / 1000);
+  let milliseconds: string | number = remainingMilliseconds % 1000;
 
-    if (minutes >= 1 && seconds < 10) seconds = "0" + seconds;
-    if (miliseconds < 10) miliseconds = "0" + miliseconds;
-    if (miliseconds < 100) miliseconds = "0" + miliseconds;
-    if (minutes <= 0) return seconds + "." + miliseconds;
-    return minutes + ":" + seconds + "." + miliseconds;
+  milliseconds = milliseconds.toString().padStart(3, '0');
+
+  if (minutes <= 0) return seconds + "." + milliseconds;
+
+  seconds = seconds.toString().padStart(2, '0');
+  return minutes + ":" + seconds + "." + milliseconds;
 };
 
 const TimerView: React.FC<TimerViewProps> = ({ startTime }) => {
@@ -24,15 +24,21 @@ const TimerView: React.FC<TimerViewProps> = ({ startTime }) => {
   const timerCallbackId = useRef();
 
   useEffect(() => {
-    timerCallbackId.current = setInterval(() => {
+    timerCallbackId.current = window.setInterval(() => {
       setCurrentTime(Date.now());
     }, 13);
 
-    return () => {clearInterval(timerCallbackId)};
+    return () => {
+      if (timerCallbackId.current !== null) {
+        clearInterval(timerCallbackId.current);
+      }
+    };
   }, []);
 
   return (
-    <Text ff="monospace" fw={600} fz="48px">{formatTime(currentTime - startTime)}</Text>
+    <Text ff="monospace" fw={600} fz="48px">
+      {formatTime(currentTime - startTime)}
+    </Text>
   );
 };
 
