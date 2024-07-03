@@ -33,7 +33,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   interface State {
     kpuzzle: KPuzzle | null;
     currentAlg: Algorithm | null;
-    solvedStateMap: Record<string, boolean>;
     moves: Move[];
 
     startTime: number,
@@ -52,7 +51,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const initialState: State = {
     kpuzzle: null,
     currentAlg:  null,
-    solvedStateMap: {},
     moves: [],
 
     startTime: 0,
@@ -87,7 +85,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // This is the heavy lifting
   /////////////////////////////////////////////////////////////////////////////
   type Action =
-      { type: 'ADD_MOVE'; payload: string }
+      { type: 'ADD_MOVE'; payload: Move }
     | { type: 'SET_KPUZZLE'; payload: KPuzzle }
     | { type: 'SET_CURRENT_ALG'; payload: Algorithm }
     | { type: 'RECOMPUTE_RANDOM_AUF'; }
@@ -211,13 +209,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       stickeringMask = generateStickeringMask(setupPattern, effectiveSolvedState);
     }
 
-    return recomputeSolvedState({ ...state, setupAlg: finalSetupAlg, effectiveSolvedState, stickeringMask });
+    return { ...state, setupAlg: finalSetupAlg, effectiveSolvedState, stickeringMask };
   };
 
   const setCurrentAlg = (state: State, currentAlg: Algorithm): State => {
     const newState = {...state, currentAlg };
 
-    // Is this pure??
     newState.moves = [];
     newState.startTime = Date.now();
 
@@ -252,20 +249,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     return recomputeSetup(newState);
   };
-
-  const recomputeSolvedState = (state: State): State => {
-    if (!state.kpuzzle) return state;
-
-    const moveString = state.moves.map((move) => (move.move)).join(' '); // Is there a better way?
-    const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
-    const solvedStateMap = {};
-    Object.keys(SolvedState)
-      .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
-      .forEach((key) => {
-        solvedStateMap[key] = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
-      });
-    return { ...state, solvedStateMap };
-  }
 
   const reducer = (state: State, action: Action): State => {
     switch (action.type) {
@@ -305,7 +288,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             return setCurrentAlg(newState, currentAlgSet.algs[randomIndex]);
           }
         } else {
-          return recomputeSolvedState({ ...state, moves });
+          return { ...state, moves };
         }
       }
       case 'RECOMPUTE_RANDOM_AUF':
@@ -358,7 +341,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // finally, our state variables
   /////////////////////////////////////////////////////////////////////////////
   const [state, dispatch] = useReducer(reducer, initialState, () => initializeState(initialAlg, currentAlgSet, settings));
-  const [stats, setStats] = useLocalStorage<SolveStat[]>({ key: 'stats' , defaultValue: {} });
+  const [stats, setStats] = useLocalStorage<{[key: string]: SolveStat[]}>({ key: 'stats' , defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
   /////////////////////////////////////////////////////////////////////////////
@@ -407,7 +390,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     if (state.sessionStats.length === 0) return;
     const recentSolve = state.sessionStats[state.sessionStats.length - 1];
-    const newStats = stats;
+    const newStats = {...stats};
     if (!(currentAlgSet.name in newStats))
       newStats[currentAlgSet.name] = [recentSolve];
     else
@@ -456,6 +439,36 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
    }, [state.stickeringMask, playerRef, settings.useMaskings]);
 
   /////////////////////////////////////////////////////////////////////////////
+  // Helper functions
+  /////////////////////////////////////////////////////////////////////////////
+  const renderSolvedStateBadges = () => {
+    if (!state.kpuzzle) return (<Group/>);
+    return (
+      <Group gap="xs" mt="xs" justify="center">
+        {Object.keys(SolvedState)
+          .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
+          .map((key) => {
+            const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
+            const isActive = (solvedStateValue & state.effectiveSolvedState) === solvedStateValue;
+            const moveString = state.moves.map((move) => (move.move)).join(' ');
+            const currentPattern = state.kpuzzle.defaultPattern().applyAlg(state.setupAlg).applyAlg(moveString);
+            const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+
+            return (
+              <Badge
+                key={key}
+                color={solved ? 'green' : 'gray'}
+                bd={isActive ? '1px solid var(--mantine-primary-color-5)' : 'none'}
+              >
+                {key}
+              </Badge>
+            );
+          })}
+      </Group>
+    );
+  };
+
+  /////////////////////////////////////////////////////////////////////////////
   // Rendering
   /////////////////////////////////////////////////////////////////////////////
   return (
@@ -465,23 +478,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Card.Section withBorder={true}>
             <Center><Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title></Center>
           </Card.Section>
-          <Group gap="xs" mt="xs" justify="center">
-            {Object.keys(SolvedState)
-              .filter((key) => !isNaN(Number(SolvedState[key as keyof typeof SolvedState])))
-              .map((key) => {
-                const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
-                const isActive = (solvedStateValue & state.effectiveSolvedState) === solvedStateValue;
-                return (
-                  <Badge
-                    key={key}
-                    color={state.solvedStateMap[key] ? 'green' : 'gray'}
-                    bd={isActive ? '1px solid var(--mantine-primary-color-5)': 'none'}
-                  >
-                    {key}
-                  </Badge>
-                );
-              })}
-          </Group>
+          {renderSolvedStateBadges()}
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
