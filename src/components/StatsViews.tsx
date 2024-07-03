@@ -1,32 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Center, Title, Table, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { Card, Title, Table, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
 import { TbDots, TbTrash } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
+import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 
 interface StatsViewProps {
   algSetName: string;
-  algName: string;
+  algName?: string; // Optional, if not used, can be removed
 }
 
 export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
-  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats' , defaultValue: {} });
+  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
   useEffect(() => {
-    setStats(algSetName in allStats ? allStats[algSetName] : []);
+    setStats(allStats[algSetName] ?? []);
   }, [allStats, algSetName]);
 
-  // useEffect(() => {
-  // }, [stats])
-
   const getBest = () => {
-    return Math.round(Math.min(...stats.map((stat) => stat.executionTime)) / 10 ) / 100;
+    return stats.length > 0 ? Math.round(Math.min(...stats.map((stat) => stat.executionTime)) / 10) / 100 : '-';
   };
 
   const getAo = (n: number) => {
     if (stats.length < n) return '-';
-    const times = stats.slice(-n - 1, -1).map((stat) => stat.executionTime);
+    const times = stats.slice(-n).map((stat) => stat.executionTime);
     return Math.round(times.reduce((a, b) => a + b, 0) / n / 10) / 100;
+  };
+
+  const handleDeleteAll = () => {
+    setAllStats(prevStats => {
+      const newStats = Object.fromEntries(Object.entries(prevStats).filter(([key]) => key !== algSetName));
+      return newStats;
+    });
   };
 
   return (
@@ -40,11 +45,11 @@ export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
                 <TbDots style={{ width: rem(16), height: rem(16) }} />
               </ActionIcon>
             </Menu.Target>
-
             <Menu.Dropdown>
               <Menu.Item
                 leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
                 color="red"
+                onClick={handleDeleteAll}
               >
                 Delete all
               </Menu.Item>
@@ -79,32 +84,24 @@ export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
 };
 
 export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
-  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats' , defaultValue: {} });
+  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
   useEffect(() => {
-    setStats(algSetName in allStats ? allStats[algSetName] : []);
+    setStats(allStats[algSetName] ?? []);
   }, [allStats, algSetName]);
 
-  // useEffect(() => {
-  // }, [stats])
-
   const getMoveName = (move: string, n: number) => {
-    if (n === 0)
-      return "-";
-    else if (n === 1)
-      return move;
-    else if (n === 2)
-      return move + "2";
-    else if (n === 3)
-      return move + "'";
-    else
-      return "?";
+    if (n === 0) return "-";
+    else if (n === 1) return move;
+    else if (n === 2) return move + "2";
+    else if (n === 3) return move + "'";
+    else return "?";
   };
 
   return (
     <Card withBorder={true} padding={0} h="100%">
-      <ScrollArea scrollbars="y">
+      <ScrollArea>
         <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0} withColumnBorders={true}>
           <Table.Thead bg="var(--mantine-color-dark-6)">
             <Table.Tr>
