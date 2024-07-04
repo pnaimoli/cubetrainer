@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title, Table, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { Card, Table, Title, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { DataTable } from 'mantine-datatable';
 import { TbDots, TbTrash } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
@@ -99,41 +100,39 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
     else return "?";
   };
 
+  const handleDelete = (index: number) => {
+    setAllStats(prevStats => {
+      const newStats = { ...prevStats };
+      newStats[algSetName] = newStats[algSetName].filter((_, i) => i !== index);
+      return newStats;
+    });
+  };
+
+  const columns = [
+    { accessor: 'index', title: '#',  textAlign: 'right', render: (record: SolveStat, index: number) => stats.length - index },
+    { accessor: 'name', title: 'Name', render: (record: SolveStat) => record.name },
+    { accessor: 'recognitionTime', title: 'Rec', textAlign: 'right', render: (record: SolveStat) => Math.ceil(record.recognitionTime / 10) / 100 },
+    { accessor: 'executionTime', title: 'Exec', textAlign: 'right', render: (record: SolveStat) => Math.ceil(record.executionTime / 10) / 100 },
+    { accessor: 'AUFs', title: 'AUFs', textAlign: 'center', render: (record: SolveStat) => getMoveName("U", record.AUFs) },
+    { accessor: 'Ys', title: 'Ys', textAlign: 'center', render: (record: SolveStat) => getMoveName("y", record.Ys) },
+    { accessor: 'mirroredOverM', title: 'M', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverM ? 'T' : 'F' },
+    { accessor: 'mirroredOverS', title: 'S', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverS ? 'T' : 'F' }
+  ];
+
   return (
-    <Card withBorder={true} padding={0} h="100%">
-      <ScrollArea>
-        <Table stickyHeader ta="center" ff="monospace" verticalSpacing={0} horizontalSpacing={0} withColumnBorders={true}>
-          <Table.Thead bg="var(--mantine-color-dark-6)">
-            <Table.Tr>
-              <Table.Th ta="center">#</Table.Th>
-              <Table.Th ta="center">name</Table.Th>
-              <Table.Th ta="center">rec</Table.Th>
-              <Table.Th ta="center">exec</Table.Th>
-              <Table.Th ta="center">AUFs</Table.Th>
-              <Table.Th ta="center">y's</Table.Th>
-              <Table.Th ta="center">M</Table.Th>
-              <Table.Th ta="center">S</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            { stats.toReversed().map((stat, index) => (
-              <Table.Tr
-                key={index}
-                bg={index % 2 === 0 ? "var(--mantine-color-dark-7)" : undefined}
-              >
-                <Table.Td>{stats.length - index}</Table.Td>
-                <Table.Td>{stat.name}</Table.Td>
-                <Table.Td>{Math.ceil(stat.recognitionTime / 10) / 100}</Table.Td>
-                <Table.Td>{Math.ceil(stat.executionTime / 10) / 100}</Table.Td>
-                <Table.Td>{getMoveName("U", stat.AUFs)}</Table.Td>
-                <Table.Td>{getMoveName("y", stat.Ys)}</Table.Td>
-                <Table.Td>{stat.mirroredOverM ? 'T' : 'F'}</Table.Td>
-                <Table.Td>{stat.mirroredOverS ? 'T' : 'F'}</Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </ScrollArea>
-    </Card>
+    <DataTable
+      ff="monospace"
+      fz="xs"
+      withTableBorder
+      withRowBorders={false}
+      borderRadius="sm"
+      verticalSpacing={0}
+      horizontalSpacing="xs"
+      highlightOnHover
+      striped
+      columns={columns}
+      records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
+      onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
+    />
   );
 };
