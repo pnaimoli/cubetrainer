@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Title, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { TbDots, TbTrash } from 'react-icons/tb';
+import { TbDots, TbTrash, TbInfoCircle } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 
@@ -121,7 +121,13 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
             </Menu.Target>
             <Menu.Dropdown>
               <Menu.Item
-                leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
+                leftSection={<TbInfoCircle/>}
+                disabled
+              >
+                Hint: double-click a row to remove that time
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<TbTrash/>}
                 color="red"
                 onClick={handleDeleteAll}
               >
