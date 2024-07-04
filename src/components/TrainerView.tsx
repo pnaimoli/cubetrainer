@@ -339,7 +339,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const renderSolvedStateBadges = () => {
     if (!kpuzzle) return (<Group />);
     return (
-      <Group gap="xs" mt="xs" justify="center">
+      <Group gap="xs" mt="xs">
         {Object.keys(SolvedState)
           .filter((key) => isNaN(Number(key)))
           .map((key) => {
@@ -370,23 +370,21 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     <Grid>
       <Grid.Col span={12}>
         <Card withBorder={true} padding="xs">
-          <Card.Section withBorder={true}>
-            <Center><Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title></Center>
+          <Card.Section withBorder={true} px="xs">
+            <Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title>
           </Card.Section>
           {renderSolvedStateBadges()}
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder={true} h="500">
-          <Card.Section withBorder={true}>
-            <Center>
+          <Card.Section withBorder={true} px="xs">
               <Title order={2}>
                 Case Name: {currentAlg.name}
               </Title>
-            </Center>
           </Card.Section>
-          <Card.Section withBorder={true}>
-            <Center><Text>{currentAlg.alg.join(' ')}</Text></Center>
+          <Card.Section withBorder={true} px="xs">
+            <Text>{currentAlg.alg.join(' ')}</Text>
           </Card.Section>
           <Stack align="center" gap={0}>
             <TimerView key={startTime} startTime={startTime} />

@@ -28,58 +28,40 @@ export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
     return Math.round(times.reduce((a, b) => a + b, 0) / n / 10) / 100;
   };
 
-  const handleDeleteAll = () => {
-    setAllStats(prevStats => {
-      const newStats = Object.fromEntries(Object.entries(prevStats).filter(([key]) => key !== algSetName));
-      return newStats;
-    });
-  };
+  const columns = [
+    { accessor: 'n', title: 'n', textAlign: 'center', render: () => stats.length },
+    { accessor: 'best', title: 'best', textAlign: 'center', render: () => getBest() },
+    { accessor: 'ao5', title: 'ao5', textAlign: 'center', render: () => getAo(5) },
+    { accessor: 'ao12', title: 'ao12', textAlign: 'center', render: () => getAo(12) },
+    { accessor: 'ao50', title: 'ao50', textAlign: 'center', render: () => getAo(50) },
+    { accessor: 'ao100', title: 'ao100', textAlign: 'center', render: () => getAo(100) }
+  ];
+
+  const records = [
+    {
+      id: "current",
+      n: stats.length,
+      best: getBest(),
+      ao5: getAo(5),
+      ao12: getAo(12),
+      ao50: getAo(50),
+      ao100: getAo(100)
+    }
+  ];
 
   return (
-    <Card withBorder={true}>
+    <Card withBorder={true} padding={0} h="100">
       <Card.Section withBorder={true} px="xs">
-        <Group justify="space-between">
-          <Title order={2}>Summary Stats</Title>
-          <Menu withinPortal position="bottom-end" shadow="sm">
-            <Menu.Target>
-              <ActionIcon variant="subtle" color="gray">
-                <TbDots style={{ width: rem(16), height: rem(16) }} />
-              </ActionIcon>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item
-                leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
-                color="red"
-                onClick={handleDeleteAll}
-              >
-                Delete all
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
-        </Group>
+        <Title order={2}>Stats</Title>
       </Card.Section>
-      <Table ta="center" ff="monospace" withColumnBorders={true}>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>n</Table.Th>
-            <Table.Th>best</Table.Th>
-            <Table.Th>ao5</Table.Th>
-            <Table.Th>ao12</Table.Th>
-            <Table.Th>ao50</Table.Th>
-            <Table.Th>ao100</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          <Table.Tr key={algSetName}>
-            <Table.Td>{stats.length}</Table.Td>
-            <Table.Td>{getBest()}</Table.Td>
-            <Table.Td>{getAo(5)}</Table.Td>
-            <Table.Td>{getAo(12)}</Table.Td>
-            <Table.Td>{getAo(50)}</Table.Td>
-            <Table.Td>{getAo(100)}</Table.Td>
-          </Table.Tr>
-        </Table.Tbody>
-      </Table>
+      <DataTable
+        ff="monospace"
+        fz="xs"
+        verticalSpacing={0}
+        horizontalSpacing="xs"
+        columns={columns}
+        records={records}
+      />
     </Card>
   );
 };
@@ -108,11 +90,18 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
     });
   };
 
+  const handleDeleteAll = () => {
+    setAllStats(prevStats => {
+      const newStats = Object.fromEntries(Object.entries(prevStats).filter(([key]) => key !== algSetName));
+      return newStats;
+    });
+  };
+
   const columns = [
     { accessor: 'index', title: '#',  textAlign: 'right', render: (record: SolveStat, index: number) => stats.length - index },
     { accessor: 'name', title: 'Name', render: (record: SolveStat) => record.name },
-    { accessor: 'recognitionTime', title: 'Rec', textAlign: 'right', render: (record: SolveStat) => Math.ceil(record.recognitionTime / 10) / 100 },
-    { accessor: 'executionTime', title: 'Exec', textAlign: 'right', render: (record: SolveStat) => Math.ceil(record.executionTime / 10) / 100 },
+    { accessor: 'recognitionTime', title: 'Rec', textAlign: 'right', render: (record: SolveStat) => (Math.ceil(record.recognitionTime / 10) / 100).toFixed(2) },
+    { accessor: 'executionTime', title: 'Exec', textAlign: 'right', render: (record: SolveStat) => (Math.ceil(record.executionTime / 10) / 100).toFixed(2) },
     { accessor: 'AUFs', title: 'AUFs', textAlign: 'center', render: (record: SolveStat) => getMoveName("U", record.AUFs) },
     { accessor: 'Ys', title: 'Ys', textAlign: 'center', render: (record: SolveStat) => getMoveName("y", record.Ys) },
     { accessor: 'mirroredOverM', title: 'M', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverM ? 'T' : 'F' },
@@ -120,19 +109,40 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
   ];
 
   return (
-    <DataTable
-      ff="monospace"
-      fz="xs"
-      withTableBorder
-      withRowBorders={false}
-      borderRadius="sm"
-      verticalSpacing={0}
-      horizontalSpacing="xs"
-      highlightOnHover
-      striped
-      columns={columns}
-      records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-      onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
-    />
+    <Card withBorder={true} padding={0} h="100%">
+      <Card.Section withBorder={true} px="xs">
+        <Group justify="space-between">
+          <Title order={2}>Times</Title>
+          <Menu withinPortal position="bottom-end" shadow="sm">
+            <Menu.Target>
+              <ActionIcon variant="subtle" color="gray">
+                <TbDots style={{ width: rem(16), height: rem(16) }} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item
+                leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
+                color="red"
+                onClick={handleDeleteAll}
+              >
+                Delete all
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Card.Section>
+      <DataTable
+        ff="monospace"
+        fz="xs"
+        withRowBorders={false}
+        verticalSpacing={0}
+        horizontalSpacing="xs"
+        highlightOnHover
+        striped
+        columns={columns}
+        records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
+        onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
+      />
+    </Card>
   );
 };
