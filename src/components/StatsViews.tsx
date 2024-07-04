@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Title, ScrollArea, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { Card, Title, Menu, ActionIcon, Group, rem } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { TbDots, TbTrash, TbInfoCircle } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
@@ -11,7 +11,7 @@ interface StatsViewProps {
 }
 
 export const SummaryStatsView: React.FC<StatsViewProps> = ({ algSetName }) => {
-  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
+  const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
   useEffect(() => {
@@ -147,7 +147,7 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
         striped
         columns={columns}
         records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-        onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
+        onRowDoubleClick={(record) => handleDelete(stats.length - 1 - record.index)}
       />
     </Card>
   );

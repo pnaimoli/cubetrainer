@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Skeleton, Text, Badge, Title, Center, Group, Stack } from '@mantine/core';
+import { Grid, Card, Skeleton, Text, Badge, Title, Group, Stack, Button } from '@mantine/core';
+import { TbArrowLeft, TbArrowRight, TbRefresh } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
@@ -109,7 +110,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings));
   const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings));
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings));
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
@@ -266,7 +266,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
     setMoves([]);
     setStartTime(Date.now());
-    playerRef.current.alg = '';
   }, [currentAlg, moves, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
       kpuzzle, mirrorAcrossM, mirrorAcrossS, randomUs, randomYs, settings,
       setStats]);
@@ -305,7 +304,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setCurrentAlg(initialAlg);
     setMoves([]);
     setStartTime(Date.now());
-    playerRef.current.alg = '';
   }, [initialAlg]);
 
   useEffect(() => {
@@ -332,6 +330,57 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (!playerRef.current) return;
     playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
   }, [playerRef, stickeringMask]);
+
+  useEffect(() => {
+    if (moves.length === 0)
+      playerRef.current.alg = '';
+  }, [playerRef, moves]);
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Control Handlers
+  /////////////////////////////////////////////////////////////////////////////
+  const handlePrev = () => {
+    const currentStats = stats[currentAlgSet.name] || [];
+    if (currentStats.length === 0) return;
+
+    const prevStat = currentStats[currentStats.length - 1];
+    const prevAlg = currentAlgSet.algs.find(alg => alg.name === prevStat.name);
+    if (prevAlg) {
+      setCurrentAlg(prevAlg);
+      setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+      setRandomUs(prevStat.randomUs);
+      setRandomYs(prevStat.randomYs);
+      setMirrorAcrossM(prevStat.mirroredOverM);
+      setMirrorAcrossS(prevStat.mirroredOverS);
+      setMoves([]);
+      setStartTime(Date.now());
+    }
+  };
+
+  const handleRestart = () => {
+    setMoves([]);
+    setStartTime(Date.now());
+  };
+
+  const handleNext = () => {
+    let newCurrentAlg;
+    if (settings.playlistMode === 'ordered') {
+      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg.name);
+      newCurrentAlg = currentAlgSet.algs[(currentIndex + 1) % currentAlgSet.algs.length];
+    } else {
+      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
+      newCurrentAlg = currentAlgSet.algs[randomIndex];
+    }
+
+    setCurrentAlg(newCurrentAlg);
+    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+    setRandomUs(recomputeRandomUs(settings.randomAUF));
+    setRandomYs(recomputeRandomYs(settings.randomYs));
+    setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+    setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+    setMoves([]);
+    setStartTime(Date.now());
+  };
 
   /////////////////////////////////////////////////////////////////////////////
   // Helper functions
@@ -371,7 +420,20 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       <Grid.Col span={12}>
         <Card withBorder={true} padding="xs">
           <Card.Section withBorder={true} px="xs">
-            <Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title>
+            <Group justify="space-between">
+              <Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title>
+              <Group>
+                <Button disabled={stats[currentAlgSet.name] ? false : true} variant="outline" size="xs" onClick={handlePrev} leftSection={<TbArrowLeft />}>
+                  Previous
+                </Button>
+                <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
+                  Retry
+                </Button>
+                <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
+                  Next
+                </Button>
+              </Group>
+            </Group>
           </Card.Section>
           {renderSolvedStateBadges()}
         </Card>
