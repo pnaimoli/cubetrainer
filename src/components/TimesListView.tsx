@@ -20,7 +20,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
   }, [allStats, algSetName]);
 
   const getMoveName = (move: string, n: number) => {
-    if (n === 0) return "-";
+    if (n === 0) return "";
     else if (n === 1) return move;
     else if (n === 2) return move + "2";
     else if (n === 3) return move + "'";
@@ -73,8 +73,8 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
     { accessor: 'executionTime', title: 'Exec', textAlign: 'right', render: (record: SolveStat) => (Math.ceil(record.executionTime / 10) / 100).toFixed(2) },
     { accessor: 'AUFs', title: 'AUFs', textAlign: 'center', render: (record: SolveStat) => getMoveName("U", record.AUFs) },
     { accessor: 'Ys', title: 'Ys', textAlign: 'center', render: (record: SolveStat) => getMoveName("y", record.Ys) },
-    { accessor: 'mirroredOverM', title: 'M', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverM ? 'T' : 'F' },
-    { accessor: 'mirroredOverS', title: 'S', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverS ? 'T' : 'F' }
+    { accessor: 'mirroredOverM', title: 'M', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverM ? '✓' : '' },
+    { accessor: 'mirroredOverS', title: 'S', textAlign: 'center', render: (record: SolveStat) => record.mirroredOverS ? '✓' : '' }
   ];
 
   return (
@@ -122,7 +122,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
         striped
         columns={columns}
         records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-        onRowDoubleClick={({ record }) => handleDelete(stats.length - 1 - record.index)}
+        onRowDoubleClick={({ index }) => handleDelete(stats.length - 1 - index)}
         rowStyle={() => ({ cursor: 'not-allowed' })}
       />
     </Card>
