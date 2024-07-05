@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title } from '@mantine/core';
+import { Group, Card, Title, SegmentedControl } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
 import { useLocalStorage } from '@mantine/hooks';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
@@ -12,18 +12,35 @@ interface SummaryStatsViewProps {
 const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetName }) => {
   const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
+  const [selectedTimeType, setSelectedTimeType] = useState<'rec' | 'exec' | 'total'>('total');
 
   useEffect(() => {
     setStats(allStats[algSetName] ?? []);
   }, [allStats, algSetName]);
 
   const getBest = () => {
-    return stats.length > 0 ? Math.round(Math.min(...stats.map((stat) => stat.executionTime)) / 10) / 100 : '-';
+    if (stats.length === 0) return '-';
+    let times;
+    if (selectedTimeType === 'rec') {
+      times = stats.map((stat) => stat.recognitionTime);
+    } else if (selectedTimeType === 'exec') {
+      times = stats.map((stat) => stat.executionTime);
+    } else {
+      times = stats.map((stat) => stat.recognitionTime + stat.executionTime);
+    }
+    return Math.round(Math.min(...times) / 10) / 100;
   };
 
   const getAo = (n: number) => {
     if (stats.length < n) return '-';
-    const times = stats.slice(-n).map((stat) => stat.executionTime);
+    let times;
+    if (selectedTimeType === 'rec') {
+      times = stats.slice(-n).map((stat) => stat.recognitionTime);
+    } else if (selectedTimeType === 'exec') {
+      times = stats.slice(-n).map((stat) => stat.executionTime);
+    } else {
+      times = stats.slice(-n).map((stat) => stat.recognitionTime + stat.executionTime);
+    }
     return Math.round(times.reduce((a, b) => a + b, 0) / n / 10) / 100;
   };
 
@@ -51,7 +68,19 @@ const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetName }) => {
   return (
     <Card withBorder={true} padding={0} h="100">
       <Card.Section withBorder={true} px="xs">
-        <Title order={2}>Stats</Title>
+        <Group justify="space-between">
+          <Title order={2}>Stats</Title>
+          <SegmentedControl
+			size="xs"
+            value={selectedTimeType}
+            onChange={(value) => setSelectedTimeType(value as 'rec' | 'exec' | 'total')}
+            data={[
+              { label: 'Rec', value: 'rec' },
+              { label: 'Exec', value: 'exec' },
+              { label: 'Total', value: 'total' },
+            ]}
+          />
+        </Group>
       </Card.Section>
       <DataTable
         ff="monospace"
