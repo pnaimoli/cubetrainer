@@ -124,12 +124,12 @@ export const generateStickeringMask = (kpattern: KPattern, solvedState: number):
   if (solvedState & SolvedState.F2LBL) {
     puzzleStickering.set(F2LBL(), PieceStickering.Regular);
   }
-  if (solvedState & SolvedState.UEDGES) {
-    puzzleStickering.set(m.and([LL(), EDGES()]), PieceStickering.Regular);
-  }
-  if (solvedState & SolvedState.UCORNERS) {
-    puzzleStickering.set(m.and([LL(), CORNERS()]), PieceStickering.Regular);
-  }
+  // if (solvedState & SolvedState.UEDGES) {
+  //   puzzleStickering.set(m.and([LL(), EDGES()]), PieceStickering.Regular);
+  // }
+  // if (solvedState & SolvedState.UCORNERS) {
+  //   puzzleStickering.set(m.and([LL(), CORNERS()]), PieceStickering.Regular);
+  // }
   if (solvedState & SolvedState.UEDGEFACES) {
     puzzleStickering.set(m.and([LL(), EDGES()]), PieceStickering.IgnoreNonPrimary);
   }
