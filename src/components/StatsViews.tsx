@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Menu, ActionIcon, Group, rem } from '@mantine/core';
 import { DataTable } from 'mantine-datatable';
-import { TbDots, TbTrash, TbInfoCircle } from 'react-icons/tb';
+import { TbDots, TbTrash, TbInfoCircle, TbDownload } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
+import { mkConfig, generateCsv, download } from 'export-to-csv';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 
 interface StatsViewProps {
@@ -97,6 +98,30 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
     });
   };
 
+  const handleExportData = () => {
+    const formatTimestamp = (date) => {
+      const pad = (num) => (num < 10 ? '0' : '') + num;
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+    };
+
+    const timestamp = formatTimestamp(new Date());
+    const filename = `${algSetName}-stats-${timestamp}`;
+
+    const csvConfig = mkConfig({
+      filename,
+      useKeysAsHeaders: true,
+      showLabels: true,
+    });
+
+    const simplifiedStats = stats.map(stat => ({
+      ...stat,
+      moves: stat.moves.length, // Convert moves array to its length
+    }));
+
+    const csv = generateCsv(csvConfig)(simplifiedStats);
+    download(csvConfig)(csv);
+  };
+
   const columns = [
     { accessor: 'index', title: '#',  textAlign: 'right', render: (record: SolveStat, index: number) => stats.length - index },
     { accessor: 'name', title: 'Name', render: (record: SolveStat) => record.name },
@@ -127,7 +152,13 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
                 Hint: double-click a row to remove that time
               </Menu.Item>
               <Menu.Item
-                leftSection={<TbTrash/>}
+                leftSection={<TbDownload style={{ width: rem(14), height: rem(14) }} />}
+                onClick={handleExportData}
+              >
+                Export to CSV
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
                 color="red"
                 onClick={handleDeleteAll}
               >
@@ -147,7 +178,8 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
         striped
         columns={columns}
         records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-        onRowDoubleClick={(record) => handleDelete(stats.length - 1 - record.index)}
+        onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
+        styles={{ tr: { cursor: 'not-allowed' } }}
       />
     </Card>
   );

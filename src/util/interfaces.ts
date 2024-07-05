@@ -99,10 +99,16 @@ export function cycleSetting<T extends keyof Settings>(settings: Settings, key: 
   return newSettings;
 }
 
+interface Move {
+  move: string;
+  timeOfMove: number;
+  timeOfMoveFromCube?: number;
+}
+
 export interface SolveStat {
   name: string;
   timeOfSolve: string; // ISO string
-  moves: string[];
+  moves: Move[];
   executionTime: number; // in milliseconds
   recognitionTime: number; // in milliseconds
   AUFs: number; // Number of AUF moves

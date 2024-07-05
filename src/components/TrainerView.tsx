@@ -9,7 +9,7 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { CTAlg } from '../util/CTAlg';
-import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat } from '../util/interfaces';
+import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { SummaryStatsView, TimesListView } from './StatsViews';
@@ -84,11 +84,6 @@ const recomputeMirrorAcrossS = (mirrorAcrossS: boolean, randomizeMirrorAcrossS: 
     return true;
   }
 };
-
-interface Move {
-  move: string;
-  timeOfMove: number;
-}
 
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
