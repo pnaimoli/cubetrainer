@@ -12,8 +12,9 @@ import { CTAlg } from '../util/CTAlg';
 import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { SummaryStatsView, TimesListView } from './StatsViews';
 import TimerView from './TimerView';
+import SummaryStatsView from './SummaryStatsView';
+import TimesListView from './TimesListView';
 
 const initializeCurrentAlg = (initialAlg: Algorithm | undefined, currentAlgSet: AlgSet, settings: Settings): Algorithm => {
   if (initialAlg) {
