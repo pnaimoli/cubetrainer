@@ -178,8 +178,8 @@ export const TimesListView: React.FC<StatsViewProps> = ({ algSetName }) => {
         striped
         columns={columns}
         records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-        onRowDoubleClick={({ record, index }) => handleDelete(stats.length - 1 - index)}
-        styles={{ tr: { cursor: 'not-allowed' } }}
+        onRowDoubleClick={({ record }) => handleDelete(stats.length - 1 - record.index)}
+        rowStyle={({ record }) => ({ cursor: 'not-allowed' })}
       />
     </Card>
   );

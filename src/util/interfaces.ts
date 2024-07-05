@@ -8,15 +8,15 @@ export enum SolvedState {
   F2LFL      = 1 << 3,
   F2LBL      = 1 << 4,
   F2LBR      = 1 << 5,
-  UCORNERS   = 1 << 6,
-  UEDGES     = 1 << 7,
+  //UCORNERS   = 1 << 6,
+  //UEDGES     = 1 << 7,
   UEDGEFACES   = 1 << 8,
   UCORNERFACES = 1 << 9,
 
   F2L = CROSS | F2LFR | F2LFL | F2LBL | F2LBR,
   EOLL  = F2L | UEDGEFACES,
   OLL = F2L | UEDGEFACES | UCORNERFACES,
-  COLL = F2L | UCORNERS | UEDGEFACES,
+  //COLL = F2L | UCORNERS | UEDGEFACES,
 }
 
 // Define an enumeration for the valid moves
