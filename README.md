@@ -37,7 +37,7 @@ cubetrainer is a powerful tool designed to help you practice and perfect any Rub
 
 1. Start the development server:
     ```sh
-    yarn start
+    yarn dev
     ```
 2. Open your browser and navigate to `http://localhost:3000` (the port might vary, check your terminal output for the correct port).
 
