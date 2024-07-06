@@ -9,14 +9,14 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { CTAlg } from '../util/CTAlg';
-import { AlgSet, Alg as Algorithm, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
+import { Settings, AlgSet, Alg, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import TimerView from './TimerView';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
 
-const initializeCurrentAlg = (initialAlg: Algorithm | undefined, currentAlgSet: AlgSet, settings: Settings): Algorithm => {
+const initializeCurrentAlg = (initialAlg: Alg | null, currentAlgSet: AlgSet, settings: Settings): Alg => {
   if (initialAlg) {
     return initialAlg;
   } else if (settings.playlistMode === 'ordered') {
@@ -90,7 +90,7 @@ interface TrainerViewProps {
   currentAlgSet: AlgSet;
   conn: GanCubeConnection | null;
   settings: Settings;
-  initialAlg?: Algorithm;
+  initialAlg: Alg | null;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,14 +98,14 @@ interface TrainerViewProps {
 ///////////////////////////////////////////////////////////////////////////////
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
-  const [currentAlg, setCurrentAlg] = useState<Algorithm>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
+  const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const [moves, setMoves] = useState<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings));
-  const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(settings));
-  const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings));
-  const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings));
-  const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings));
+  const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+  const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(settings.randomAUF));
+  const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings.randomYs));
+  const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+  const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
@@ -212,11 +212,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     const newMove = { move: event.move, timeOfMove: Date.now() };
     const newMoves = [...moves, newMove];
-    playerRef.current.experimentalAddMove(event.move);
+    playerRef.current?.experimentalAddMove(event.move);
 
     const moveString = newMoves.map(move => move.move).join(' ');
-    const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
-    const isSolved = isPatternSolved(currentPattern, effectiveSolvedState);
+    let isSolved = false;
+    if (kpuzzle) {
+      const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+      isSolved = isPatternSolved(currentPattern, effectiveSolvedState);
+    }
 
     if (!isSolved) {
       setMoves(prevMoves => ([...prevMoves, newMove]));
@@ -272,8 +275,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     const fetchPuzzle = async () => {
       try {
-        const loadedKPuzzle: KPuzzle = await cube3x3x3.kpuzzle();
-        setKpuzzle(loadedKPuzzle);
+        const loadedKPuzzle = await cube3x3x3.kpuzzle();
+        setKpuzzle(loadedKPuzzle as unknown as KPuzzle);
       } catch (error) {
         console.error("Error loading puzzle:", error);
       }
@@ -328,7 +331,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [playerRef, stickeringMask]);
 
   useEffect(() => {
-    if (moves.length === 0)
+    if (moves.length === 0 && playerRef.current)
       playerRef.current.alg = '';
   }, [playerRef, moves]);
 
@@ -344,8 +347,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (prevAlg) {
       setCurrentAlg(prevAlg);
       setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
-      setRandomUs(prevStat.randomUs);
-      setRandomYs(prevStat.randomYs);
+      setRandomUs(prevStat.AUFs);
+      setRandomYs(prevStat.Ys);
       setMirrorAcrossM(prevStat.mirroredOverM);
       setMirrorAcrossS(prevStat.mirroredOverS);
       setMoves([]);
@@ -391,7 +394,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
             const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
             const moveString = moves.map((move) => (move.move)).join(' ');
-            const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+            const currentPattern = kpuzzle?.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
             const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
 
             return (

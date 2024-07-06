@@ -99,7 +99,7 @@ export function cycleSetting<T extends keyof Settings>(settings: Settings, key: 
   return newSettings;
 }
 
-interface Move {
+export interface Move {
   move: string;
   timeOfMove: number;
   timeOfMoveFromCube?: number;

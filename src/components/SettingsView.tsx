@@ -46,7 +46,7 @@ const SettingsView: React.FC = () => {
         </Group>
       </Group>
       <Divider label="Symmetries" />
-      <Group position="apart">
+      <Group>
         <Checkbox
           label="Random AUF"
           checked={settings.randomAUF}
@@ -65,7 +65,7 @@ const SettingsView: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
         />
       </Group>
-      <Group position="apart">
+      <Group>
         <Checkbox
           label="Mirror Across M"
           checked={settings.mirrorAcrossM}
@@ -78,7 +78,7 @@ const SettingsView: React.FC = () => {
           onChange={(event) => setSettings({ ...settings, randomizeMirrorAcrossM: event.currentTarget.checked })}
         />
       </Group>
-      <Group position="apart">
+      <Group>
         <Checkbox
           label="Mirror Across S"
           checked={settings.mirrorAcrossS}
@@ -123,14 +123,14 @@ const SettingsView: React.FC = () => {
               label="Initial Rotation"
               value={settings.firstRotation}
               maw="175px"
-              onChange={(value) => setSettings({ ...settings, firstRotation: value })}
+              onChange={(value) => setSettings({ ...settings, firstRotation: value || '' })}
               data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
             />
             <Select
               label="Subsequent Rotation(s)"
               value={settings.randomRotations1}
               maw="175px"
-              onChange={(value) => setSettings({ ...settings, randomRotations1: value })}
+              onChange={(value) => setSettings({ ...settings, randomRotations1: value || '' })}
               data={["x", "y", "z"]}
             />
         </Stack>

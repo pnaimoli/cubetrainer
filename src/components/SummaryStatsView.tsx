@@ -45,12 +45,12 @@ const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetName }) => {
   };
 
   const columns = [
-    { accessor: 'n', title: 'n', textAlign: 'center', render: () => stats.length },
-    { accessor: 'best', title: 'best', textAlign: 'center', render: () => getBest() },
-    { accessor: 'ao5', title: 'ao5', textAlign: 'center', render: () => getAo(5) },
-    { accessor: 'ao12', title: 'ao12', textAlign: 'center', render: () => getAo(12) },
-    { accessor: 'ao50', title: 'ao50', textAlign: 'center', render: () => getAo(50) },
-    { accessor: 'ao100', title: 'ao100', textAlign: 'center', render: () => getAo(100) }
+    { accessor: 'n', title: 'n', render: () => stats.length },
+    { accessor: 'best', title: 'best', render: () => getBest() },
+    { accessor: 'ao5', title: 'ao5', render: () => getAo(5) },
+    { accessor: 'ao12', title: 'ao12', render: () => getAo(12) },
+    { accessor: 'ao50', title: 'ao50', render: () => getAo(50) },
+    { accessor: 'ao100', title: 'ao100', render: () => getAo(100) }
   ];
 
   const records = [
@@ -89,6 +89,9 @@ const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetName }) => {
         horizontalSpacing="xs"
         columns={columns}
         records={records}
+        defaultColumnProps={{
+          textAlign: 'center',
+        }}
       />
     </Card>
   );

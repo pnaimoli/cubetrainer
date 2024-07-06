@@ -1,4 +1,4 @@
-export const ALG_PRESETS = {
+export const ALG_PRESETS: { [key: string]: string } = {
 	"PLL": `
 Aa, x (R' U R') D2 (R U' R') D2 R2 x'
 Ab, x R2 D2 (R U R') D2 (R U' R) x'

@@ -6,7 +6,7 @@ import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
-import { AlgSet, Settings } from '../util/interfaces';
+import { AlgSet, Settings, Alg } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
 import SettingsView from './SettingsView';
@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const [settings] = useLocalStorage<Settings>({ key: 'settings' });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
-  const [initialAlg, setInitialAlg] = useState<Algorithm | null>(null);
+  const [initialAlg, setInitialAlg] = useState<Alg | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
@@ -39,8 +39,9 @@ const App: React.FC = () => {
         setLoading(false);
       } catch (error) {
         setLoading(false);
-        if (error.name !== 'NotFoundError') {
-          setError(error.message);
+        const e = error as Error;
+        if (e.name !== 'NotFoundError') {
+          setError(e.message);
         }
       }
     }
@@ -85,9 +86,12 @@ const App: React.FC = () => {
       case 'Welcome':
         return <WelcomeView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView algSets={algSets} setAlgSets={setAlgSets} />;
+        return <AddAlgSetView />;
       case 'TrainerView':
-        return <TrainerView key={currentAlgSet.name} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+        if (currentAlgSet)
+          return <TrainerView key={currentAlgSet.name} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+        else
+          return <WelcomeView />;
       default:
         return <WelcomeView />;
     }
@@ -138,7 +142,7 @@ const App: React.FC = () => {
             <Accordion
               value={expandedItem}
               chevronSize="0px"
-              onChange={setExpandedItem}
+              onChange={(value) => setExpandedItem(value || '')}
               styles={{ content: { padding: '0px' } }}
             >
               {algSets.sort((a, b) => a.name.localeCompare(b.name)).map((set) => (
@@ -149,7 +153,6 @@ const App: React.FC = () => {
                       <Group
                         gap="xs"
                         wrap="nowrap"
-                        padding={0}
                         ff="monospace"
                         bg={index % 2 === 0 ? "var(--mantine-color-dark-6)" : undefined}
                         key={`${set.name}-${alg.name}`}

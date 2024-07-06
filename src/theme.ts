@@ -4,14 +4,14 @@ export const theme: MantineThemeOverride = createTheme({
   fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
   headings: {
     fontFamily: "Avenir, system-ui, Helvetica, Arial, sans-serif",
-    fontWeight: 700,
+    fontWeight: "700",
   },
   primaryColor: "orange", // Change this to "red", "green", "orange", etc.
   components: {
     Button: {
-      styles: (theme) => ({
+      styles: (theme: MantineThemeOverride) => ({
         root: {
-          borderRadius: theme.radius.md,
+          borderRadius: theme.radius?.md,
         },
       }),
     },

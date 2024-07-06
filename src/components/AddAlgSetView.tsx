@@ -76,7 +76,7 @@ const AddAlgSetView: React.FC = () => {
       setAlgSets([...algSets, { name: setName.trim(), algs }]);
       form.reset();
     } catch (error) {
-      form.setErrors({ algList: error.message });
+      form.setErrors({ algList: (error as Error).message });
     }
   };
 
@@ -100,7 +100,7 @@ const AddAlgSetView: React.FC = () => {
       </Button>
       {showInstructions && (
         <Box my="sm" style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '5px' }}>
-          <Text weight={700} mb="xs" style={{ fontSize: '20px' }}>Algorithm Input Format</Text>
+          <Text fw={700} mb="xs" style={{ fontSize: '20px' }}>Algorithm Input Format</Text>
           <List spacing="sm" type="ordered" style={{ color: '#555', lineHeight: '1.6' }}>
             <List.Item>
               <Text><strong>List each algorithm on a separate line.</strong></Text>
@@ -176,7 +176,7 @@ const AddAlgSetView: React.FC = () => {
           {...form.getInputProps('algList')}
           error={form.errors.algList}
         />
-        <Group position="right">
+        <Group>
           <Button type="submit">Add AlgSet</Button>
         </Group>
       </form>

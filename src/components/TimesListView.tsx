@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Title, Menu, ActionIcon, Group, rem } from '@mantine/core';
-import { DataTable } from 'mantine-datatable';
+import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { TbDots, TbTrash, TbInfoCircle, TbDownload } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -43,8 +43,8 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
   };
 
   const handleExportData = () => {
-    const formatTimestamp = (date) => {
-      const pad = (num) => (num < 10 ? '0' : '') + num;
+    const formatTimestamp = (date: Date) => {
+      const pad = (num: number) => (num < 10 ? '0' : '') + num;
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
     };
 
@@ -54,7 +54,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
     const csvConfig = mkConfig({
       filename,
       useKeysAsHeaders: true,
-      showLabels: true,
+      showColumnHeaders: true,
     });
 
     const simplifiedStats = stats.map(stat => ({
@@ -66,8 +66,8 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
     download(csvConfig)(csv);
   };
 
-  const columns = [
-    { accessor: 'index', title: '#',  textAlign: 'right', render: (record: SolveStat, index: number) => stats.length - index },
+  const columns: DataTableColumn<SolveStat>[] = [
+    { accessor: 'index', title: '#', textAlign: 'right', render: (_: SolveStat, index: number) => stats.length - index },
     { accessor: 'name', title: 'Name', render: (record: SolveStat) => record.name },
     { accessor: 'recognitionTime', title: 'Rec', textAlign: 'right', render: (record: SolveStat) => (Math.ceil(record.recognitionTime / 10) / 100).toFixed(2) },
     { accessor: 'executionTime', title: 'Exec', textAlign: 'right', render: (record: SolveStat) => (Math.ceil(record.executionTime / 10) / 100).toFixed(2) },

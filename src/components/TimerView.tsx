@@ -7,7 +7,7 @@ interface TimerViewProps {
 
 const TimerView: React.FC<TimerViewProps> = ({ startTime }) => {
   const [currentTime, setCurrentTime] = useState<number>(startTime);
-  const timerCallbackId = useRef();
+  const timerCallbackId = useRef<number>();
 
   useEffect(() => {
     timerCallbackId.current = window.setInterval(() => {
