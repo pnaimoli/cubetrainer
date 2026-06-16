@@ -88,7 +88,7 @@ function isStickerCorrect(reidPieces: string[], stickerName: string): boolean {
   }
 
   const mainFace = stickerName[0];
-  const pieceIndex = pieceType === 'EDGES' ? pieceNames['EDGES'].indexOf(stickerName) : pieceNames['CORNERS'].indexOf(stickerName);
+  const pieceIndex = pieceType === 'EDGES' ? pieceNames['EDGES'].indexOf(stickerName) : 12 + pieceNames['CORNERS'].indexOf(stickerName);
   const actualSticker = reidPieces[pieceIndex][0];
   const expectedSticker = reidPieces[20 + pieceNames['CENTERS'].indexOf(mainFace)];
 
