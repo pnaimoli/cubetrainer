@@ -1,7 +1,6 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Box, Tooltip, Group, Center, Collapse, ActionIcon, Text, Divider } from '@mantine/core';
+import { Stack, Checkbox, Select, Tooltip, Group, Collapse, ActionIcon, Text, Divider, Box } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { FaInfoCircle } from 'react-icons/fa';
 import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
 import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
 
@@ -30,19 +29,36 @@ const SettingsView: React.FC = () => {
       <Group>
         <Group gap="xs" onClick={() => setSettings(cycleSetting(settings, "playlistMode"))} style={{ cursor: 'pointer' }}>
           <Text fz="sm">Order:</Text>
-          <ActionIcon variant="subtle">
-            {settings.playlistMode === 'ordered' && <TbListNumbers style={{ color: 'gray' }} />}
-            {settings.playlistMode === 'shuffle' && <TbArrowsShuffle style={{ color: 'green' }} />}
-            {settings.playlistMode === 'random' && <TbArrowsRandom style={{ color: 'green' }} />}
-          </ActionIcon>
+          <Tooltip withArrow label={
+            settings.playlistMode === 'ordered' ? 'Ordered - play algs in sequence' :
+            settings.playlistMode === 'shuffle' ? 'Shuffle - cycle through all algs in random order before repeating' :
+            'Random - pick a random alg each time'
+          }>
+            <ActionIcon variant="subtle">
+              {settings.playlistMode === 'ordered' && <TbListNumbers style={{ color: 'gray' }} />}
+              {settings.playlistMode === 'shuffle' && <TbArrowsShuffle style={{ color: 'green' }} />}
+              {settings.playlistMode === 'random' && <TbArrowsRandom style={{ color: 'green' }} />}
+            </ActionIcon>
+          </Tooltip>
         </Group>
-        <Group gap="xs" onClick={() => setSettings(cycleSetting(settings, "loopMode"))} style={{ cursor: 'pointer' }}>
+        <Group
+          gap="xs"
+          onClick={() => settings.playlistMode !== 'random' && setSettings(cycleSetting(settings, "loopMode"))}
+          style={{ cursor: settings.playlistMode === 'random' ? 'not-allowed' : 'pointer', opacity: settings.playlistMode === 'random' ? 0.4 : 1 }}
+        >
           <Text fz="sm">Loop:</Text>
-          <ActionIcon variant="subtle">
-            {settings.loopMode === 'no loop' && <TbRepeatOff style={{ color: 'gray' }} />}
-            {settings.loopMode === 'loop' && <TbRepeat style={{ color: 'green' }} />}
-            {settings.loopMode === 'loop1' && <TbRepeatOnce style={{ color: 'green' }} />}
-          </ActionIcon>
+          <Tooltip withArrow label={
+            settings.playlistMode === 'random' ? 'Loop has no effect in random mode - only Repeat Once is meaningful' :
+            settings.loopMode === 'no loop' ? 'No Loop - stop after the last alg' :
+            settings.loopMode === 'loop' ? 'Loop - restart from the beginning after finishing' :
+            'Repeat Once - keep repeating the current alg'
+          }>
+            <ActionIcon variant="subtle" disabled={settings.playlistMode === 'random'}>
+              {settings.loopMode === 'no loop' && <TbRepeatOff style={{ color: 'gray' }} />}
+              {settings.loopMode === 'loop' && <TbRepeat style={{ color: 'green' }} />}
+              {settings.loopMode === 'loop1' && <TbRepeatOnce style={{ color: 'green' }} />}
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
       <Divider label="Symmetries" />
@@ -52,18 +68,15 @@ const SettingsView: React.FC = () => {
           checked={settings.randomAUF}
           onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
         />
-        <Checkbox
-          label={
-            <Center>
-              Random y's
-              <Tooltip label="Do a random number of y rotation(s) after the setup" withArrow>
-                <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
-              </Tooltip>
-            </Center>
-          }
-          checked={settings.randomYs}
-          onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
-        />
+        <Tooltip label="Do a random number of y rotation(s) after the setup" withArrow>
+          <Box display="inline-flex">
+            <Checkbox
+              label="Random y's"
+              checked={settings.randomYs}
+              onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
+            />
+          </Box>
+        </Tooltip>
       </Group>
       <Group>
         <Checkbox
@@ -97,18 +110,15 @@ const SettingsView: React.FC = () => {
         checked={settings.showHintFacelets}
         onChange={(event) => setSettings({ ...settings, showHintFacelets: event.currentTarget.checked })}
       />
-      <Checkbox
-        label={
-          <Center>
-            Use Maskings
-            <Tooltip label="3D cube can optionally grey out unimportant stickers to your current case" withArrow>
-              <Box><FaInfoCircle style={{ marginLeft: 5 }} /></Box>
-            </Tooltip>
-          </Center>
-        }
-        checked={settings.useMaskings}
-        onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
-      />
+      <Tooltip label="3D cube can optionally grey out unimportant stickers to your current case" withArrow>
+        <Box display="inline-flex">
+          <Checkbox
+            label="Use Maskings"
+            checked={settings.useMaskings}
+            onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
+          />
+        </Box>
+      </Tooltip>
       <Divider label="Preorientation"/>
       <Group>
         <Checkbox

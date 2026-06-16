@@ -115,4 +115,5 @@ export interface SolveStat {
   Ys: number; // Number of Y rotations
   mirroredOverM: boolean;
   mirroredOverS: boolean;
+  preorientationMoves: string[];
 }

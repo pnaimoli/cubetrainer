@@ -12,6 +12,7 @@ import { CTAlg } from '../util/CTAlg';
 import { Settings, AlgSet, Alg, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
+import { getNextAlg, ShuffleQueue } from '../util/playlist';
 import TimerView from './TimerView';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
@@ -107,42 +108,59 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings.randomYs));
   const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+  const [shuffleQueue, setShuffleQueue] = useState<ShuffleQueue>([]);
+  const [historyOffset, setHistoryOffset] = useState<number>(0);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
+
+  const currentStats = stats[currentAlgSet.name] || [];
+  const historyStat = historyOffset > 0
+    ? currentStats[currentStats.length - historyOffset] ?? null
+    : null;
+  const displayedAlg = historyStat
+    ? (currentAlgSet.algs.find(a => a.name === historyStat.name) ?? currentAlg)
+    : currentAlg;
+  const displayedPreorientation = historyStat
+    ? (historyStat.preorientationMoves ?? []).map(m => ({ move: m, timeOfMove: 0 }))
+    : preorientationMoves;
+  const displayedRandomUs = historyStat ? historyStat.AUFs : randomUs;
+  const displayedRandomYs = historyStat ? historyStat.Ys : randomYs;
+  const displayedMirrorAcrossM = historyStat ? historyStat.mirroredOverM : mirrorAcrossM;
+  const displayedMirrorAcrossS = historyStat ? historyStat.mirroredOverS : mirrorAcrossS;
 
   const setupAlg = useMemo(() => {
     // First compute what the inverse of our alg needs to be,
     // subject to potentially mirroring across a couple axes
-    let algString = currentAlg.alg.join(' ');
+    let algString = displayedAlg.alg.join(' ');
 
-    if (mirrorAcrossM)
+    if (displayedMirrorAcrossM)
       algString = (new CTAlg(algString)).mirror().toString();
-    if (mirrorAcrossS)
+    if (displayedMirrorAcrossS)
       algString = (new CTAlg(algString)).mirrorOverS().toString();
 
     const inverseAlg = (new CTAlg(algString)).invert().toString();
 
-    const preorientationString = preorientationMoves.map(move => move.move).join(' ');
+    const preorientationString = displayedPreorientation.map(move => move.move).join(' ');
 
     let postMoves = '';
-    if (randomUs === 1) {
+    if (displayedRandomUs === 1) {
       postMoves += ' U';
-    } else if (randomUs === 2) {
+    } else if (displayedRandomUs === 2) {
       postMoves += ` U2`;
-    } else if (randomUs === 3) {
+    } else if (displayedRandomUs === 3) {
       postMoves += ` U'`;
     }
 
-    if (randomYs === 1) {
+    if (displayedRandomYs === 1) {
       postMoves += ' y';
-    } else if (randomYs === 2) {
+    } else if (displayedRandomYs === 2) {
       postMoves += ` y2`;
-    } else if (randomYs === 3) {
+    } else if (displayedRandomYs === 3) {
       postMoves += ` y'`;
     }
 
     return `${preorientationString} ${inverseAlg} ${postMoves}`.replace(/\s+/g, ' ').trim();
-  }, [currentAlg, preorientationMoves, randomUs, randomYs, mirrorAcrossM, mirrorAcrossS]);
+  }, [displayedAlg, displayedPreorientation, displayedRandomUs, displayedRandomYs, displayedMirrorAcrossM, displayedMirrorAcrossS]);
 
   const effectiveSolvedState = useMemo(() => {
     const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
@@ -185,18 +203,18 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       return mirroredState;
     };
 
-    let newEffectiveSolvedState = currentAlg.solved ?? SolvedState.FULL;
-    if (mirrorAcrossM)
+    let newEffectiveSolvedState = displayedAlg.solved ?? SolvedState.FULL;
+    if (displayedMirrorAcrossM)
       newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_M_MAPPING);
-    if (mirrorAcrossS)
+    if (displayedMirrorAcrossS)
       newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, MIRROR_ACROSS_S_MAPPING);
-    if (randomYs > 0) {
-      for (let i = 0; i < randomYs; ++i)
+    if (displayedRandomYs > 0) {
+      for (let i = 0; i < displayedRandomYs; ++i)
         newEffectiveSolvedState = mapSolvedState(newEffectiveSolvedState, Y_ROTATION_MAPPING);
     }
 
     return newEffectiveSolvedState;
-  }, [currentAlg, randomYs, mirrorAcrossM, mirrorAcrossS]);
+  }, [displayedAlg, displayedRandomYs, displayedMirrorAcrossM, displayedMirrorAcrossS]);
 
   const stickeringMask = useMemo(() => {
     if (!settings.useMaskings || !kpuzzle)
@@ -210,6 +228,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   /////////////////////////////////////////////////////////////////////////////
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
     if (event.type !== "MOVE") return;
+    if (historyOffset > 0) return;
 
     const newMove = { move: event.move, timeOfMove: Date.now() };
     const newMoves = [...movesRef.current, newMove];
@@ -238,6 +257,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       Ys: randomYs,
       mirroredOverM: mirrorAcrossM,
       mirroredOverS: mirrorAcrossS,
+      preorientationMoves: preorientationMoves.map(m => m.move),
     };
 
     setStats(prevStats => {
@@ -250,16 +270,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       };
     });
 
-    let newCurrentAlg;
-    if (settings.playlistMode === 'ordered') {
-      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg.name);
-      newCurrentAlg = currentAlgSet.algs[(currentIndex + 1) % currentAlgSet.algs.length];
-    } else {
-      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-      newCurrentAlg = currentAlgSet.algs[randomIndex];
-    }
+    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(currentAlg, currentAlgSet, settings, shuffleQueue);
 
     setCurrentAlg(newCurrentAlg);
+    setShuffleQueue(newShuffleQueue);
+    setHistoryOffset(0);
     setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
     setRandomUs(recomputeRandomUs(settings.randomAUF));
     setRandomYs(recomputeRandomYs(settings.randomYs));
@@ -270,6 +285,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setStartTime(Date.now());
   }, [currentAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
       kpuzzle, mirrorAcrossM, mirrorAcrossS, randomUs, randomYs, settings,
+      shuffleQueue, historyOffset, preorientationMoves,
       setStats]);
 
   /////////////////////////////////////////////////////////////////////////////
@@ -346,22 +362,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // Control Handlers
   /////////////////////////////////////////////////////////////////////////////
   const handlePrev = () => {
-    const currentStats = stats[currentAlgSet.name] || [];
-    if (currentStats.length === 0) return;
-
-    const prevStat = currentStats[currentStats.length - 1];
-    const prevAlg = currentAlgSet.algs.find(alg => alg.name === prevStat.name);
-    if (prevAlg) {
-      setCurrentAlg(prevAlg);
-      setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
-      setRandomUs(prevStat.AUFs);
-      setRandomYs(prevStat.Ys);
-      setMirrorAcrossM(prevStat.mirroredOverM);
-      setMirrorAcrossS(prevStat.mirroredOverS);
-      movesRef.current = [];
-      setMoves([]);
-      setStartTime(Date.now());
-    }
+    if (historyOffset >= currentStats.length) return;
+    setHistoryOffset(prev => prev + 1);
+    movesRef.current = [];
+    setMoves([]);
+    setStartTime(Date.now());
   };
 
   const handleRestart = () => {
@@ -371,16 +376,16 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   };
 
   const handleNext = () => {
-    let newCurrentAlg;
-    if (settings.playlistMode === 'ordered') {
-      const currentIndex = currentAlgSet.algs.findIndex(alg => alg.name === currentAlg.name);
-      newCurrentAlg = currentAlgSet.algs[(currentIndex + 1) % currentAlgSet.algs.length];
-    } else {
-      const randomIndex = Math.floor(Math.random() * currentAlgSet.algs.length);
-      newCurrentAlg = currentAlgSet.algs[randomIndex];
+    if (historyOffset > 0) {
+      setHistoryOffset(prev => prev - 1);
+      movesRef.current = [];
+      setMoves([]);
+      setStartTime(Date.now());
+      return;
     }
-
+    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(currentAlg, currentAlgSet, settings, shuffleQueue);
     setCurrentAlg(newCurrentAlg);
+    setShuffleQueue(newShuffleQueue);
     setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
     setRandomUs(recomputeRandomUs(settings.randomAUF));
     setRandomYs(recomputeRandomYs(settings.randomYs));
@@ -432,14 +437,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             <Group justify="space-between">
               <Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title>
               <Group>
-                <Button disabled={stats[currentAlgSet.name] ? false : true} variant="outline" size="xs" onClick={handlePrev} leftSection={<TbArrowLeft />}>
+                <Button disabled={historyOffset >= currentStats.length} variant="outline" size="xs" onClick={handlePrev} leftSection={<TbArrowLeft />}>
                   Previous
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
                   Retry
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
-                  Next
+                  {historyOffset > 0 ? 'Forward' : 'Skip'}
                 </Button>
               </Group>
             </Group>
@@ -451,11 +456,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         <Card withBorder={true} h="500">
           <Card.Section withBorder={true} px="xs">
               <Title order={2}>
-                Case Name: {currentAlg.name}
+                Case Name: {displayedAlg.name}
               </Title>
           </Card.Section>
           <Card.Section withBorder={true} px="xs">
-            <Text>{currentAlg.alg.join(' ')}</Text>
+            <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
           <Stack align="center" gap={0}>
             <TimerView key={startTime} startTime={startTime} />
