@@ -8,7 +8,7 @@ import {
   StickeringManager,
 } from "./mask";
 
-const getRotationsToInitialState = (kpattern: KPattern): [number, number, number] => {
+export const getRotationsToInitialState = (kpattern: KPattern): [number, number, number] => {
   // Centers in WCA state: [U, L, F, R, B, D]
   const WCA_CENTERS = kpattern.kpuzzle.defaultPattern().patternData.CENTERS.pieces;
 
@@ -39,15 +39,8 @@ const getRotationsToInitialState = (kpattern: KPattern): [number, number, number
   }
 
   // If we were unable to get the U face on top using z rotations, try x rotations.
-
-  // Try up to 4 y rotations to get 1 to the L face.
-  let y = 0;
-  if (rotatedPattern.patternData.CENTERS.pieces[1] !== WCA_CENTERS[1]) {
-    for (y = 1; y < 4; y++) {
-      rotatedPattern = rotatedPattern.applyAlg("y");
-      if (rotatedPattern.patternData.CENTERS.pieces[1] === WCA_CENTERS[1]) break;
-    }
-  }
+  // x rotates U/F/D/B and leaves L/R untouched, so fix U first with x.
+  // Then fix L with y (y rotates F/R/B/L and leaves U/D untouched).
 
   // Try up to 4 x rotations to get 0 to the U face.
   let x = 0;
@@ -58,6 +51,14 @@ const getRotationsToInitialState = (kpattern: KPattern): [number, number, number
     }
   }
 
+  // Try up to 4 y rotations to get 1 to the L face.
+  let y = 0;
+  if (rotatedPattern.patternData.CENTERS.pieces[1] !== WCA_CENTERS[1]) {
+    for (y = 1; y < 4; y++) {
+      rotatedPattern = rotatedPattern.applyAlg("y");
+      if (rotatedPattern.patternData.CENTERS.pieces[1] === WCA_CENTERS[1]) break;
+    }
+  }
 
   return [x, y, 0];
 };
@@ -143,11 +144,11 @@ export const generateStickeringMask = (kpattern: KPattern, solvedState: number):
     if (rotationsNeeded[2] !== 0) {
       rotationString += `z${rotationsNeeded[2]} `;
     }
-    if (rotationsNeeded[1] !== 0) {
-      rotationString += `y${rotationsNeeded[1]} `;
-    }
     if (rotationsNeeded[0] !== 0) {
       rotationString += `x${rotationsNeeded[0]} `;
+    }
+    if (rotationsNeeded[1] !== 0) {
+      rotationString += `y${rotationsNeeded[1]} `;
     }
 
     // if there's a move like z1, just replace it with z

@@ -2,7 +2,16 @@ import { expect } from 'chai';
 import { KPattern, KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 import { SolvedState } from './interfaces';
-import { generateStickeringMask } from './StickeringMask';
+import { generateStickeringMask, getRotationsToInitialState } from './StickeringMask';
+
+const applyRotations = (pattern: KPattern, x: number, y: number, z: number): KPattern => {
+  let p = pattern;
+  // Applied in z, x, y order (matching how generateStickeringMask builds rotationString)
+  for (let i = 0; i < z; i++) p = p.applyAlg("z");
+  for (let i = 0; i < x; i++) p = p.applyAlg("x");
+  for (let i = 0; i < y; i++) p = p.applyAlg("y");
+  return p;
+};
 
 const R = { facelets: new Array(5).fill("regular") };
 //const D = { facelets: new Array(5).fill("dim") };
@@ -168,5 +177,50 @@ describe('StickeringMask Test', () => {
         },
       }
     }), "OLL");
+  });
+});
+
+describe('getRotationsToInitialState', () => {
+  let kpuzzle: KPuzzle;
+
+  before(async () => {
+    kpuzzle = await cube3x3x3.kpuzzle() as unknown as KPuzzle;
+  });
+
+  const WCA_CENTERS = [0, 1, 2, 3, 4, 5];
+
+  const checkResult = (pattern: KPattern, label: string) => {
+    const [x, y, z] = getRotationsToInitialState(pattern);
+    const result = applyRotations(pattern, x, y, z);
+    expect(result.patternData.CENTERS.pieces).to.deep.equal(WCA_CENTERS, label);
+  };
+
+  it('returns zero rotations for identity', () => {
+    checkResult(kpuzzle.defaultPattern(), 'identity');
+  });
+
+  it('handles z-fixable rotations (success path)', () => {
+    // z cycles U/R/D/L so z-only rotations can always return U to the top
+    checkResult(kpuzzle.defaultPattern().applyAlg("z"), 'z');
+    checkResult(kpuzzle.defaultPattern().applyAlg("z2"), 'z2');
+    checkResult(kpuzzle.defaultPattern().applyAlg("z y2"), 'z y2');
+  });
+
+  it('handles fallback path when U center is at F or B (x rotation)', () => {
+    // x puts U at F/B - z cannot reach F or B, so the fallback (y then x) is used
+    // When L is already correct (y=0), the fallback works fine
+    checkResult(kpuzzle.defaultPattern().applyAlg("x"), 'x');
+    checkResult(kpuzzle.defaultPattern().applyAlg("x'"), "x'");
+    checkResult(kpuzzle.defaultPattern().applyAlg("x2"), 'x2');
+  });
+
+  it('handles fallback path when U center is at F/B and L also needs fixing', () => {
+    // These require both x and y in the fallback. The bug is that y is applied
+    // before x, but y can move U center (at F/B) to L/R where x cannot reach it.
+    // Correct fix: apply x first (leaves L alone), then y.
+    checkResult(kpuzzle.defaultPattern().applyAlg("x z"), 'x z');
+    checkResult(kpuzzle.defaultPattern().applyAlg("x z'"), "x z'");
+    checkResult(kpuzzle.defaultPattern().applyAlg("x2 z"), 'x2 z');
+    checkResult(kpuzzle.defaultPattern().applyAlg("z y"), 'z y');
   });
 });
