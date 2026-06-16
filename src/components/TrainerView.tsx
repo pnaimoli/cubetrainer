@@ -100,6 +100,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const [moves, setMoves] = useState<Move[]>([]);
+  const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
   const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(settings.randomAUF));
@@ -211,7 +212,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (event.type !== "MOVE") return;
 
     const newMove = { move: event.move, timeOfMove: Date.now() };
-    const newMoves = [...moves, newMove];
+    const newMoves = [...movesRef.current, newMove];
+    movesRef.current = newMoves;
     playerRef.current?.experimentalAddMove(event.move);
 
     const moveString = newMoves.map(move => move.move).join(' ');
@@ -222,7 +224,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
 
     if (!isSolved) {
-      setMoves(prevMoves => ([...prevMoves, newMove]));
+      setMoves(newMoves);
       return;
     }
 
@@ -263,9 +265,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setRandomYs(recomputeRandomYs(settings.randomYs));
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
     setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+    movesRef.current = [];
     setMoves([]);
     setStartTime(Date.now());
-  }, [currentAlg, moves, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
+  }, [currentAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
       kpuzzle, mirrorAcrossM, mirrorAcrossS, randomUs, randomYs, settings,
       setStats]);
 
@@ -285,18 +288,22 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     fetchPuzzle();
   }, []);
 
+  const handleCubeMoveEventRef = useRef(handleCubeMoveEvent);
+  useEffect(() => {
+    handleCubeMoveEventRef.current = handleCubeMoveEvent;
+  }, [handleCubeMoveEvent]);
+
   useEffect(() => {
     if (conn) {
-      const handleCubeEvent = async (event: GanCubeEvent) => {
-        handleCubeMoveEvent(event);
-      };
-      const sub = conn.events$.subscribe(handleCubeEvent);
+      const sub = conn.events$.subscribe((event) => {
+        handleCubeMoveEventRef.current(event);
+      });
 
       return () => {
         sub.unsubscribe();
       };
     }
-  }, [conn, handleCubeMoveEvent]);
+  }, [conn]);
 
   useEffect(() => {
     if (initialAlg === null) return;
