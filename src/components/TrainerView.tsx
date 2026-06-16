@@ -358,12 +358,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setRandomYs(prevStat.Ys);
       setMirrorAcrossM(prevStat.mirroredOverM);
       setMirrorAcrossS(prevStat.mirroredOverS);
+      movesRef.current = [];
       setMoves([]);
       setStartTime(Date.now());
     }
   };
 
   const handleRestart = () => {
+    movesRef.current = [];
     setMoves([]);
     setStartTime(Date.now());
   };
@@ -384,6 +386,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setRandomYs(recomputeRandomYs(settings.randomYs));
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
     setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+    movesRef.current = [];
     setMoves([]);
     setStartTime(Date.now());
   };
