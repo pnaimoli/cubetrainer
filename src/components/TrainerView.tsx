@@ -316,7 +316,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       };
     });
 
-    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(currentAlg, currentAlgSet, settings, shuffleQueue);
+    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
 
     setCurrentAlg(newCurrentAlg);
     setShuffleQueue(newShuffleQueue);
@@ -429,7 +429,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setStartTime(Date.now());
       return;
     }
-    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(currentAlg, currentAlgSet, settings, shuffleQueue);
+    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
     setCurrentAlg(newCurrentAlg);
     setShuffleQueue(newShuffleQueue);
     setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
