@@ -3,6 +3,7 @@ import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, 
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
+import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff } from 'react-icons/tb';
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
@@ -23,6 +24,8 @@ const App: React.FC = () => {
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [cubeName, setCubeName] = useState<string>('GAN Cube');
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
 
   const handleBluetoothConnect = async () => {
     setError(null);
@@ -30,11 +33,27 @@ const App: React.FC = () => {
     if (conn) {
       conn.disconnect();
       setConn(null);
+      setCubeName('GAN Cube');
+      setBatteryLevel(null);
       setLoading(false);
     } else {
       try {
         const connection = await connectGanCube();
+        const sub = connection.events$.subscribe((event) => {
+          if (event.type === 'HARDWARE' && event.hardwareName) {
+            setCubeName(event.hardwareName);
+          } else if (event.type === 'BATTERY') {
+            setBatteryLevel(event.batteryLevel);
+          } else if (event.type === 'DISCONNECT') {
+            setConn(null);
+            setCubeName('GAN Cube');
+            setBatteryLevel(null);
+            sub.unsubscribe();
+          }
+        });
         await connection.sendCubeCommand({ type: "REQUEST_FACELETS" });
+        await connection.sendCubeCommand({ type: "REQUEST_HARDWARE" });
+        setTimeout(() => connection.sendCubeCommand({ type: "REQUEST_BATTERY" }), 500);
         setConn(connection);
         setLoading(false);
       } catch (error) {
@@ -45,6 +64,15 @@ const App: React.FC = () => {
         }
       }
     }
+  };
+
+  const BatteryIcon = ({ level }: { level: number }) => {
+    const style = { display: 'block' };
+    if (level > 75) return <TbBattery4 size="1.5rem" style={style} />;
+    if (level > 50) return <TbBattery3 size="1.5rem" style={style} />;
+    if (level > 25) return <TbBattery2 size="1.5rem" style={style} />;
+    if (level > 0) return <TbBattery1 size="1.5rem" style={style} />;
+    return <TbBatteryOff size="1.5rem" style={style} />;
   };
 
   const handleDeleteAlgSet = (name: string): void => {
@@ -113,11 +141,12 @@ const App: React.FC = () => {
             <Stack align="center">
               <Button
                 leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}
+                rightSection={conn && batteryLevel !== null ? <Tooltip label={`${batteryLevel}%`} withArrow><Box><BatteryIcon level={batteryLevel} /></Box></Tooltip> : undefined}
                 onClick={handleBluetoothConnect}
-                color={conn ? '' : 'red'}
+                color={conn ? 'green' : 'red'}
                 loading={loading}
               >
-                {conn ? 'Disconnect Gan 12 Cube' : 'Connect Gan 12 Cube'}
+                {conn ? `${cubeName} Connected` : 'Connect GAN Cube'}
               </Button>
               <Text color="red" size="xs" pos="absolute" top={0}>{error}</Text>
             </Stack>
