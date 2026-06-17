@@ -96,12 +96,61 @@ interface TrainerViewProps {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// SolvedStateBadges
+///////////////////////////////////////////////////////////////////////////////
+interface SolvedStateBadgesProps {
+  kpuzzle: KPuzzle | null;
+  setupAlg: string;
+  effectiveSolvedState: number;
+  movesRef: React.RefObject<Move[]>;
+}
+
+export interface SolvedStateBadgesHandle {
+  notify: () => void;
+}
+
+const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateBadgesProps>(
+  ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef }, ref) => {
+    const [, setMoveCount] = useState(0);
+
+    React.useImperativeHandle(ref, () => ({
+      notify: () => setMoveCount(c => c + 1),
+    }));
+
+    if (!kpuzzle) return <Group />;
+
+    return (
+      <Group gap="xs" mt="xs">
+        {Object.keys(SolvedState)
+          .filter((key) => isNaN(Number(key)))
+          .map((key) => {
+            const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
+            const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
+            const moveString = (movesRef.current ?? []).map((move) => move.move).join(' ');
+            const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+            const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+
+            return (
+              <Badge
+                key={key}
+                color={solved ? 'green' : 'gray'}
+                bd={isActive ? '1px solid var(--mantine-primary-color-5)' : 'none'}
+              >
+                {key}
+              </Badge>
+            );
+          })}
+      </Group>
+    );
+  }
+);
+
+///////////////////////////////////////////////////////////////////////////////
 // TrainerView
 ///////////////////////////////////////////////////////////////////////////////
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
-  const [moves, setMoves] = useState<Move[]>([]);
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
@@ -115,6 +164,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
+  const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStats = stats[currentAlgSet.id] || [];
@@ -292,7 +342,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
 
     if (!isSolved) {
-      setMoves(newMoves);
+      badgesRef.current?.notify();
       return;
     }
 
@@ -334,7 +384,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
       setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
       movesRef.current = [];
-      setMoves([]);
+  
       setStartTime(Date.now());
     };
 
@@ -385,7 +435,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     if (initialAlg === null) return;
     setCurrentAlg(initialAlg);
-    setMoves([]);
+
     setStartTime(Date.now());
   }, [initialAlg]);
 
@@ -415,9 +465,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [playerRef, stickeringMask]);
 
   useEffect(() => {
-    if (moves.length === 0 && playerRef.current)
+    if (movesRef.current.length === 0 && playerRef.current)
       playerRef.current.alg = '';
-  }, [playerRef, moves]);
+  }, [playerRef, startTime]);
 
   useEffect(() => {
     return () => {
@@ -432,13 +482,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (historyOffset >= currentStats.length) return;
     setHistoryOffset(prev => prev + 1);
     movesRef.current = [];
-    setMoves([]);
+
     setStartTime(Date.now());
   };
 
   const handleRestart = () => {
     movesRef.current = [];
-    setMoves([]);
+
     setStartTime(Date.now());
   };
 
@@ -446,7 +496,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (historyOffset > 0) {
       setHistoryOffset(prev => prev - 1);
       movesRef.current = [];
-      setMoves([]);
+  
       setStartTime(Date.now());
       return;
     }
@@ -459,38 +509,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
     setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
     movesRef.current = [];
-    setMoves([]);
+
     setStartTime(Date.now());
-  };
-
-  /////////////////////////////////////////////////////////////////////////////
-  // Helper functions
-  /////////////////////////////////////////////////////////////////////////////
-  const renderSolvedStateBadges = () => {
-    if (!kpuzzle) return (<Group />);
-    return (
-      <Group gap="xs" mt="xs">
-        {Object.keys(SolvedState)
-          .filter((key) => isNaN(Number(key)))
-          .map((key) => {
-            const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
-            const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
-            const moveString = moves.map((move) => (move.move)).join(' ');
-            const currentPattern = kpuzzle?.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
-            const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
-
-            return (
-              <Badge
-                key={key}
-                color={solved ? 'green' : 'gray'}
-                bd={isActive ? '1px solid var(--mantine-primary-color-5)' : 'none'}
-              >
-                {key}
-              </Badge>
-            );
-          })}
-      </Group>
-    );
   };
 
   /////////////////////////////////////////////////////////////////////////////
@@ -516,7 +536,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
               </Group>
             </Group>
           </Card.Section>
-          {renderSolvedStateBadges()}
+          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={setupAlg} effectiveSolvedState={effectiveSolvedState} movesRef={movesRef} />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
