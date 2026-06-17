@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { Grid, Card, Skeleton, Text, Badge, Title, Group, Stack, Button } from '@mantine/core';
-import { TbArrowLeft, TbArrowRight, TbRefresh } from 'react-icons/tb';
+import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
@@ -110,6 +110,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
   const [shuffleQueue, setShuffleQueue] = useState<ShuffleQueue>([]);
   const [historyOffset, setHistoryOffset] = useState<number>(0);
+  const [caseHidden, setCaseHidden] = useState<boolean>(false);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
@@ -455,8 +456,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       <Grid.Col span={4}>
         <Card withBorder={true} h="500">
           <Card.Section withBorder={true} px="xs">
-              <Title order={2}>
-                Case Name: {displayedAlg.name}
+              <Title order={2} style={{ cursor: 'pointer' }} onClick={() => setCaseHidden(h => !h)}>
+                Case Name {caseHidden
+                  ? <TbEyeOff style={{ verticalAlign: 'middle' }} />
+                  : <TbEye style={{ verticalAlign: 'middle' }} />
+                }: {caseHidden ? '???' : displayedAlg.name}
               </Title>
           </Card.Section>
           <Card.Section withBorder={true} px="xs">
