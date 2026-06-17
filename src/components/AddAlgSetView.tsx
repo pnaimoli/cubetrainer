@@ -40,7 +40,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) 
         if (value.length > 30) {
           return 'Name must be at most 30 characters';
         }
-        if (algSets.some(set => set.name === value.trim() && (!isEditing || set.name !== editingAlgSet!.name))) {
+        if (algSets.some(set => set.name === value.trim() && (!isEditing || set.id !== editingAlgSet!.id))) {
           return 'An algorithm set of this name already exists';
         }
         return null;
@@ -90,9 +90,9 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) 
       });
 
       if (isEditing) {
-        setAlgSets(algSets.map(set => set.name === editingAlgSet!.name ? { name: setName.trim(), algs } : set));
+        setAlgSets(algSets.map(set => set.id === editingAlgSet!.id ? { ...set, name: setName.trim(), algs } : set));
       } else {
-        setAlgSets([...algSets, { name: setName.trim(), algs }]);
+        setAlgSets([...algSets, { id: crypto.randomUUID(), name: setName.trim(), algs }]);
       }
       onSave?.();
       if (!isEditing) form.reset();

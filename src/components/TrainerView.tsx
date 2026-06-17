@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Skeleton, Text, Badge, Title, Group, Stack, Button } from '@mantine/core';
+import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button } from '@mantine/core';
 import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
@@ -16,6 +16,7 @@ import { getNextAlg, ShuffleQueue } from '../util/playlist';
 import TimerView from './TimerView';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
+import SettingsView from './SettingsView';
 
 const initializeCurrentAlg = (initialAlg: Alg | null, currentAlgSet: AlgSet, settings: Settings): Alg => {
   if (initialAlg) {
@@ -114,7 +115,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
 
-  const currentStats = stats[currentAlgSet.name] || [];
+  const currentStats = stats[currentAlgSet.id] || [];
   const historyStat = historyOffset > 0
     ? currentStats[currentStats.length - historyOffset] ?? null
     : null;
@@ -309,8 +310,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setStats(prevStats => {
       return {
         ...prevStats,
-        [currentAlgSet.name]: [
-          ...(prevStats[currentAlgSet.name] || []),
+        [currentAlgSet.id]: [
+          ...(prevStats[currentAlgSet.id] || []),
           newSolveStat
         ]
       };
@@ -529,15 +530,19 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       </Grid.Col>
       <Grid.Col span={4}>
         <Stack h="500">
-          <SummaryStatsView algSetName={currentAlgSet.name} />
-          <TimesListView algSetName={currentAlgSet.name} />
+          <SummaryStatsView algSetId={currentAlgSet.id} />
+          <TimesListView algSetId={currentAlgSet.id} algSetName={currentAlgSet.name} />
         </Stack>
       </Grid.Col>
       <Grid.Col span={4}>
-        <Stack h="500">
-          <Skeleton visible={true} h="100%" />
-          <Skeleton visible={true} h={200} />
-        </Stack>
+        <Card withBorder h="500" style={{ overflowY: 'auto' }}>
+          <Card.Section withBorder px="xs">
+            <Title order={2} mt="xs" mb="xs">Settings</Title>
+          </Card.Section>
+          <Box pt="xs">
+            <SettingsView />
+          </Box>
+        </Card>
       </Grid.Col>
     </Grid>
   );

@@ -9,6 +9,7 @@ const makeAlg = (name: string): Alg => ({
 });
 
 const algSet: AlgSet = {
+  id: 'test-id',
   name: 'Test',
   algs: [makeAlg('A'), makeAlg('B'), makeAlg('C')],
 };

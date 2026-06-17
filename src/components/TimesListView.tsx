@@ -7,17 +7,17 @@ import { mkConfig, generateCsv, download } from 'export-to-csv';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 
 interface TimesListViewProps {
+  algSetId: string;
   algSetName: string;
-  algName?: string; // Optional, if not used, can be removed
 }
 
-const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
+const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName }) => {
   const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
   useEffect(() => {
-    setStats(allStats[algSetName] ?? []);
-  }, [allStats, algSetName]);
+    setStats(allStats[algSetId] ?? []);
+  }, [allStats, algSetId]);
 
   const getMoveName = (move: string, n: number) => {
     if (n === 0) return "";
@@ -30,7 +30,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
   const handleDelete = (index: number) => {
     setAllStats(prevStats => {
       const newStats = { ...prevStats };
-      newStats[algSetName] = newStats[algSetName].filter((_, i) => i !== index);
+      newStats[algSetId] = newStats[algSetId].filter((_, i) => i !== index);
       return newStats;
     });
   };
@@ -39,7 +39,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
 
   const handleDeleteAll = () => {
     setAllStats(prevStats => {
-      const newStats = Object.fromEntries(Object.entries(prevStats).filter(([key]) => key !== algSetName));
+      const newStats = Object.fromEntries(Object.entries(prevStats).filter(([key]) => key !== algSetId));
       return newStats;
     });
   };

@@ -5,18 +5,17 @@ import { useLocalStorage } from '@mantine/hooks';
 import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 
 interface SummaryStatsViewProps {
-  algSetName: string;
-  algName?: string; // Optional, if not used, can be removed
+  algSetId: string;
 }
 
-const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetName }) => {
+const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetId }) => {
   const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
   const [selectedTimeType, setSelectedTimeType] = useState<'rec' | 'exec' | 'total'>('total');
 
   useEffect(() => {
-    setStats(allStats[algSetName] ?? []);
-  }, [allStats, algSetName]);
+    setStats(allStats[algSetId] ?? []);
+  }, [allStats, algSetId]);
 
   const getBest = () => {
     if (stats.length === 0) return '-';

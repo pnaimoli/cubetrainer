@@ -49,6 +49,7 @@ export interface Alg {
 }
 
 export interface AlgSet {
+  id: string;
   name: string;
   algs: Alg[];
 }
@@ -104,6 +105,16 @@ export interface Move {
   timeOfMove: number;
   timeOfMoveFromCube?: number;
 }
+
+export interface ReportSettings {
+  eliminateOutliers: boolean;
+  timeType: 'total' | 'rec' | 'exec';
+}
+
+export const defaultReportSettings: ReportSettings = {
+  eliminateOutliers: true,
+  timeType: 'total',
+};
 
 export interface SolveStat {
   name: string;

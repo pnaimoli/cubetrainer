@@ -1,2 +1,7 @@
-/* 👇 Make sure the styles are applied IN THE CORRECT order */
+/* Make sure the styles are applied IN THE CORRECT order */
 @layer mantine, mantine-datatable;
+
+.reports-table thead th {
+  background-color: var(--mantine-color-dark-5);
+  border-bottom: 2px solid var(--mantine-color-dark-3);
+}

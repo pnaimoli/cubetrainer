@@ -1,17 +1,49 @@
 import React, { useState } from 'react';
 import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
-import { useDisclosure, useLocalStorage } from '@mantine/hooks';
-import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
+import { useLocalStorage } from '@mantine/hooks';
+import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
-import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff } from 'react-icons/tb';
+import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell, TbEdit, TbReport, TbTrash } from 'react-icons/tb';
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
-import { AlgSet, Settings, Alg } from '../util/interfaces';
+import { AlgSet, Settings, Alg, SolveStat } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
-import SettingsView, { defaultSettings } from './SettingsView';
+import { defaultSettings } from './SettingsView';
 import WelcomeView from './WelcomeView';
+import ReportsView from './ReportsView';
+
+// One-time migration: assign ids to AlgSets and re-key stats.
+// Runs synchronously before hooks read localStorage so every useLocalStorage
+// instance across the component tree sees the migrated data on first render.
+// TODO: Remove this migration after all users have been migrated.
+(() => {
+  try {
+    const raw = localStorage.getItem('algSets');
+    if (!raw) return;
+    const sets: AlgSet[] = JSON.parse(raw);
+    if (!sets.some(s => !s.id)) return;
+
+    const rawStats = localStorage.getItem('stats');
+    const stats: Record<string, SolveStat[]> = rawStats ? JSON.parse(rawStats) : {};
+
+    const migrated = sets.map(set => {
+      if (set.id) return set;
+      const id = crypto.randomUUID();
+      if (stats[set.name]) {
+        stats[id] = stats[set.name];
+        delete stats[set.name];
+      }
+      return { ...set, id };
+    });
+
+    localStorage.setItem('algSets', JSON.stringify(migrated));
+    localStorage.setItem('stats', JSON.stringify(stats));
+  } catch {
+    // If localStorage is unavailable or data is corrupt, skip migration
+  }
+})();
 
 const App: React.FC = () => {
   const [view, setView] = useState<string>('Welcome');
@@ -21,7 +53,6 @@ const App: React.FC = () => {
   const [initialAlg, setInitialAlg] = useState<Alg | null>(null);
   const [editingAlgSet, setEditingAlgSet] = useState<AlgSet | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
-  const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,8 +110,9 @@ const App: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const handleDeleteAlgSet = (name: string): void => {
+    const setToDelete = algSets.find(set => set.name === name);
     setAlgSets(algSets.filter(set => set.name !== name));
-    if (currentAlgSet?.name === name) {
+    if (setToDelete && currentAlgSet?.id === setToDelete.id) {
       setCurrentAlgSet(null);
       setView('Welcome');
     }
@@ -105,16 +137,20 @@ const App: React.FC = () => {
           </ActionIcon>
         </Menu.Target>
         <Menu.Dropdown>
-          <Menu.Item onClick={() => {
+          <Menu.Item leftSection={<TbBarbell size={14} />} onClick={() => {
             setInitialAlg(null);
             setCurrentAlgSet(set);
             setView('TrainerView');
           }}>Train</Menu.Item>
-          <Menu.Item onClick={() => {
+          <Menu.Item leftSection={<TbEdit size={14} />} onClick={() => {
             setEditingAlgSet(set);
             setView('AddAlgSetView');
           }}>Edit</Menu.Item>
-          <Menu.Item color="red" onClick={() => setDeleteTarget(set.name)}>Delete</Menu.Item>
+          <Menu.Item leftSection={<TbReport size={14} />} onClick={() => {
+            setCurrentAlgSet(set);
+            setView('ReportsView');
+          }}>Reports</Menu.Item>
+          <Menu.Item leftSection={<TbTrash size={14} />} color="red" onClick={() => setDeleteTarget(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
       </Menu>
     </Flex>
@@ -125,16 +161,18 @@ const App: React.FC = () => {
       case 'Welcome':
         return <WelcomeView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView key={editingAlgSet?.name ?? 'new'} editingAlgSet={editingAlgSet} onSave={() => {
-          if (editingAlgSet && currentAlgSet?.name === editingAlgSet.name) {
-            setCurrentAlgSet(null);
-          }
+        return <AddAlgSetView key={editingAlgSet?.id ?? 'new'} editingAlgSet={editingAlgSet} onSave={() => {
           setEditingAlgSet(null);
           setView('Welcome');
         }} />;
       case 'TrainerView':
         if (currentAlgSet)
-          return <TrainerView key={currentAlgSet.name} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+        else
+          return <WelcomeView />;
+      case 'ReportsView':
+        if (currentAlgSet)
+          return <ReportsView key={currentAlgSet.id} currentAlgSet={currentAlgSet} />;
         else
           return <WelcomeView />;
       default:
@@ -147,7 +185,6 @@ const App: React.FC = () => {
       header={{ height: 75 }}
       padding="md"
       navbar={{ width: 300, breakpoint: 'sm' }}
-      aside={{ width: 300, collapsed: { mobile: !asideOpened, desktop: !asideOpened }, breakpoint: 'sm' }}
     >
       <AppShell.Header>
         <Flex justify="space-between" align="center">
@@ -168,9 +205,6 @@ const App: React.FC = () => {
           </Group>
           <Group mr="md">
             <Text>Cubetrainer v{version}</Text>
-            <ActionIcon variant="subtle" onClick={toggleAside}>
-              <FaCog size="1.5rem" />
-            </ActionIcon>
           </Group>
         </Flex>
       </AppShell.Header>
@@ -221,9 +255,6 @@ const App: React.FC = () => {
           </Box>
         </ScrollArea>
       </AppShell.Navbar>
-      <AppShell.Aside p="md">
-        <SettingsView />
-      </AppShell.Aside>
       <AppShell.Main>
         {renderView()}
       </AppShell.Main>
