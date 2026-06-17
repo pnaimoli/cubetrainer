@@ -19,6 +19,7 @@ const App: React.FC = () => {
   const [settings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [initialAlg, setInitialAlg] = useState<Alg | null>(null);
+  const [editingAlgSet, setEditingAlgSet] = useState<AlgSet | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
   const [asideOpened, { toggle: toggleAside }] = useDisclosure(true);
   const [conn, setConn] = useState<GanCubeConnection | null>(null);
@@ -109,9 +110,10 @@ const App: React.FC = () => {
             setCurrentAlgSet(set);
             setView('TrainerView');
           }}>Train</Menu.Item>
-          <Tooltip label="Not yet implemented" withArrow position="right">
-            <Box><Menu.Item disabled>Edit</Menu.Item></Box>
-          </Tooltip>
+          <Menu.Item onClick={() => {
+            setEditingAlgSet(set);
+            setView('AddAlgSetView');
+          }}>Edit</Menu.Item>
           <Menu.Item color="red" onClick={() => setDeleteTarget(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
       </Menu>
@@ -123,7 +125,13 @@ const App: React.FC = () => {
       case 'Welcome':
         return <WelcomeView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView />;
+        return <AddAlgSetView key={editingAlgSet?.name ?? 'new'} editingAlgSet={editingAlgSet} onSave={() => {
+          if (editingAlgSet && currentAlgSet?.name === editingAlgSet.name) {
+            setCurrentAlgSet(null);
+          }
+          setEditingAlgSet(null);
+          setView('Welcome');
+        }} />;
       case 'TrainerView':
         if (currentAlgSet)
           return <TrainerView key={currentAlgSet.name} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
@@ -171,7 +179,7 @@ const App: React.FC = () => {
           <Button
             leftSection={<FaPlus />}
             fullWidth
-            onClick={() => setView('AddAlgSetView')}
+            onClick={() => { setEditingAlgSet(null); setView('AddAlgSetView'); }}
             style={{ borderRadius: '0px' }}
           >
             New Algorithm Set

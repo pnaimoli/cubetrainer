@@ -6,15 +6,31 @@ import Papa from 'papaparse';
 import { Alg, AlgSet, ValidMove, SolvedState, SOLVED_STATES } from '../util/interfaces';
 import { ALG_PRESETS } from '../util/algPresets';
 
-const AddAlgSetView: React.FC = () => {
+function algSetToCsv(algSet: AlgSet): string {
+  return algSet.algs.map(alg => {
+    const solvedNames = Object.entries(SolvedState)
+      .filter(([, val]) => typeof val === 'number' && (alg.solved! & (val as number)) !== 0)
+      .map(([name]) => name);
+    const solvedStr = solvedNames.length > 0 ? solvedNames.join('|') : 'FULL';
+    return `${alg.name}, ${alg.alg.join(' ')}, ${solvedStr}`;
+  }).join('\n');
+}
+
+interface AddAlgSetViewProps {
+  editingAlgSet?: AlgSet | null;
+  onSave?: () => void;
+}
+
+const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) => {
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showInstructions, {toggle: toggleInstructions}] = useDisclosure(false);
+  const isEditing = !!editingAlgSet;
 
   const form = useForm({
     initialValues: {
-      setName: '',
-      algList: '',
+      setName: editingAlgSet?.name ?? '',
+      algList: editingAlgSet ? algSetToCsv(editingAlgSet) : '',
     },
     validate: {
       setName: (value: string) => {
@@ -24,7 +40,7 @@ const AddAlgSetView: React.FC = () => {
         if (value.length > 30) {
           return 'Name must be at most 30 characters';
         }
-        if (algSets.some(set => set.name === value.trim())) {
+        if (algSets.some(set => set.name === value.trim() && (!isEditing || set.name !== editingAlgSet!.name))) {
           return 'An algorithm set of this name already exists';
         }
         return null;
@@ -73,8 +89,13 @@ const AddAlgSetView: React.FC = () => {
         return { name: name.trim(), alg: algMoves, solved: solvedStates as SolvedState };
       });
 
-      setAlgSets([...algSets, { name: setName.trim(), algs }]);
-      form.reset();
+      if (isEditing) {
+        setAlgSets(algSets.map(set => set.name === editingAlgSet!.name ? { name: setName.trim(), algs } : set));
+      } else {
+        setAlgSets([...algSets, { name: setName.trim(), algs }]);
+      }
+      onSave?.();
+      if (!isEditing) form.reset();
     } catch (error) {
       form.setErrors({ algList: (error as Error).message });
     }
@@ -177,7 +198,7 @@ const AddAlgSetView: React.FC = () => {
           error={form.errors.algList}
         />
         <Group>
-          <Button type="submit">Add AlgSet</Button>
+          <Button type="submit">{isEditing ? 'Save AlgSet' : 'Add AlgSet'}</Button>
         </Group>
       </form>
     </Box>
