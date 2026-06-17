@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack } from '@mantine/core';
+import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
@@ -9,13 +9,13 @@ import ReactLogo from '../assets/logo.svg?react';
 import { AlgSet, Settings, Alg } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
-import SettingsView from './SettingsView';
+import SettingsView, { defaultSettings } from './SettingsView';
 import WelcomeView from './WelcomeView';
 
 const App: React.FC = () => {
   const [view, setView] = useState<string>('Welcome');
   const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
-  const [settings] = useLocalStorage<Settings>({ key: 'settings' });
+  const [settings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [initialAlg, setInitialAlg] = useState<Alg | null>(null);
   const [expandedItem, setExpandedItem] = useState<string>("");
@@ -74,7 +74,9 @@ const App: React.FC = () => {
             setCurrentAlgSet(set);
             setView('TrainerView');
           }}>Train</Menu.Item>
-          <Menu.Item>Edit</Menu.Item>
+          <Tooltip label="Not yet implemented" withArrow position="right">
+            <Box><Menu.Item disabled>Edit</Menu.Item></Box>
+          </Tooltip>
           <Menu.Item onClick={() => handleDeleteAlgSet(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
       </Menu>

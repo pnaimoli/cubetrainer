@@ -45,7 +45,7 @@ export enum ValidMove {
 export interface Alg {
   name: string;
   alg: ValidMove[];
-  solved: SolvedState;
+  solved?: SolvedState;
 }
 
 export interface AlgSet {

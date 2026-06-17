@@ -4,7 +4,7 @@ import { useLocalStorage } from '@mantine/hooks';
 import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
 import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
 
-const defaultSettings: Settings = {
+export const defaultSettings: Settings = {
   randomAUF: false,
   randomYs: false,
   playlistMode: 'ordered',
