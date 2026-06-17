@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title, Menu, ActionIcon, Group, rem } from '@mantine/core';
+import { Card, Title, Menu, ActionIcon, Group, rem, Modal, Text, Button } from '@mantine/core';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { TbDots, TbTrash, TbInfoCircle, TbDownload } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
@@ -34,6 +34,8 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
       return newStats;
     });
   };
+
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const handleDeleteAll = () => {
     setAllStats(prevStats => {
@@ -78,6 +80,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
   ];
 
   return (
+    <>
     <Card withBorder={true} padding={0} h="100%">
       <Card.Section withBorder={true} px="xs">
         <Group justify="space-between">
@@ -104,7 +107,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
               <Menu.Item
                 leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
                 color="red"
-                onClick={handleDeleteAll}
+                onClick={() => setConfirmDeleteAll(true)}
               >
                 Delete all
               </Menu.Item>
@@ -126,6 +129,14 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
         rowStyle={() => ({ cursor: 'not-allowed' })}
       />
     </Card>
+    <Modal opened={confirmDeleteAll} onClose={() => setConfirmDeleteAll(false)} title="Delete All Times" centered>
+      <Text mb="md">Are you sure you want to delete all times for <b>{algSetName}</b>? This can't be undone.</Text>
+      <Group justify="flex-end">
+        <Button variant="default" onClick={() => setConfirmDeleteAll(false)}>Cancel</Button>
+        <Button color="red" onClick={() => { handleDeleteAll(); setConfirmDeleteAll(false); }}>Delete All</Button>
+      </Group>
+    </Modal>
+    </>
   );
 };
 
