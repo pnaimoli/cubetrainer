@@ -3,22 +3,26 @@ import { Text } from '@mantine/core';
 
 interface TimerViewProps {
   startTime: number;
-  stopTime?: number | null;
 }
 
-const TimerView: React.FC<TimerViewProps> = ({ startTime, stopTime }) => {
+export interface TimerViewHandle {
+  stop: () => void;
+}
+
+const TimerView = React.forwardRef<TimerViewHandle, TimerViewProps>(({ startTime }, ref) => {
   const [currentTime, setCurrentTime] = useState<number>(startTime);
   const timerCallbackId = useRef<number>();
 
-  useEffect(() => {
-    if (stopTime) {
+  React.useImperativeHandle(ref, () => ({
+    stop: () => {
       if (timerCallbackId.current !== undefined) {
         clearInterval(timerCallbackId.current);
       }
-      setCurrentTime(stopTime);
-      return;
-    }
+      setCurrentTime(Date.now());
+    },
+  }));
 
+  useEffect(() => {
     timerCallbackId.current = window.setInterval(() => {
       setCurrentTime(Date.now());
     }, 13);
@@ -28,13 +32,13 @@ const TimerView: React.FC<TimerViewProps> = ({ startTime, stopTime }) => {
         clearInterval(timerCallbackId.current);
       }
     };
-  }, [stopTime]);
+  }, []);
 
   return (
     <Text ff="monospace" fw={600} fz="48px">
       {((currentTime - startTime)/1000).toFixed(3)}
     </Text>
   );
-};
+});
 
 export default TimerView;

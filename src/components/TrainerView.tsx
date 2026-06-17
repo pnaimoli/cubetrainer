@@ -13,7 +13,7 @@ import { Settings, AlgSet, Alg, SolvedState, CUBE_ROTATIONS, SolveStat, Move } f
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { getNextAlg, ShuffleQueue } from '../util/playlist';
-import TimerView from './TimerView';
+import TimerView, { TimerViewHandle } from './TimerView';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
 import SettingsView from './SettingsView';
@@ -96,6 +96,27 @@ interface TrainerViewProps {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// CubePlayer - memoized to prevent re-renders from re-applying attributes
+///////////////////////////////////////////////////////////////////////////////
+const CubePlayer = React.memo(({ playerRef, setupAlg, showHintFacelets }: {
+  playerRef: React.RefObject<TwistyPlayer | null>;
+  setupAlg: string;
+  showHintFacelets: boolean;
+}) => (
+  <twisty-player
+    ref={playerRef}
+    visualization="PG3D"
+    control-panel="none"
+    background="none"
+    puzzle="3x3x3"
+    tempo-scale="4"
+    hint-facelets={showHintFacelets ? "true" : "none"}
+    experimental-setup-alg={setupAlg}
+    style={{ width: "300px", height: "300px" }}
+  />
+));
+
+///////////////////////////////////////////////////////////////////////////////
 // SolvedStateBadges
 ///////////////////////////////////////////////////////////////////////////////
 interface SolvedStateBadgesProps {
@@ -160,10 +181,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
   const [shuffleQueue, setShuffleQueue] = useState<ShuffleQueue>([]);
   const [historyOffset, setHistoryOffset] = useState<number>(0);
-  const [stopTime, setStopTime] = useState<number | null>(null);
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
+  const timerRef = useRef<TimerViewHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -359,25 +380,23 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       preorientationMoves: displayedPreorientation.map(m => m.move),
     };
 
-    setStopTime(Date.now());
-
-    setStats(prevStats => {
-      return {
-        ...prevStats,
-        [currentAlgSet.id]: [
-          ...(prevStats[currentAlgSet.id] || []),
-          newSolveStat
-        ]
-      };
-    });
+    timerRef.current?.stop();
 
     const advanceToNext = () => {
+      setStats(prevStats => {
+        return {
+          ...prevStats,
+          [currentAlgSet.id]: [
+            ...(prevStats[currentAlgSet.id] || []),
+            newSolveStat
+          ]
+        };
+      });
       const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
 
       setCurrentAlg(newCurrentAlg);
       setShuffleQueue(newShuffleQueue);
       setHistoryOffset(0);
-      setStopTime(null);
       setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
       setRandomUs(recomputeRandomUs(settings.randomAUF));
       setRandomYs(recomputeRandomYs(settings.randomYs));
@@ -553,18 +572,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
           <Stack align="center" gap={0}>
-            <TimerView key={startTime} startTime={startTime} stopTime={stopTime} />
-            <twisty-player
-              ref={playerRef}
-              visualization="PG3D"
-              control-panel="none"
-              background="none"
-              puzzle="3x3x3"
-              tempo-scale="4"
-              hint-facelets={settings.showHintFacelets ? "true" : "none"}
-              experimental-setup-alg={setupAlg}
-              style={{ width: "300px", height: "300px" }}
-            />
+            <TimerView key={startTime} ref={timerRef} startTime={startTime} />
+            <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={settings.showHintFacelets} />
           </Stack>
         </Card>
       </Grid.Col>
