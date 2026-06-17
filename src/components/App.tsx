@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip } from '@mantine/core';
+import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
 import { useDisclosure, useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus, FaCog } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
@@ -75,8 +75,15 @@ const App: React.FC = () => {
     return <TbBatteryOff size="1.5rem" style={style} />;
   };
 
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
   const handleDeleteAlgSet = (name: string): void => {
     setAlgSets(algSets.filter(set => set.name !== name));
+    if (currentAlgSet?.name === name) {
+      setCurrentAlgSet(null);
+      setView('Welcome');
+    }
+    setDeleteTarget(null);
   };
 
   interface AccordionControlProps {
@@ -105,7 +112,7 @@ const App: React.FC = () => {
           <Tooltip label="Not yet implemented" withArrow position="right">
             <Box><Menu.Item disabled>Edit</Menu.Item></Box>
           </Tooltip>
-          <Menu.Item onClick={() => handleDeleteAlgSet(set.name)}>Delete</Menu.Item>
+          <Menu.Item color="red" onClick={() => setDeleteTarget(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
       </Menu>
     </Flex>
@@ -212,6 +219,13 @@ const App: React.FC = () => {
       <AppShell.Main>
         {renderView()}
       </AppShell.Main>
+      <Modal opened={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="Delete Algorithm Set" centered>
+        <Text mb="md">Are you sure you want to delete <b>{deleteTarget}</b>? This can't be undone.</Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button color="red" onClick={() => deleteTarget && handleDeleteAlgSet(deleteTarget)}>Delete</Button>
+        </Group>
+      </Modal>
     </AppShell>
   );
 };
