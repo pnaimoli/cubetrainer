@@ -225,11 +225,56 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.useMaskings, kpuzzle, setupAlg, effectiveSolvedState]);
 
   /////////////////////////////////////////////////////////////////////////////
+  // KNOWN BUG: Toggling showHintFacelets or useMaskings while moves have been
+  // made causes the cube to briefly show the wrong state (reverts to one move
+  // behind) until the next move is made.
+  //
+  // Root cause: experimentalAddMove() updates the TwistyPlayer's alg
+  // asynchronously (wraps in a Promise that chains multiple awaits). When a
+  // setting change triggers the player to re-render its 3D scene, it reads the
+  // alg which hasn't resolved yet, so it sees the stale (pre-move) value.
+  //
+  // Even player.alg = "string" is async under the hood - TwistyPropSource.set()
+  // calls deriveFromPromiseOrValue() which does `await input` regardless of
+  // whether input is a Promise or a plain value. So there is NO synchronous way
+  // to set the alg on TwistyPlayer.
+  //
+  // Approaches tried (none worked):
+  //  1. Re-applying moves via player.alg = moveString after setting change
+  //     - Still async, same race condition
+  //  2. Moving hint-facelets and experimental-setup-alg from JSX attributes to
+  //     imperative useEffect setters to avoid React re-setting them on render
+  //     - Didn't help; the bug isn't caused by React re-setting attributes
+  //  3. Creating TwistyPlayer imperatively (new TwistyPlayer(), appendChild)
+  //     instead of <twisty-player> JSX to fully remove it from React's lifecycle
+  //     - Didn't help; the async alg is the issue, not React re-rendering
+  //  4. Setting player.alg synchronously + triggering animation via
+  //     experimentalModel.catchUpMove.set() and timestampRequest.set("end")
+  //     - Bug returned; catchUpMove/timestampRequest trigger re-evaluation
+  //  5. Same as #4 but with queueMicrotask() delay on catchUpMove
+  //     - Didn't help
+  //  6. requestAnimationFrame delay before re-applying alg
+  //     - Didn't help
+  //  7. Upgrading cubing.js from 0.49.0 to 0.63.3
+  //     - Same async architecture, didn't help
+  //
+  // What DOES work (but loses animation):
+  //  - Replacing experimentalAddMove with player.alg = moveString
+  //    This resolves faster (single microtask vs multiple awaits) so the alg is
+  //    settled by the time any setting change re-render occurs. But moves snap
+  //    into place instead of animating.
+  //
+  // Related cubing.js issues:
+  //  - https://github.com/cubing/cubing.js/issues/223 (framework sync getters)
+  //  - https://github.com/cubing/cubing.js/issues/313 (React double-apply)
+  //  - https://github.com/cubing/cubing.js/issues/371 (animation on alg write)
+  /////////////////////////////////////////////////////////////////////////////
+
+  /////////////////////////////////////////////////////////////////////////////
   // Handle cube move event
   /////////////////////////////////////////////////////////////////////////////
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
     if (event.type !== "MOVE") return;
-    if (historyOffset > 0) return;
 
     const newMove = { move: event.move, timeOfMove: Date.now() };
     const newMoves = [...movesRef.current, newMove];
@@ -249,16 +294,16 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     }
 
     const newSolveStat: SolveStat = {
-      name: currentAlg.name,
+      name: displayedAlg.name,
       timeOfSolve: new Date().toISOString(),
       moves: newMoves,
       executionTime: newMoves[newMoves.length-1].timeOfMove - newMoves[0].timeOfMove,
       recognitionTime: newMoves[0].timeOfMove - startTime,
-      AUFs: randomUs,
-      Ys: randomYs,
-      mirroredOverM: mirrorAcrossM,
-      mirroredOverS: mirrorAcrossS,
-      preorientationMoves: preorientationMoves.map(m => m.move),
+      AUFs: displayedRandomUs,
+      Ys: displayedRandomYs,
+      mirroredOverM: displayedMirrorAcrossM,
+      mirroredOverS: displayedMirrorAcrossS,
+      preorientationMoves: displayedPreorientation.map(m => m.move),
     };
 
     setStats(prevStats => {
@@ -284,10 +329,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     movesRef.current = [];
     setMoves([]);
     setStartTime(Date.now());
-  }, [currentAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
-      kpuzzle, mirrorAcrossM, mirrorAcrossS, randomUs, randomYs, settings,
-      shuffleQueue, historyOffset, preorientationMoves,
-      setStats]);
+  }, [displayedAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
+      kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomUs,
+      displayedRandomYs, settings, shuffleQueue, displayedPreorientation,
+      currentAlg, setStats]);
 
   /////////////////////////////////////////////////////////////////////////////
   // useEffects
