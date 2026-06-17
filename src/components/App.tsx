@@ -109,7 +109,7 @@ const App: React.FC = () => {
       <AppShell.Header>
         <Flex justify="space-between" align="center">
           <Group h="100%" px="md">
-            <ReactLogo width="65px" height="100%" style={{ paddingTop: '10px' }}/>
+            <ReactLogo width="65px" height="100%"/>
             <Stack align="center">
               <Button
                 leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}

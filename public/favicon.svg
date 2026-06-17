@@ -1,45 +1,88 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    .cube { stroke: #000; stroke-width: 1.5; }
-    .face1 { fill: #FFD700; }
-    .face2 { fill: #00FF00; }
-    .face3 { fill: #0000FF; }
-    .face4 { fill: #FF0000; }
-    .face5 { fill: #FFA500; }
-    .face6 { fill: #FFFFFF; }
-  </style>
-  <g transform="translate(50, 50)">
-    <rect class="cube face1" x="0" y="0" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="0" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="0" width="30" height="30"/>
-    <rect class="cube face4" x="0" y="30" width="30" height="30"/>
-    <rect class="cube face5" x="30" y="30" width="30" height="30"/>
-    <rect class="cube face6" x="60" y="30" width="30" height="30"/>
-    <rect class="cube face1" x="0" y="60" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="60" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="60" width="30" height="30"/>
-  </g>
-  <g transform="translate(50, 20) rotate(-45 45 45)">
-    <rect class="cube face1" x="0" y="0" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="0" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="0" width="30" height="30"/>
-    <rect class="cube face4" x="0" y="30" width="30" height="30"/>
-    <rect class="cube face5" x="30" y="30" width="30" height="30"/>
-    <rect class="cube face6" x="60" y="30" width="30" height="30"/>
-    <rect class="cube face1" x="0" y="60" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="60" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="60" width="30" height="30"/>
-  </g>
-  <g transform="translate(50, 50) skewX(-30)">
-    <rect class="cube face1" x="0" y="0" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="0" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="0" width="30" height="30"/>
-    <rect class="cube face4" x="0" y="30" width="30" height="30"/>
-    <rect class="cube face5" x="30" y="30" width="30" height="30"/>
-    <rect class="cube face6" x="60" y="30" width="30" height="30"/>
-    <rect class="cube face1" x="0" y="60" width="30" height="30"/>
-    <rect class="cube face2" x="30" y="60" width="30" height="30"/>
-    <rect class="cube face3" x="60" y="60" width="30" height="30"/>
-  </g>
-</svg>
+  <!--
+    Isometric 3x3 Rubik's cube.
 
+    Coordinate system: unit U=26, half=13, center=(100,100)
+      iso(c, r, l): x = 100 + 26c - 26r
+                    y = 100 + 13c + 13r - 26l
+
+    Three visible faces:
+      TOP   (l=3): cubie(c,r) for c,r in 0..2
+      RIGHT (c=3): cubie(r,l) for r,l in 0..2
+      LEFT  (r=3): cubie(c,l) for c,l in 0..2
+
+    Cube bounding box: x=[22,178], y=[22,178] (22px margin in 200x200)
+
+    Stickers inset with factor 0.72 from each cubie face center.
+  -->
+
+  <!-- ======== LEFT FACE (r=3) - Orange ======== -->
+  <!-- Cubie background polygons (BL, BR, TR, TL) -->
+  <!-- c=0,l=0 --> <polygon points="22,139 48,152 48,126 22,113" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,l=0 --> <polygon points="48,152 74,165 74,139 48,126" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,l=0 --> <polygon points="74,165 100,178 100,152 74,139" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=0,l=1 --> <polygon points="22,113 48,126 48,100 22,87"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,l=1 --> <polygon points="48,126 74,139 74,113 48,100" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,l=1 --> <polygon points="74,139 100,152 100,126 74,113" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=0,l=2 --> <polygon points="22,87 48,100 48,74 22,61"   fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,l=2 --> <polygon points="48,100 74,113 74,87 48,74"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,l=2 --> <polygon points="74,113 100,126 100,100 74,87" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Left face stickers (orange) -->
+  <!-- c=0,l=0 --> <polygon points="25.6,137.2 44.4,146.5 44.4,127.8 25.6,118.5" fill="#EA3323"/>
+  <!-- c=1,l=0 --> <polygon points="51.6,150.2 70.4,159.5 70.4,140.8 51.6,131.5" fill="#EA3323"/>
+  <!-- c=2,l=0 --> <polygon points="77.6,163.2 96.4,172.5 96.4,153.8 77.6,144.5" fill="#EA3323"/>
+  <!-- c=0,l=1 --> <polygon points="25.6,111.2 44.4,120.5 44.4,101.8 25.6,92.5"  fill="#EA3323"/>
+  <!-- c=1,l=1 --> <polygon points="51.6,124.2 70.4,133.5 70.4,114.8 51.6,105.5" fill="#EA3323"/>
+  <!-- c=2,l=1 --> <polygon points="77.6,137.2 96.4,146.5 96.4,127.8 77.6,118.5" fill="#EA3323"/>
+  <!-- c=0,l=2 --> <polygon points="25.6,85.2 44.4,94.5 44.4,75.8 25.6,66.5"    fill="#EA3323"/>
+  <!-- c=1,l=2 --> <polygon points="51.6,98.2 70.4,107.5 70.4,88.8 51.6,79.5"  fill="#EA3323"/>
+  <!-- c=2,l=2 --> <polygon points="77.6,111.2 96.4,120.5 96.4,101.8 77.6,92.5" fill="#EA3323"/>
+
+  <!-- ======== RIGHT FACE (c=3) - Blue ======== -->
+  <!-- Cubie background polygons (BR, BL, TL, TR) -->
+  <!-- r=0,l=0 --> <polygon points="178,139 152,152 152,126 178,113" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=1,l=0 --> <polygon points="152,152 126,165 126,139 152,126" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=2,l=0 --> <polygon points="126,165 100,178 100,152 126,139" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=0,l=1 --> <polygon points="178,113 152,126 152,100 178,87"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=1,l=1 --> <polygon points="152,126 126,139 126,113 152,100" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=2,l=1 --> <polygon points="126,139 100,152 100,126 126,113" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=0,l=2 --> <polygon points="178,87 152,100 152,74 178,61"   fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=1,l=2 --> <polygon points="152,100 126,113 126,87 152,74"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- r=2,l=2 --> <polygon points="126,113 100,126 100,100 126,87" fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Right face stickers (blue) -->
+  <!-- r=0,l=0 --> <polygon points="174.4,137.2 155.6,146.5 155.6,127.8 174.4,118.5" fill="#F5F5F5"/>
+  <!-- r=1,l=0 --> <polygon points="148.4,150.2 129.6,159.5 129.6,140.8 148.4,131.5" fill="#F5F5F5"/>
+  <!-- r=2,l=0 --> <polygon points="122.4,163.2 103.6,172.5 103.6,153.8 122.4,144.5" fill="#F5F5F5"/>
+  <!-- r=0,l=1 --> <polygon points="174.4,111.2 155.6,120.5 155.6,101.8 174.4,92.5"  fill="#F5F5F5"/>
+  <!-- r=1,l=1 --> <polygon points="148.4,124.2 129.6,133.5 129.6,114.8 148.4,105.5" fill="#F5F5F5"/>
+  <!-- r=2,l=1 --> <polygon points="122.4,137.2 103.6,146.5 103.6,127.8 122.4,118.5" fill="#F5F5F5"/>
+  <!-- r=0,l=2 --> <polygon points="174.4,85.2 155.6,94.5 155.6,75.8 174.4,66.5"    fill="#F5F5F5"/>
+  <!-- r=1,l=2 --> <polygon points="148.4,98.2 129.6,107.5 129.6,88.8 148.4,79.5"  fill="#F5F5F5"/>
+  <!-- r=2,l=2 --> <polygon points="122.4,111.2 103.6,120.5 103.6,101.8 122.4,92.5" fill="#F5F5F5"/>
+
+  <!-- ======== TOP FACE (l=3) - Yellow ======== -->
+  <!-- Cubie background polygons (top, right, bottom, left) -->
+  <!-- c=0,r=0 --> <polygon points="100,22 126,35 100,48 74,35"   fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,r=0 --> <polygon points="126,35 152,48 126,61 100,48"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,r=0 --> <polygon points="152,48 178,61 152,74 126,61"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=0,r=1 --> <polygon points="74,35 100,48 74,61 48,48"     fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,r=1 --> <polygon points="100,48 126,61 100,74 74,61"   fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,r=1 --> <polygon points="126,61 152,74 126,87 100,74"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=0,r=2 --> <polygon points="48,48 74,61 48,74 22,61"      fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=1,r=2 --> <polygon points="74,61 100,74 74,87 48,74"     fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+  <!-- c=2,r=2 --> <polygon points="100,74 126,87 100,100 74,87"  fill="#1a1a1a" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Top face stickers (yellow) -->
+  <!-- c=0,r=0 --> <polygon points="100,25.6 118.7,35 100,44.4 81.3,35"   fill="#7BEB47"/>
+  <!-- c=1,r=0 --> <polygon points="126,38.6 144.7,48 126,57.4 107.3,48"  fill="#7BEB47"/>
+  <!-- c=2,r=0 --> <polygon points="152,51.6 170.7,61 152,70.4 133.3,61"  fill="#7BEB47"/>
+  <!-- c=0,r=1 --> <polygon points="74,38.6 92.7,48 74,57.4 55.3,48"      fill="#7BEB47"/>
+  <!-- c=1,r=1 --> <polygon points="100,51.6 118.7,61 100,70.4 81.3,61"   fill="#7BEB47"/>
+  <!-- c=2,r=1 --> <polygon points="126,64.6 144.7,74 126,83.4 107.3,74"  fill="#7BEB47"/>
+  <!-- c=0,r=2 --> <polygon points="48,51.6 66.7,61 48,70.4 29.3,61"      fill="#7BEB47"/>
+  <!-- c=1,r=2 --> <polygon points="74,64.6 92.7,74 74,83.4 55.3,74"      fill="#7BEB47"/>
+  <!-- c=2,r=2 --> <polygon points="100,77.6 118.7,87 100,96.4 81.3,87"   fill="#7BEB47"/>
+
+</svg>
