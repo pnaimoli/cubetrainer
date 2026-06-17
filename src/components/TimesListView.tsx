@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Title, Menu, ActionIcon, Group, rem, Modal, Text, Button } from '@mantine/core';
+import { Card, Title, Menu, ActionIcon, Group, rem, Modal, Text, Button, Box } from '@mantine/core';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { TbDots, TbTrash, TbInfoCircle, TbDownload } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
@@ -9,9 +9,10 @@ import { SolveStat } from '../util/interfaces'; // Ensure this path is correct
 interface TimesListViewProps {
   algSetId: string;
   algSetName: string;
+  maxHeight?: string;
 }
 
-const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName }) => {
+const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName, maxHeight }) => {
   const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
@@ -81,7 +82,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName }) =
 
   return (
     <>
-    <Card withBorder={true} padding={0} h="100%">
+    <Card withBorder={true} padding={0} h="100%" style={maxHeight ? { maxHeight, display: 'flex', flexDirection: 'column' as const } : undefined}>
       <Card.Section withBorder={true} px="xs">
         <Group justify="space-between">
           <Title order={2}>Times</Title>
@@ -115,19 +116,21 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName }) =
           </Menu>
         </Group>
       </Card.Section>
-      <DataTable
-        ff="monospace"
-        fz="xs"
-        withRowBorders={false}
-        verticalSpacing={0}
-        horizontalSpacing="xs"
-        highlightOnHover
-        striped
-        columns={columns}
-        records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
-        onRowDoubleClick={({ index }) => handleDelete(stats.length - 1 - index)}
-        rowStyle={() => ({ cursor: 'not-allowed' })}
-      />
+      <Box style={maxHeight ? { flex: 1, minHeight: 0, overflowY: 'auto' } : undefined}>
+        <DataTable
+          ff="monospace"
+          fz="xs"
+          withRowBorders={false}
+          verticalSpacing={0}
+          horizontalSpacing="xs"
+          highlightOnHover
+          striped
+          columns={columns}
+          records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
+          onRowDoubleClick={({ index }) => handleDelete(stats.length - 1 - index)}
+          rowStyle={() => ({ cursor: 'not-allowed' })}
+        />
+      </Box>
     </Card>
     <Modal opened={confirmDeleteAll} onClose={() => setConfirmDeleteAll(false)} title="Delete All Times" centered>
       <Text mb="md">Are you sure you want to delete all times for <b>{algSetName}</b>? This can't be undone.</Text>

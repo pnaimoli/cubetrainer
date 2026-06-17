@@ -65,7 +65,7 @@ const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetId }) => {
   ];
 
   return (
-    <Card withBorder={true} padding={0} h="100">
+    <Card withBorder={true} padding={0}>
       <Card.Section withBorder={true} px="xs">
         <Group justify="space-between">
           <Title order={2}>Stats</Title>

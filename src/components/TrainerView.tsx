@@ -500,7 +500,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
-        <Card withBorder={true} h="500">
+        <Card withBorder={true}>
           <Card.Section withBorder={true} px="xs">
               <Title order={2} style={{ cursor: 'pointer' }} onClick={() => setCaseHidden(h => !h)}>
                 Case Name {caseHidden
@@ -529,13 +529,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
-        <Stack h="500">
+        <Stack>
           <SummaryStatsView algSetId={currentAlgSet.id} />
-          <TimesListView algSetId={currentAlgSet.id} algSetName={currentAlgSet.name} />
+          <TimesListView algSetId={currentAlgSet.id} algSetName={currentAlgSet.name} maxHeight="calc(100vh - 360px)" />
         </Stack>
       </Grid.Col>
       <Grid.Col span={4}>
-        <Card withBorder h="500" style={{ overflowY: 'auto' }}>
+        <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} mt="xs" mb="xs">Settings</Title>
           </Card.Section>
