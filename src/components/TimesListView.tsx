@@ -59,9 +59,9 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetName }) => {
       showColumnHeaders: true,
     });
 
-    const simplifiedStats = stats.map(stat => ({
+    const simplifiedStats = stats.map(({ preorientationMoves, ...stat }) => ({
       ...stat,
-      moves: stat.moves.length, // Convert moves array to its length
+      moves: stat.moves.length,
     }));
 
     const csv = generateCsv(csvConfig)(simplifiedStats);
