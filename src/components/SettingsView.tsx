@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Tooltip, Group, Collapse, ActionIcon, Text, Divider, Box } from '@mantine/core';
+import { Stack, Checkbox, Select, Tooltip, Group, Collapse, ActionIcon, Text, Divider, Box, NumberInput } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
 import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
@@ -17,7 +17,8 @@ export const defaultSettings: Settings = {
   useMaskings: false,
   fullColourNeutrality: false,
   firstRotation: '',
-  randomRotations1: ''
+  randomRotations1: '',
+  postSolveDelay: 1
 };
 
 const SettingsView: React.FC = () => {
@@ -60,6 +61,20 @@ const SettingsView: React.FC = () => {
             </ActionIcon>
           </Tooltip>
         </Group>
+      </Group>
+      <Group gap="xs" align="center">
+        <Text fz="sm">Post-Solve Delay (s):</Text>
+        <NumberInput
+          value={settings.postSolveDelay}
+          onChange={(value) => setSettings({ ...settings, postSolveDelay: typeof value === 'number' ? value : 0 })}
+          min={0}
+          max={10}
+          step={0.1}
+          decimalScale={1}
+          hideControls
+          maw="60px"
+          size="xs"
+        />
       </Group>
       <Divider label="Symmetries" />
       <Group>

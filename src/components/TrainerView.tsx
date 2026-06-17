@@ -111,9 +111,11 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
   const [shuffleQueue, setShuffleQueue] = useState<ShuffleQueue>([]);
   const [historyOffset, setHistoryOffset] = useState<number>(0);
+  const [stopTime, setStopTime] = useState<number | null>(null);
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
+  const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentStats = stats[currentAlgSet.id] || [];
   const historyStat = historyOffset > 0
@@ -307,6 +309,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       preorientationMoves: displayedPreorientation.map(m => m.move),
     };
 
+    setStopTime(Date.now());
+
     setStats(prevStats => {
       return {
         ...prevStats,
@@ -317,19 +321,29 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       };
     });
 
-    const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
+    const advanceToNext = () => {
+      const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
 
-    setCurrentAlg(newCurrentAlg);
-    setShuffleQueue(newShuffleQueue);
-    setHistoryOffset(0);
-    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
-    setRandomUs(recomputeRandomUs(settings.randomAUF));
-    setRandomYs(recomputeRandomYs(settings.randomYs));
-    setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
-    setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
-    movesRef.current = [];
-    setMoves([]);
-    setStartTime(Date.now());
+      setCurrentAlg(newCurrentAlg);
+      setShuffleQueue(newShuffleQueue);
+      setHistoryOffset(0);
+      setStopTime(null);
+      setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+      setRandomUs(recomputeRandomUs(settings.randomAUF));
+      setRandomYs(recomputeRandomYs(settings.randomYs));
+      setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+      setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+      movesRef.current = [];
+      setMoves([]);
+      setStartTime(Date.now());
+    };
+
+    const delay = settings.postSolveDelay * 1000;
+    if (delay > 0) {
+      postSolveTimeoutRef.current = setTimeout(advanceToNext, delay);
+    } else {
+      advanceToNext();
+    }
   }, [displayedAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
       kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomUs,
       displayedRandomYs, settings, shuffleQueue, displayedPreorientation,
@@ -404,6 +418,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (moves.length === 0 && playerRef.current)
       playerRef.current.alg = '';
   }, [playerRef, moves]);
+
+  useEffect(() => {
+    return () => {
+      if (postSolveTimeoutRef.current) clearTimeout(postSolveTimeoutRef.current);
+    };
+  }, []);
 
   /////////////////////////////////////////////////////////////////////////////
   // Control Handlers
@@ -513,7 +533,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
           <Stack align="center" gap={0}>
-            <TimerView key={startTime} startTime={startTime} />
+            <TimerView key={startTime} startTime={startTime} stopTime={stopTime} />
             <twisty-player
               ref={playerRef}
               visualization="PG3D"

@@ -80,6 +80,7 @@ export interface Settings {
   fullColourNeutrality: boolean;
   firstRotation: string;
   randomRotations1: string;
+  postSolveDelay: number;
 }
 
 // Export arrays of enum values for easy usage
