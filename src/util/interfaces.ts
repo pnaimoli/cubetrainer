@@ -84,8 +84,8 @@ export interface Settings {
 }
 
 // Export arrays of enum values for easy usage
-export const SOLVED_STATES: SolvedState[] = Object.values(SolvedState).filter(value => typeof value === 'string') as SolvedState[];
-export const CUBE_ROTATIONS: CubeRotation[] = Object.values(CubeRotation).filter(value => typeof value === 'string') as CubeRotation[];
+export const SOLVED_STATES: SolvedState[] = Object.values(SolvedState).filter(value => typeof value === 'string') as unknown as SolvedState[];
+export const CUBE_ROTATIONS: CubeRotation[] = Object.values(CubeRotation).filter(value => typeof value === 'string') as unknown as CubeRotation[];
 
 export function cycleSetting<T extends keyof Settings>(settings: Settings, key: T): Settings {
   const possibleValues = {

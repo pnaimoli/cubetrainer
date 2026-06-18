@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, Title, Group, SegmentedControl, Checkbox, Text } from '@mantine/core';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import { useLocalStorage } from '@mantine/hooks';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AlgSet, SolveStat, ReportSettings, defaultReportSettings } from '../util/interfaces';
 
 interface ReportsViewProps {
@@ -36,6 +37,25 @@ const formatTime = (ms: number | null): string => {
   return (ms / 1000).toFixed(2);
 };
 
+const MOVING_AVERAGES = [
+  { window: 12, label: 'ao12', color: '#228be6' },
+  { window: 50, label: 'ao50', color: '#40c057' },
+  { window: 100, label: 'ao100', color: '#fa5252' },
+] as const;
+
+const computeMovingAverages = (times: number[]) => {
+  return times.map((_, i) => {
+    const point: Record<string, number> = { solve: i + 1 };
+    for (const { window, label } of MOVING_AVERAGES) {
+      if (i + 1 >= window) {
+        const slice = times.slice(i + 1 - window, i + 1);
+        point[label] = slice.reduce((a, b) => a + b, 0) / window / 1000;
+      }
+    }
+    return point;
+  });
+};
+
 const ReportsView: React.FC<ReportsViewProps> = ({ currentAlgSet }) => {
   const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
   const [reportSettings, setReportSettings] = useLocalStorage<ReportSettings>({
@@ -46,6 +66,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ currentAlgSet }) => {
     columnAccessor: 'name',
     direction: 'asc',
   });
+
+  const [timelineTimeType, setTimelineTimeType] = useState<'total' | 'rec' | 'exec'>('total');
+  const [timelineEliminateOutliers, setTimelineEliminateOutliers] = useState(true);
 
   const stats = allStats[currentAlgSet.id] ?? [];
 
@@ -109,6 +132,24 @@ const ReportsView: React.FC<ReportsViewProps> = ({ currentAlgSet }) => {
     return sortStatus.direction === 'desc' ? sorted.reverse() : sorted;
   }, [reports, sortStatus]);
 
+  const timelineData = useMemo(() => {
+    if (stats.length === 0) return [];
+
+    const sorted = [...stats].sort((a, b) =>
+      new Date(a.timeOfSolve).getTime() - new Date(b.timeOfSolve).getTime()
+    );
+
+    let times = sorted.map(s => getTime(s, timelineTimeType));
+
+    if (timelineEliminateOutliers && times.length >= 4) {
+      const m = computeMean(times);
+      const sd = computeStdDev(times, m);
+      times = times.filter(t => Math.abs(t - m) <= 2 * sd);
+    }
+
+    return computeMovingAverages(times);
+  }, [stats, timelineTimeType, timelineEliminateOutliers]);
+
   if (stats.length === 0) {
     return (
       <Card withBorder padding="xs">
@@ -121,56 +162,113 @@ const ReportsView: React.FC<ReportsViewProps> = ({ currentAlgSet }) => {
   }
 
   return (
-    <Card withBorder padding={0} maw={400}>
-      <Card.Section withBorder px="xs">
-        <Title order={2}>Average by Alg: {currentAlgSet.name}</Title>
-      </Card.Section>
-      <Card.Section withBorder px="xs" py="xs">
-        <Group gap="lg">
-          <SegmentedControl
-            size="xs"
-            value={reportSettings.timeType}
-            onChange={(value) => setReportSettings({ ...reportSettings, timeType: value as 'total' | 'rec' | 'exec' })}
-            data={[
-              { label: 'Total', value: 'total' },
-              { label: 'Rec', value: 'rec' },
-              { label: 'Exec', value: 'exec' },
-            ]}
-          />
-          <Checkbox
-            size="xs"
-            label="Eliminate 2σ outliers"
-            checked={reportSettings.eliminateOutliers}
-            onChange={(event) => setReportSettings({ ...reportSettings, eliminateOutliers: event.currentTarget.checked })}
-          />
-        </Group>
-      </Card.Section>
-      <DataTable
-        ff="monospace"
-        fz="xs"
-        withRowBorders={false}
-        verticalSpacing={0}
-        horizontalSpacing="xs"
-        records={sortedReports}
-        idAccessor="name"
-        sortStatus={sortStatus}
-        onSortStatusChange={setSortStatus}
-        striped
-        highlightOnHover
-        defaultColumnProps={{
-          textAlign: 'center',
-          sortable: true,
-        }}
-        className="reports-table"
-        columns={[
-          { accessor: 'name', title: 'Case', textAlign: 'left', footer: 'Total' },
-          { accessor: 'count', title: 'n', footer: totals ? String(totals.count) : '' },
-          { accessor: 'best', title: 'Best', render: (row) => formatTime(row.best), footer: totals ? formatTime(totals.best) : '' },
-          { accessor: 'mean', title: 'Mean', render: (row) => formatTime(row.mean), footer: totals ? formatTime(totals.mean) : '' },
-          { accessor: 'stdDev', title: 'σ', render: (row) => formatTime(row.stdDev), footer: totals ? formatTime(totals.stdDev) : '' },
-        ]}
-      />
-    </Card>
+    <Group align="flex-start" wrap="wrap">
+      <Card withBorder padding={0} maw={400}>
+        <Card.Section withBorder px="xs">
+          <Title order={2}>Average by Alg: {currentAlgSet.name}</Title>
+        </Card.Section>
+        <Card.Section withBorder px="xs" py="xs">
+          <Group gap="lg">
+            <SegmentedControl
+              size="xs"
+              value={reportSettings.timeType}
+              onChange={(value) => setReportSettings({ ...reportSettings, timeType: value as 'total' | 'rec' | 'exec' })}
+              data={[
+                { label: 'Total', value: 'total' },
+                { label: 'Rec', value: 'rec' },
+                { label: 'Exec', value: 'exec' },
+              ]}
+            />
+            <Checkbox
+              size="xs"
+              label="Eliminate 2σ outliers"
+              checked={reportSettings.eliminateOutliers}
+              onChange={(event) => setReportSettings({ ...reportSettings, eliminateOutliers: event.currentTarget.checked })}
+            />
+          </Group>
+        </Card.Section>
+        <DataTable
+          ff="monospace"
+          fz="xs"
+          withRowBorders={false}
+          verticalSpacing={0}
+          horizontalSpacing="xs"
+          records={sortedReports}
+          idAccessor="name"
+          sortStatus={sortStatus}
+          onSortStatusChange={setSortStatus}
+          striped
+          highlightOnHover
+          defaultColumnProps={{
+            textAlign: 'center',
+            sortable: true,
+          }}
+          className="reports-table"
+          columns={[
+            { accessor: 'name', title: 'Case', textAlign: 'left', footer: 'Total' },
+            { accessor: 'count', title: 'n', footer: totals ? String(totals.count) : '' },
+            { accessor: 'best', title: 'Best', render: (row) => formatTime(row.best), footer: totals ? formatTime(totals.best) : '' },
+            { accessor: 'mean', title: 'Mean', render: (row) => formatTime(row.mean), footer: totals ? formatTime(totals.mean) : '' },
+            { accessor: 'stdDev', title: 'σ', render: (row) => formatTime(row.stdDev), footer: totals ? formatTime(totals.stdDev) : '' },
+          ]}
+        />
+      </Card>
+      <Card withBorder padding={0} style={{ flex: 1, minWidth: 400 }}>
+        <Card.Section withBorder px="xs">
+          <Title order={2}>Timeline</Title>
+        </Card.Section>
+        <Card.Section withBorder px="xs" py="xs">
+          <Group gap="lg">
+            <SegmentedControl
+              size="xs"
+              value={timelineTimeType}
+              onChange={(value) => setTimelineTimeType(value as 'total' | 'rec' | 'exec')}
+              data={[
+                { label: 'Total', value: 'total' },
+                { label: 'Rec', value: 'rec' },
+                { label: 'Exec', value: 'exec' },
+              ]}
+            />
+            <Checkbox
+              size="xs"
+              label="Eliminate 2σ outliers"
+              checked={timelineEliminateOutliers}
+              onChange={(event) => setTimelineEliminateOutliers(event.currentTarget.checked)}
+            />
+          </Group>
+        </Card.Section>
+        <Card.Section px="xs" py="xs">
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={timelineData}>
+            <XAxis
+              dataKey="solve"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              allowDecimals={false}
+              label={{ value: 'Solve #', position: 'insideBottom', offset: -5 }}
+            />
+            <YAxis unit="s" domain={['dataMin', 'dataMax']} tickFormatter={(v: number) => v.toFixed(2)} />
+            <Tooltip
+              labelFormatter={(v) => `Solve #${v}`}
+              formatter={(value) => [(value as number).toFixed(2) + 's']}
+            />
+            <Legend wrapperStyle={{ paddingTop: 20 }} />
+            {MOVING_AVERAGES.map(({ label, color }) => (
+              <Line
+                key={label}
+                dataKey={label}
+                stroke={color}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+        </Card.Section>
+      </Card>
+    </Group>
   );
 };
 
