@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button } from '@mantine/core';
-import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff } from 'react-icons/tb';
+import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button, Tooltip, Collapse, UnstyledButton } from '@mantine/core';
+import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbAlertTriangle, TbChevronDown, TbChevronUp } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
@@ -167,6 +167,86 @@ const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateB
 );
 
 ///////////////////////////////////////////////////////////////////////////////
+// DebugMovesTable
+///////////////////////////////////////////////////////////////////////////////
+interface DebugMoveEntry {
+  move: string;
+  dateNowDelta: number;
+  cubeTimestampDelta: number | null;
+  sliceRecovered?: boolean;
+}
+
+export interface DebugMovesTableHandle {
+  addMove: (entry: DebugMoveEntry) => void;
+  clear: () => void;
+}
+
+const RECOVERED_TOOLTIP = "This move was recovered from cube history, not received in real time. Its timestamp was adjusted to match the paired slice move.";
+const MISSING_TIMESTAMP_TOOLTIP = "No cube timestamp available. This move was recovered from cube history rather than received via BLE notification.";
+
+const DebugMovesTable = React.forwardRef<DebugMovesTableHandle>((_, ref) => {
+  const [moves, setMoves] = useState<DebugMoveEntry[]>([]);
+  const [opened, setOpened] = useState(false);
+
+  React.useImperativeHandle(ref, () => ({
+    addMove: (entry: DebugMoveEntry) => setMoves(prev => [...prev, entry]),
+    clear: () => setMoves([]),
+  }));
+
+  return (
+    <Card.Section px="xs">
+      <UnstyledButton
+        onClick={() => setOpened(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '2px 0', color: 'var(--mantine-color-dimmed)', fontSize: '0.7rem' }}
+      >
+        {opened ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />} Move Debug {opened ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}
+      </UnstyledButton>
+      <Collapse in={opened}>
+        <table style={{ width: '100%', fontSize: '0.75rem', fontFamily: 'monospace', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
+              <th style={{ textAlign: 'left', padding: '2px 8px' }}>#</th>
+              <th style={{ textAlign: 'left', padding: '2px 8px' }}>Move</th>
+              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Date.now (s)</th>
+              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Cube (s)</th>
+              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Drift (s)</th>
+              <th style={{ textAlign: 'center', padding: '2px 8px' }}>Rec</th>
+            </tr>
+          </thead>
+          <tbody>
+            {moves.map((d, i) => (
+              <tr key={i}>
+                <td style={{ padding: '2px 8px' }}>{i + 1}</td>
+                <td style={{ padding: '2px 8px' }}>{d.move}</td>
+                <td style={{ textAlign: 'right', padding: '2px 8px' }}>{(d.dateNowDelta / 1000).toFixed(3)}</td>
+                <td style={{ textAlign: 'right', padding: '2px 8px' }}>
+                  {d.cubeTimestampDelta != null
+                    ? (d.cubeTimestampDelta / 1000).toFixed(3)
+                    : <Tooltip label={MISSING_TIMESTAMP_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>-</span></Tooltip>
+                  }
+                </td>
+                <td style={{ textAlign: 'right', padding: '2px 8px' }}>
+                  {d.cubeTimestampDelta != null
+                    ? ((d.dateNowDelta - d.cubeTimestampDelta) / 1000).toFixed(3)
+                    : <Tooltip label={MISSING_TIMESTAMP_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>-</span></Tooltip>
+                  }
+                </td>
+                <td style={{ textAlign: 'center', padding: '2px 8px' }}>
+                  {d.sliceRecovered
+                    ? <Tooltip label={RECOVERED_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>R</span></Tooltip>
+                    : ''
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Collapse>
+    </Card.Section>
+  );
+});
+
+///////////////////////////////////////////////////////////////////////////////
 // TrainerView
 ///////////////////////////////////////////////////////////////////////////////
 const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
@@ -182,6 +262,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [shuffleQueue, setShuffleQueue] = useState<ShuffleQueue>([]);
   const [historyOffset, setHistoryOffset] = useState<number>(0);
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
+
+  const [showSliceWarning, setShowSliceWarning] = useState(false);
+  const debugStartRef = useRef<{ dateNow: number; cubeTimestamp: number | null }>({ dateNow: 0, cubeTimestamp: null });
+  const debugTableRef = useRef<DebugMovesTableHandle>(null);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
   const timerRef = useRef<TimerViewHandle>(null);
@@ -350,7 +434,42 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
     if (event.type !== "MOVE") return;
 
-    const newMove = { move: event.move, timeOfMove: Date.now() };
+    const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
+
+    const now = Date.now();
+    const cubeTs = event.type === "MOVE" ? event.cubeTimestamp : null;
+
+    // Detect slice move recovery: recovered move (null cube timestamp) on opposite face
+    const prevMoves = movesRef.current;
+    const moveFace = event.move.charAt(0);
+    const isSliceRecovery = cubeTs === null
+      && prevMoves.length > 0
+      && OPPOSITE_FACES[prevMoves[prevMoves.length - 1].move.charAt(0)] === moveFace;
+
+    const timeOfMove = isSliceRecovery ? prevMoves[prevMoves.length - 1].timeOfMove : now;
+
+    // On first move, clear previous debug data and set baselines
+    if (movesRef.current.length === 0) {
+      debugStartRef.current = { dateNow: now, cubeTimestamp: cubeTs };
+      setShowSliceWarning(false);
+      debugTableRef.current?.clear();
+      debugTableRef.current?.addMove({
+        move: event.move,
+        dateNowDelta: now - startTime,
+        cubeTimestampDelta: 0,
+      });
+    } else {
+      debugTableRef.current?.addMove({
+        move: event.move,
+        dateNowDelta: now - startTime,
+        cubeTimestampDelta: cubeTs != null && debugStartRef.current.cubeTimestamp != null
+          ? cubeTs - debugStartRef.current.cubeTimestamp
+          : null,
+        sliceRecovered: isSliceRecovery,
+      });
+    }
+
+    const newMove = { move: event.move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
     playerRef.current?.experimentalAddMove(event.move);
@@ -380,7 +499,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       preorientationMoves: displayedPreorientation.map(m => m.move),
     };
 
-    timerRef.current?.stop();
+    if (isSliceRecovery) {
+      setShowSliceWarning(true);
+      timerRef.current?.stopAt(timeOfMove);
+    } else {
+      timerRef.current?.stop();
+    }
 
     const advanceToNext = () => {
       setStats(prevStats => {
@@ -572,9 +696,19 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
           <Stack align="center" gap={0}>
-            <TimerView key={startTime} ref={timerRef} startTime={startTime} />
+            <div style={{ position: 'relative' }}>
+              <TimerView key={startTime} ref={timerRef} startTime={startTime} />
+              {showSliceWarning && (
+                <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted to match the paired face turn." withArrow>
+                  <span style={{ position: 'absolute', top: 12, right: -18, lineHeight: 0 }}>
+                    <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
+                  </span>
+                </Tooltip>
+              )}
+            </div>
             <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={settings.showHintFacelets} />
           </Stack>
+          <DebugMovesTable ref={debugTableRef} />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>

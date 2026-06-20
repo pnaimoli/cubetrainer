@@ -7,6 +7,7 @@ interface TimerViewProps {
 
 export interface TimerViewHandle {
   stop: () => void;
+  stopAt: (time: number) => void;
 }
 
 const TimerView = React.forwardRef<TimerViewHandle, TimerViewProps>(({ startTime }, ref) => {
@@ -19,6 +20,12 @@ const TimerView = React.forwardRef<TimerViewHandle, TimerViewProps>(({ startTime
         clearInterval(timerCallbackId.current);
       }
       setCurrentTime(Date.now());
+    },
+    stopAt: (time: number) => {
+      if (timerCallbackId.current !== undefined) {
+        clearInterval(timerCallbackId.current);
+      }
+      setCurrentTime(time);
     },
   }));
 
