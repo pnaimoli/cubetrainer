@@ -70,22 +70,22 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 	"OLL": `
 1, R U2' R2' F R F' U2' R' F R F', OLL
 2, f U R U' R' S' U R U' R' F', OLL
-3, f U R U' R' S' R' F' R U R U' R', OLL
-4, R' F R F' U' S R' U' R U R S', OLL
+3, F U R U' R' F' U' F R U R' U' F', OLL
+4, F U R U' R' F' U F R U R' U' F', OLL
 5, r' U2' R U R' U r, OLL
 6, r U2 R' U' R U' r', OLL
 7, r U R' U R U2' r', OLL
 8, R U2 R' U2 R' F R F', OLL
-9, R U2 R' U' S' R U' R' S, OLL
+9, R U2' R' U' S' R U' R' S, OLL
 10, R U R' U R' F R F' R U2 R', OLL
 11, S R U R' U R U2 R' U2 S', OLL
-12, r R2 U' R U' R' U2 R U' R r', OLL
-13, r U' r' U' r U r' F' U F, OLL
+12, R' F R U R' F' R F U' F', OLL
+13, F U R U2 R' U' R U R' F', OLL
 14, R' F R U R' F' R F U' F', OLL
 15, R' F' R L' U' L U R' F R, OLL
 16, R' F' R U R U' R' U' F U R U R', OLL
 17, F R' F' R U S' R U' R' S, OLL
-18, F S' R U' R' S R U2' R' U' F', OLL
+18, R U R2' F' U' F U R U2' R' F R F', OLL
 19, S' R U R' S U' R' F R F', OLL
 20, S R' U' R U R U R U' R' S', OLL
 21, R U R' U R U' R' U R U2' R', OLL
@@ -96,8 +96,8 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 26, R U2 R' U' R U' R', OLL
 27, R U R' U R U2' R', OLL
 28, S' R U R' S R U' R', OLL
-29, S' R U R' U' R' F R F' U S, OLL
-30, r' D' r U' r' D r2 U' r' U r U r', OLL
+29, R U R' U' R U' R' F' U' F R U R', OLL
+30, F U R U2 R' U' R U2 R' U' F', OLL
 31, R' U' F U R U' R' F' R, OLL
 32, S R U R' U' R' F R f', OLL
 33, R U R' U' R' F R F', OLL
@@ -114,7 +114,7 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 44, F U R U' R' F', OLL
 45, F R U R' U' F', OLL
 46, R' U' R' F R F' U R, OLL
-47, R' U' R' F R F' R' F R F' U R, OLL
+47, F R' F' R U2 R U' R' U R U2' R', OLL
 48, F R U R' U' R U R' U' F', OLL
 49, R B' R2 F R2 B R2 F' R, OLL
 50, R' F R2 B' R2 F' R2 B R', OLL
@@ -123,8 +123,49 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 53, r' U2 R U R' U' R U R' U r, OLL
 54, r U R' U R U' R' U R U2 r', OLL
 55, R' F U R U' R2' F' R2 U R' U' R, OLL
-56, R' F' R U' L' U L U' L' U L R' F R, OLL
+56, f U R U' R' U R U' R' S' U R U' R' F', OLL
 57, R U R' S' R U' R' S, OLL
+`,
+
+	"PLL Hard Recognition": `
+Ua, U R U' R U R U R U' R' U' R2
+Ub, R2' U R U R' U' R3 U' R' U R'
+T-1, R U R' U' R' F R2 U' R' U' R U R' F'
+T-2, U' R U R' U' R' F R2 U' R' U' R U R' F'
+Aa-1, x (R' U R') D2 (R U' R') D2 R2 x'
+Aa-2, U' x (R' U R') D2 (R U' R') D2 R2 x'
+Ab-1, x R2 D2 (R U R') D2 (R U' R) x'
+Ab-2, U' x R2 D2 (R U R') D2 (R U' R) x'
+Ra-1, R U' R2 D' R U R' D R U' R U' R' U R U R'
+Ra-2, U' R U' R2 D' R U R' D R U' R U' R' U R U R'
+Ra-3, U R U' R2 D' R U R' D R U' R U' R' U R U R'
+Rb-1, R' U2 R U2 R' F R U R' U' R' F' R2
+Rb-2, U' R' U2 R U2 R' F R U R' U' R' F' R2
+Rb-3, U2 R' U2 R U2 R' F R U R' U' R' F' R2
+F-1, R' F R f' R' F R2 U R' U' R' F' R2 U R' S
+F-2, U' R' F R f' R' F R2 U R' U' R' F' R2 U R' S
+V, U' R' U R U' R' f' U' R U2 R' U' R U' R' f R
+Y, U2 F R (U' R' U') (R U R' F') (R U R' U') (R' F R F')
+E-1, x' R U' R' D R U R' D' R U R' D R U' R' D' x
+E-2, U' x' R U' R' D R U R' D' R U R' D R U' R' D' x
+E-3, U2 x' R U' R' D R U R' D' R U R' D R U' R' D' x
+E-4, U x' R U' R' D R U R' D' R U R' D R U' R' D' x
+Ga-1, R2 U R' U R' U' R U' R2 D U' R' U R D'
+Ga-2, U' R2 U R' U R' U' R U' R2 D U' R' U R D'
+Ga-3, U2 R2 U R' U R' U' R U' R2 D U' R' U R D'
+Ga-4, U R2 U R' U R' U' R U' R2 D U' R' U R D'
+Gb-1, R' U' R U D' R2 U R' U R U' R U' R2 D
+Gb-2, U' R' U' R U D' R2 U R' U R U' R U' R2 D
+Gb-3, U2 R' U' R U D' R2 U R' U R U' R U' R2 D
+Gb-4, U R' U' R U D' R2 U R' U R U' R U' R2 D
+Gc-1, R2 F2 R U2 R U2 R' F R U R' U' R' F R2
+Gc-2, U' R2 F2 R U2 R U2 R' F R U R' U' R' F R2
+Gc-3, U2 R2 F2 R U2 R U2 R' F R U R' U' R' F R2
+Gc-4, U R2 F2 R U2 R U2 R' F R U R' U' R' F R2
+Gd-1, R U R' U' D R2 U' R U' R' U R' U R2 D'
+Gd-2, U' R U R' U' D R2 U' R U' R' U R' U R2 D'
+Gd-3, U2 R U R' U' D R2 U' R U' R' U R' U R2 D'
+Gd-4, U R U R' U' D R2 U' R U' R' U R' U R2 D'
 `,
 
 	"Advanced F2L": `
