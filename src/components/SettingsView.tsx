@@ -5,6 +5,7 @@ import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, 
 import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
 
 export const defaultSettings: Settings = {
+  randomPreAUF: false,
   randomAUF: false,
   randomYs: false,
   playlistMode: 'ordered',
@@ -78,21 +79,34 @@ const SettingsView: React.FC = () => {
       </Group>
       <Divider label="Symmetries" />
       <Group>
-        <Checkbox
-          label="Random AUF"
-          checked={settings.randomAUF}
-          onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
-        />
-        <Tooltip label="Do a random number of y rotation(s) after the setup" withArrow>
+        <Tooltip label="Add a random U move before the setup to misalign the F2L from the last layer" withArrow>
           <Box display="inline-flex">
             <Checkbox
-              label="Random y's"
-              checked={settings.randomYs}
-              onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
+              label="Random Pre-AUF"
+              checked={settings.randomPreAUF}
+              onChange={(event) => setSettings({ ...settings, randomPreAUF: event.currentTarget.checked })}
+            />
+          </Box>
+        </Tooltip>
+        <Tooltip label="Add a random U move after the setup that must be solved before executing the alg" withArrow>
+          <Box display="inline-flex">
+            <Checkbox
+              label="Random AUF"
+              checked={settings.randomAUF}
+              onChange={(event) => setSettings({ ...settings, randomAUF: event.currentTarget.checked })}
             />
           </Box>
         </Tooltip>
       </Group>
+      <Tooltip label="Add a random y rotation after the setup to change which side you're solving from" withArrow>
+        <Box display="inline-flex">
+          <Checkbox
+            label="Random y's"
+            checked={settings.randomYs}
+            onChange={(event) => setSettings({ ...settings, randomYs: event.currentTarget.checked })}
+          />
+        </Box>
+      </Tooltip>
       <Group>
         <Checkbox
           label="Mirror Across M"

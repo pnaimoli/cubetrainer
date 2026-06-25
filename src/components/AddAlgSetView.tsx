@@ -18,7 +18,7 @@ function algSetToCsv(algSet: AlgSet): string {
 
 interface AddAlgSetViewProps {
   editingAlgSet?: AlgSet | null;
-  onSave?: () => void;
+  onSave?: (savedAlgSet?: AlgSet) => void;
 }
 
 const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) => {
@@ -89,22 +89,28 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) 
         return { name: name.trim(), alg: algMoves, solved: solvedStates as SolvedState };
       });
 
+      let savedAlgSet: AlgSet;
       if (isEditing) {
-        setAlgSets(algSets.map(set => set.id === editingAlgSet!.id ? { ...set, name: setName.trim(), algs } : set));
+        savedAlgSet = { ...editingAlgSet!, name: setName.trim(), algs };
+        setAlgSets(algSets.map(set => set.id === editingAlgSet!.id ? savedAlgSet : set));
       } else {
-        setAlgSets([...algSets, { id: crypto.randomUUID(), name: setName.trim(), algs }]);
+        savedAlgSet = { id: crypto.randomUUID(), name: setName.trim(), algs };
+        setAlgSets([...algSets, savedAlgSet]);
       }
-      onSave?.();
+      onSave?.(savedAlgSet);
       if (!isEditing) form.reset();
     } catch (error) {
       form.setErrors({ algList: (error as Error).message });
     }
   };
 
-  const insertPreset = (preset: string) => {
+  const insertPreset = (name: string, preset: string) => {
     if (textareaRef.current) {
       textareaRef.current.value = preset.trim();
       form.setFieldValue('algList', preset.trim());
+      if (!form.values.setName) {
+        form.setFieldValue('setName', name);
+      }
     }
   };
 
@@ -181,7 +187,7 @@ const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) 
                   size="xs"
                   variant="outline"
                   style={{ marginLeft: '10px' }}
-                  onClick={() => insertPreset(ALG_PRESETS[preset])}
+                  onClick={() => insertPreset(preset, ALG_PRESETS[preset])}
                 >
                   {preset}
                 </Button>

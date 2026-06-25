@@ -172,4 +172,16 @@ Gd-4, U R U R' U' D R2 U' R U' R' U R' U R2 D'
 1, R' D' F' D R, CROSS | F2LFR
 2, F D R D' F', CROSS | F2LFR
 `,
+
+	"Connected F2L": `
+1, R U2 R' U R U2 R' U F' U' F, F2L
+2, r U' r' U2 r U r' R U R', F2L
+3, R U' R' U R U' R' U2' R U' R', F2L
+4, R U' R' U' R U R' U2' R U' R', F2L
+5, F' U F U' R U' R', F2L
+6, R U R' F U R U' R' F' R U R', F2L
+7, U R U' R' U' R U' R' U R U' R', F2L
+8, U R U' R' U R U' R' U R U' R', F2L
+9, F' U F U2' R U R' U, F2L
+`,
 };

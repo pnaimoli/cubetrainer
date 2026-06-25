@@ -255,6 +255,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+  const [randomPreUs, setRandomPreUs] = useState<number>(recomputeRandomUs(settings.randomPreAUF));
   const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(settings.randomAUF));
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings.randomYs));
   const [mirrorAcrossM, setMirrorAcrossM] = useState<boolean>(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
@@ -282,6 +283,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const displayedPreorientation = historyStat
     ? (historyStat.preorientationMoves ?? []).map(m => ({ move: m, timeOfMove: 0 }))
     : preorientationMoves;
+  const displayedRandomPreUs = historyStat ? (historyStat.preAUFs ?? 0) : randomPreUs;
   const displayedRandomUs = historyStat ? historyStat.AUFs : randomUs;
   const displayedRandomYs = historyStat ? historyStat.Ys : randomYs;
   const displayedMirrorAcrossM = historyStat ? historyStat.mirroredOverM : mirrorAcrossM;
@@ -301,6 +303,15 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     const preorientationString = displayedPreorientation.map(move => move.move).join(' ');
 
+    let preMoves = '';
+    if (displayedRandomPreUs === 1) {
+      preMoves = 'U';
+    } else if (displayedRandomPreUs === 2) {
+      preMoves = 'U2';
+    } else if (displayedRandomPreUs === 3) {
+      preMoves = "U'";
+    }
+
     let postMoves = '';
     if (displayedRandomUs === 1) {
       postMoves += ' U';
@@ -318,8 +329,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       postMoves += ` y'`;
     }
 
-    return `${preorientationString} ${inverseAlg} ${postMoves}`.replace(/\s+/g, ' ').trim();
-  }, [displayedAlg, displayedPreorientation, displayedRandomUs, displayedRandomYs, displayedMirrorAcrossM, displayedMirrorAcrossS]);
+    return `${preorientationString} ${preMoves} ${inverseAlg} ${postMoves}`.replace(/\s+/g, ' ').trim();
+  }, [displayedAlg, displayedPreorientation, displayedRandomPreUs, displayedRandomUs, displayedRandomYs, displayedMirrorAcrossM, displayedMirrorAcrossS]);
 
   const effectiveSolvedState = useMemo(() => {
     const MIRROR_ACROSS_M_MAPPING: Record<number, number> = {
@@ -492,6 +503,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       moves: newMoves,
       executionTime: newMoves[newMoves.length-1].timeOfMove - newMoves[0].timeOfMove,
       recognitionTime: newMoves[0].timeOfMove - startTime,
+      preAUFs: displayedRandomPreUs,
       AUFs: displayedRandomUs,
       Ys: displayedRandomYs,
       mirroredOverM: displayedMirrorAcrossM,
@@ -522,12 +534,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setShuffleQueue(newShuffleQueue);
       setHistoryOffset(0);
       setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+      setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
       setRandomUs(recomputeRandomUs(settings.randomAUF));
       setRandomYs(recomputeRandomYs(settings.randomYs));
       setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
       setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
       movesRef.current = [];
-  
+
       setStartTime(Date.now());
     };
 
@@ -538,7 +551,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       advanceToNext();
     }
   }, [displayedAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
-      kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomUs,
+      kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomPreUs, displayedRandomUs,
       displayedRandomYs, settings, shuffleQueue, displayedPreorientation,
       currentAlg, setStats]);
 
@@ -581,6 +594,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     setStartTime(Date.now());
   }, [initialAlg]);
+
+  useEffect(() => {
+    setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
+  }, [initialAlg, settings.randomPreAUF]);
 
   useEffect(() => {
     setRandomUs(recomputeRandomUs(settings.randomAUF));
@@ -647,6 +664,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setCurrentAlg(newCurrentAlg);
     setShuffleQueue(newShuffleQueue);
     setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+    setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
     setRandomUs(recomputeRandomUs(settings.randomAUF));
     setRandomYs(recomputeRandomYs(settings.randomYs));
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));

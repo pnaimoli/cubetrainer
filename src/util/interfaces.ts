@@ -67,6 +67,7 @@ const LoopModes = ['no loop', 'loop', 'loop1'];
 type LoopMode = typeof LoopModes[number];
 
 export interface Settings {
+  randomPreAUF: boolean;
   randomAUF: boolean;
   randomYs: boolean;
   playlistMode: PlaylistMode;
@@ -123,6 +124,7 @@ export interface SolveStat {
   moves: Move[];
   executionTime: number; // in milliseconds
   recognitionTime: number; // in milliseconds
+  preAUFs?: number; // Number of pre-AUF moves
   AUFs: number; // Number of AUF moves
   Ys: number; // Number of Y rotations
   mirroredOverM: boolean;

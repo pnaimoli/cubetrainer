@@ -161,9 +161,15 @@ const App: React.FC = () => {
       case 'Welcome':
         return <WelcomeView />;
       case 'AddAlgSetView':
-        return <AddAlgSetView key={editingAlgSet?.id ?? 'new'} editingAlgSet={editingAlgSet} onSave={() => {
+        return <AddAlgSetView key={editingAlgSet?.id ?? 'new'} editingAlgSet={editingAlgSet} onSave={(savedAlgSet) => {
           setEditingAlgSet(null);
-          setView('Welcome');
+          if (savedAlgSet) {
+            setInitialAlg(null);
+            setCurrentAlgSet(savedAlgSet);
+            setView('TrainerView');
+          } else {
+            setView('Welcome');
+          }
         }} />;
       case 'TrainerView':
         if (currentAlgSet)
