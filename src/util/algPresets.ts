@@ -1,4 +1,6 @@
-export const ALG_PRESETS: { [key: string]: string } = {
+import { generateFRFLSample } from './f2lGenerator';
+
+const ALG_PRESETS_BASE: { [key: string]: string } = {
 	"PLL": `
 Aa, x (R' U R') D2 (R U' R') D2 R2 x'
 Ab, x R2 D2 (R U R') D2 (R U' R) x'
@@ -82,8 +84,8 @@ Z,  M2 U M2 U M' U2 M2 U2 M'
 12, R' F R U R' F' R F U' F', OLL
 13, F U R U2 R' U' R U R' F', OLL
 14, R' F R U R' F' R F U' F', OLL
-15, R' F' R L' U' L U R' F R, OLL
-16, R' F' R U R U' R' U' F U R U R', OLL
+15, r' U' r R' U' R U r' U r, OLL
+16, r U r' R U R' U' r U' r', OLL
 17, F R' F' R U S' R U' R' S, OLL
 18, R U R2' F' U' F U R U2' R' F R F', OLL
 19, S' R U R' S U' R' F R F', OLL
@@ -185,3 +187,17 @@ Gd-4, U R U R' U' D R2 U' R U' R' U R' U R2 D'
 9, F' U F U2' R U R' U, F2L
 `,
 };
+
+export const ALG_PRESETS: { [key: string]: string } = new Proxy(ALG_PRESETS_BASE, {
+  get(target, prop: string) {
+    if (prop === 'FR+FL Minigame') return generateFRFLSample(target['F2L'], 100);
+    return target[prop];
+  },
+  ownKeys(target) {
+    return [...Object.keys(target), 'FR+FL Minigame'];
+  },
+  getOwnPropertyDescriptor(target, prop: string) {
+    if (prop === 'FR+FL Minigame') return { configurable: true, enumerable: true, value: '' };
+    return Object.getOwnPropertyDescriptor(target, prop);
+  },
+});

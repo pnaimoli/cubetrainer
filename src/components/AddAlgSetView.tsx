@@ -6,13 +6,28 @@ import Papa from 'papaparse';
 import { Alg, AlgSet, ValidMove, SolvedState, SOLVED_STATES } from '../util/interfaces';
 import { ALG_PRESETS } from '../util/algPresets';
 
+function solvedStateToString(solved: number): string {
+  // Try exact named match first (e.g. F2L, OLL)
+  const exact = Object.entries(SolvedState)
+    .find(([key, val]) => typeof val === 'number' && val === solved && isNaN(Number(key)));
+  if (exact) return exact[0];
+
+  // Decompose into primitive (single-bit) flags
+  const flags = Object.entries(SolvedState)
+    .filter(([key, val]) => {
+      if (typeof val !== 'number' || !isNaN(Number(key))) return false;
+      const v = val as number;
+      if (v === 0) return false;
+      return (v & (v - 1)) === 0 && (solved & v) !== 0;
+    })
+    .map(([name]) => name);
+
+  return flags.length > 0 ? flags.join('|') : 'FULL';
+}
+
 function algSetToCsv(algSet: AlgSet): string {
   return algSet.algs.map(alg => {
-    const solvedNames = Object.entries(SolvedState)
-      .filter(([, val]) => typeof val === 'number' && (alg.solved! & (val as number)) !== 0)
-      .map(([name]) => name);
-    const solvedStr = solvedNames.length > 0 ? solvedNames.join('|') : 'FULL';
-    return `${alg.name}, ${alg.alg.join(' ')}, ${solvedStr}`;
+    return `${alg.name}, ${alg.alg.join(' ')}, ${solvedStateToString(alg.solved ?? SolvedState.FULL)}`;
   }).join('\n');
 }
 
