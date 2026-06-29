@@ -185,11 +185,15 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
         return { ...prev, undoIndex: nextUndoIndex };
       }
 
-      // Additional wrong move while in error state
-      // If this move cancels the last wrong move, remove both
-      const lastWrong = prev.wrongMoves[prev.wrongMoves.length - 1];
+      // Truncate already-undone moves before processing new input.
+      // When undoIndex > 0, the last undoIndex entries in wrongMoves have
+      // already been reversed on the physical cube and must be removed.
+      const effectiveWrongs = prev.wrongMoves.slice(0, prev.wrongMoves.length - prev.undoIndex);
+
+      // If this move cancels the last effective wrong move, remove both
+      const lastWrong = effectiveWrongs[effectiveWrongs.length - 1];
       if (lastWrong && actual === invertQuarterTurn(lastWrong)) {
-        const trimmed = prev.wrongMoves.slice(0, -1);
+        const trimmed = effectiveWrongs.slice(0, -1);
         if (trimmed.length === 0) {
           // All wrong moves cancelled, back to executing
           const newStatuses = [...prev.moveStatuses];
@@ -203,7 +207,7 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
         }
         return { ...prev, wrongMoves: trimmed, undoIndex: 0 };
       }
-      return { ...prev, wrongMoves: [...prev.wrongMoves, actual], undoIndex: 0 };
+      return { ...prev, wrongMoves: [...effectiveWrongs, actual], undoIndex: 0 };
     });
   }, [moves, moveInfos, onComplete]);
 
