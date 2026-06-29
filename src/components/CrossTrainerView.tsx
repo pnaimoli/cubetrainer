@@ -73,6 +73,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [moveCount, setMoveCount] = useState(0);
   const [genCount, setGenCount] = useState(0);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
+  const isRetryRef = useRef(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
 
@@ -196,7 +197,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
     const colors = crossColorsRef.current;
     const face = colors[Math.floor(Math.random() * colors.length)];
-    const { scrambleMoves: moves, targetPattern } = generateScrambleFromState(kpuzzle.defaultPattern());
+    const { scrambleMoves: moves, targetPattern } = generateScrambleFromState(kpuzzle.defaultPattern(), undefined, 25);
 
     const solutions = solveCross(targetPattern, face);
 
@@ -206,6 +207,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setOptimalSolutions(solutions);
     setScrambledPattern(targetPattern);
     setCrossFace(face);
+    isRetryRef.current = false;
     setPhase('scrambling');
     setResult(null);
     setFirstMoveTime(null);
@@ -307,7 +309,12 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           executionMs,
           timestamp: new Date().toISOString(),
         };
-        setCrossStats(prev => [...prev, stat]);
+        if (isRetryRef.current) {
+          const idx = crossStats.findLastIndex(s => s.scramble === scramble);
+          setCrossStats(prev => idx >= 0 ? prev.map((s, i) => i === idx ? stat : s) : [...prev, stat]);
+        } else {
+          setCrossStats(prev => [...prev, stat]);
+        }
       }
     }
   }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace]);
@@ -327,6 +334,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   }, [conn]);
 
   const handleRetry = () => {
+    isRetryRef.current = true;
     setPhase('scrambling');
     setResult(null);
     setFirstMoveTime(null);
