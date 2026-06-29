@@ -199,18 +199,91 @@ export function solveCross(pattern: KPattern): CrossSolution[] {
   }));
 }
 
+// Face names indexed by moveFaceIndex
+const FACE_NAMES = ['R', 'L', 'U', 'D', 'F', 'B'];
+
+// Solve cross using only moves from a restricted set of faces.
+// Uses IDA* with the BFS table as a perfect heuristic.
+// Returns the first optimal solution found for the given face restriction, or null.
+export function solveGenRestricted(
+  pattern: KPattern,
+  allowedFaces: Set<number>, // set of face indices (0=R,1=L,2=U,3=D,4=F,5=B)
+  maxExtraMoves: number = 4, // how many moves beyond unrestricted optimal to search
+): CrossSolution | null {
+  if (!bfsTable || !moveTransforms) throw new Error('Cross solver not initialized.');
+
+  const { pieces, orientations } = extractCrossState(pattern);
+  const startKey = encodeState(pieces, orientations);
+  const startEntry = bfsTable.get(startKey);
+  if (!startEntry) return null;
+  if (startEntry.depth === 0) return { moveCount: 0, solution: '' };
+
+  const maxDepth = Math.min(startEntry.depth + maxExtraMoves, 10);
+
+  // Build allowed move indices
+  const allowedMoves: number[] = [];
+  for (let mi = 0; mi < 18; mi++) {
+    if (allowedFaces.has(moveFaceIndex(mi))) allowedMoves.push(mi);
+  }
+
+  // IDA* search
+  let foundPath: string[] | null = null;
+
+  function dfs(
+    pcs: number[], oris: number[], depth: number, limit: number, lastFace: number,
+    path: string[],
+  ): boolean {
+    const key = encodeState(pcs, oris);
+    const entry = bfsTable!.get(key);
+    if (!entry) return false; // unreachable state
+    if (entry.depth === 0) {
+      foundPath = [...path];
+      return true;
+    }
+    if (depth + entry.depth > limit) return false; // prune: can't reach in time
+
+    for (const mi of allowedMoves) {
+      const face = moveFaceIndex(mi);
+      if (face === lastFace) continue;
+      if ((face ^ 1) === lastFace && face > lastFace) continue;
+
+      const { pieces: np, orientations: no } = applyMoveToState(pcs, oris, mi);
+      path.push(MOVE_NAMES[mi]);
+      if (dfs(np, no, depth + 1, limit, face, path)) return true;
+      path.pop();
+    }
+    return false;
+  }
+
+  for (let limit = startEntry.depth; limit <= maxDepth; limit++) {
+    if (dfs(pieces, orientations, 0, limit, -1, [])) {
+      return {
+        moveCount: foundPath!.length,
+        solution: foundPath!.map(invertHTMMove).join(' '),
+      };
+    }
+  }
+
+  return null;
+}
+
+// Get face index from face character
+export function faceCharToIndex(face: string): number {
+  return FACE_NAMES.indexOf(face);
+}
+
 function invertHTMMove(move: string): string {
   if (move.endsWith('2')) return move;
   if (move.endsWith("'")) return move.slice(0, -1);
   return move + "'";
 }
 
-// Generate a random scramble: 20 random face moves, no consecutive same-face
-export function generateRandomScramble(): string {
+// Generate random face moves, no consecutive same-face
+function generateRandomMoves(numMoves: number): string {
   const moves: string[] = [];
   let lastFace = -1;
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < numMoves; i++) {
     let mi: number;
     do {
       mi = Math.floor(Math.random() * 18);
@@ -220,4 +293,22 @@ export function generateRandomScramble(): string {
   }
 
   return moves.join(' ');
+}
+
+// Generate a random scramble: 20 random face moves, no consecutive same-face
+export function generateRandomScramble(): string {
+  return generateRandomMoves(20);
+}
+
+// Generate a scramble from a given cube state. Returns the scramble moves,
+// the resulting target pattern, and optimal cross solutions for that target.
+export function generateScrambleFromState(
+  currentPattern: KPattern,
+  _kpuzzle?: KPuzzle,
+  numMoves: number = 15,
+): { scrambleMoves: string; targetPattern: KPattern; solutions: CrossSolution[] } {
+  const scrambleMoves = generateRandomMoves(numMoves);
+  const targetPattern = currentPattern.applyAlg(scrambleMoves);
+  const solutions = solveCross(targetPattern);
+  return { scrambleMoves, targetPattern, solutions };
 }

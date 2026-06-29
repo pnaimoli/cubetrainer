@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, NumberInput, Spoiler } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, NumberInput, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { TbRefresh, TbArrowRight, TbAlertTriangle } from 'react-icons/tb';
+import { DataTable, DataTableColumn } from 'mantine-datatable';
+import { mkConfig, generateCsv, download } from 'export-to-csv';
+import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp } from 'react-icons/tb';
 import 'cubing/twisty';
 import { TwistyPlayer } from 'cubing/twisty';
-import { KPuzzle } from 'cubing/kpuzzle';
+import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { initCrossSolver, solveCross, generateRandomScramble, CrossSolution } from '../util/crossSolver';
+import { initCrossSolver, generateScrambleFromState, CrossSolution } from '../util/crossSolver';
 import { requestFacelets, computeTransitionMoves, simplifyMoves, movesToHTM } from '../util/cubeState';
+import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import ScrambleGuide from './ScrambleGuide';
 import TimerView, { TimerViewHandle } from './TimerView';
 
@@ -53,14 +56,19 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [solverReady, setSolverReady] = useState(false);
   const [scramble, setScramble] = useState<string>('');
+  const [scrambleMoves, setScrambleMoves] = useState<string>('');
   const [optimalSolutions, setOptimalSolutions] = useState<CrossSolution[]>([]);
+  const [scrambledPattern, setScrambledPattern] = useState<KPattern | null>(null);
   const [phase, setPhase] = useState<Phase>('scrambling');
+  const [selectedGen, setSelectedGen] = useState<string>('');
   const [transitionMoves, setTransitionMoves] = useState<string[]>([]);
   const [computingTransition, setComputingTransition] = useState(false);
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [result, setResult] = useState<{ userMoves: number; optimal: number; time: number } | null>(null);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [solutionsOpen, setSolutionsOpen] = useState(false);
 
   const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [] });
   const [showHintFacelets, setShowHintFacelets] = useState(settings.showHintFacelets);
@@ -69,10 +77,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const playerRef = useRef<TwistyPlayer>(null);
   const timerRef = useRef<TimerViewHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track the current scramble for async operations
   const scrambleRef = useRef<string>('');
 
-  // Setup alg for the 3D cube (the scramble itself)
+  // Setup alg for the 3D cube (the full scramble from solved)
   const setupAlg = useMemo(() => scramble, [scramble]);
 
   // Stickering mask for cross (show only cross-relevant stickers)
@@ -81,6 +88,42 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const setupPattern = kpuzzle.defaultPattern().applyAlg(scramble);
     return generateStickeringMask(setupPattern, SolvedState.CROSS);
   }, [kpuzzle, scramble]);
+
+  // Ranked solution groups by gen level
+  const genGroups = useMemo(() =>
+    rankCrossSolutions(optimalSolutions, scrambledPattern ?? undefined),
+    [optimalSolutions, scrambledPattern],
+  );
+
+  // Active gen group based on segmented control
+  const activeGroup = useMemo(() => {
+    if (genGroups.length === 0) return null;
+    return genGroups.find(g => String(g.genCount) === selectedGen) ?? genGroups[0];
+  }, [genGroups, selectedGen]);
+
+  // Segmented control data: highest gen first, with n-1 gen always present (disabled if not found)
+  const genSegmentData = useMemo(() => {
+    if (genGroups.length === 0) return [];
+    const maxGen = genGroups[0].genCount;
+    const minGen = Math.max(2, maxGen - 2);
+    const data: { label: string; value: string; disabled: boolean }[] = [];
+    for (let g = maxGen; g >= minGen; g--) {
+      const group = genGroups.find(gr => gr.genCount === g);
+      data.push({
+        label: group ? `${g}-gen (${group.moveCount})` : `${g}-gen`,
+        value: String(g),
+        disabled: !group,
+      });
+    }
+    return data;
+  }, [genGroups]);
+
+  // Auto-select the optimal gen (highest gen = fewest moves) when groups change
+  useEffect(() => {
+    if (genGroups.length > 0) {
+      setSelectedGen(String(genGroups[0].genCount));
+    }
+  }, [genGroups]);
 
   // Initialize puzzle and solver
   useEffect(() => {
@@ -100,10 +143,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setStartTime(Date.now());
   }, []);
 
-  // Compute transition moves from current cube state to desired scramble state
+  // Compute transition moves from current cube state to desired scramble state (retry only)
   const computeTransition = useCallback(async (targetScramble: string) => {
     if (!kpuzzle || !conn) {
-      // No cube connected - just show the raw scramble
       setTransitionMoves(targetScramble.split(/\s+/).filter(Boolean));
       return;
     }
@@ -113,17 +155,14 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       const facelets = await requestFacelets(conn);
       const rawMoves = await computeTransitionMoves(facelets, targetScramble, kpuzzle);
       const simplified = simplifyMoves(rawMoves);
-      // Only update if this is still the current scramble
       if (scrambleRef.current === targetScramble) {
         if (simplified.length === 0) {
-          // Already at desired state, go straight to solving
           handleScrambleComplete();
           return;
         }
         setTransitionMoves(simplified);
       }
     } catch (err) {
-      // If facelets request fails, fall back to raw scramble
       console.warn('Failed to compute transition, using raw scramble:', err);
       if (scrambleRef.current === targetScramble) {
         setTransitionMoves(targetScramble.split(/\s+/).filter(Boolean));
@@ -133,27 +172,29 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     }
   }, [kpuzzle, conn, handleScrambleComplete]);
 
-  // Generate new scramble when solver is ready
+  // Generate new scramble from solved, then compute differential from cube state
   const generateNewScramble = useCallback(() => {
     if (!kpuzzle || !solverReady) return;
-    const newScramble = generateRandomScramble();
-    const pattern = kpuzzle.defaultPattern().applyAlg(newScramble);
-    const solutions = solveCross(pattern);
-    scrambleRef.current = newScramble;
-    setScramble(newScramble);
+
+    const { scrambleMoves: moves, targetPattern, solutions } = generateScrambleFromState(kpuzzle.defaultPattern());
+
+    scrambleRef.current = moves;
+    setScramble(moves);
+    setScrambleMoves(moves);
     setOptimalSolutions(solutions);
+    setScrambledPattern(targetPattern);
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
     setStartTime(Date.now());
     setShowSliceWarning(false);
-    setTransitionMoves([]); // Clear while computing
-    computeTransition(newScramble);
+    setTransitionMoves([]);
+    computeTransition(moves);
   }, [kpuzzle, solverReady, computeTransition]);
 
   useEffect(() => {
     if (solverReady) generateNewScramble();
-  }, [solverReady, generateNewScramble]);
+  }, [solverReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply stickering mask
   useEffect(() => {
@@ -247,7 +288,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   }, []);
 
   const handleRetry = () => {
-    // Re-scramble to same state - compute transition from current cube state
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
@@ -261,15 +301,82 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     generateNewScramble();
   };
 
-  // Stats summary
+  // Stats computations
   const recentStats = crossStats.slice(-50);
   const optimalCount = recentStats.filter(s => s.userMoveCount === s.optimalMoveCount).length;
   const avgMoves = recentStats.length > 0
     ? (recentStats.reduce((sum, s) => sum + s.userMoveCount, 0) / recentStats.length).toFixed(1)
     : '-';
-  const avgOptimal = recentStats.length > 0
-    ? (recentStats.reduce((sum, s) => sum + s.optimalMoveCount, 0) / recentStats.length).toFixed(1)
-    : '-';
+
+  const getBestTime = () => {
+    if (recentStats.length === 0) return '-';
+    return (Math.min(...recentStats.map(s => s.timeMs)) / 1000).toFixed(3);
+  };
+
+  const getAoTime = (n: number) => {
+    if (recentStats.length < n) return '-';
+    const times = recentStats.slice(-n).map(s => s.timeMs);
+    return (times.reduce((a, b) => a + b, 0) / n / 1000).toFixed(3);
+  };
+
+  const handleDeleteStat = (index: number) => {
+    setCrossStats(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteAll = () => {
+    setCrossStats([]);
+  };
+
+  const handleExportData = () => {
+    const formatTimestamp = (date: Date) => {
+      const pad = (num: number) => (num < 10 ? '0' : '') + num;
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+    };
+    const timestamp = formatTimestamp(new Date());
+    const csvConfig = mkConfig({
+      filename: `cross-stats-${timestamp}`,
+      useKeysAsHeaders: true,
+      showColumnHeaders: true,
+    });
+    const csv = generateCsv(csvConfig)(crossStats as unknown as Record<string, string | number>[]);
+    download(csvConfig)(csv);
+  };
+
+  // Format ranked solution display
+  const formatRankedSolution = (rs: RankedSolution) => {
+    const prefix = rs.rotation ? `[${rs.rotation}] ` : '';
+    return `${prefix}${rs.solution}`;
+  };
+
+  // DataTable columns for times list
+  const timesColumns: DataTableColumn<CrossStat & { id: number }>[] = [
+    { accessor: 'index', title: '#', textAlign: 'right', render: (_: CrossStat, index: number) => crossStats.length - index },
+    {
+      accessor: 'userMoveCount', title: 'Moves', textAlign: 'right',
+      render: (record: CrossStat) => (
+        <Text fz="xs" ff="monospace" c={record.userMoveCount === record.optimalMoveCount ? 'green' : undefined} component="span">
+          {record.userMoveCount}
+        </Text>
+      ),
+    },
+    { accessor: 'optimalMoveCount', title: 'Optimal', textAlign: 'right' },
+    {
+      accessor: 'timeMs', title: 'Time', textAlign: 'right',
+      render: (record: CrossStat) => (record.timeMs / 1000).toFixed(3),
+    },
+  ];
+
+  // Summary stats DataTable
+  const summaryColumns = [
+    { accessor: 'n', title: 'n', render: () => recentStats.length },
+    { accessor: 'optimal', title: 'optimal%', render: () => recentStats.length > 0 ? `${((optimalCount / recentStats.length) * 100).toFixed(0)}%` : '-' },
+    { accessor: 'avgMoves', title: 'avg moves', render: () => avgMoves },
+    { accessor: 'best', title: 'best', render: () => getBestTime() },
+    { accessor: 'ao5', title: 'ao5', render: () => getAoTime(5) },
+    { accessor: 'ao12', title: 'ao12', render: () => getAoTime(12) },
+  ];
+
+  const summaryRecords = [{ id: 'current' }];
 
   return (
     <Grid>
@@ -292,24 +399,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder>
-          <Card.Section withBorder px="xs">
-            <Group justify="space-between" align="center">
-              <Spoiler maxHeight={0} showLabel="Solution" hideLabel="Solution" styles={{ control: { color: 'var(--mantine-color-dimmed)' } }}>
-                <Stack gap={2} py="xs">
-                  {optimalSolutions.slice(0, 5).map((sol, i) => (
-                    <Text key={i} fz="sm" ff="monospace" c="dimmed">{sol.solution}</Text>
-                  ))}
-                  {optimalSolutions.length > 5 && (
-                    <Text fz="xs" c="dimmed">+{optimalSolutions.length - 5} more</Text>
-                  )}
-                </Stack>
-              </Spoiler>
-              {optimalSolutions.length > 0 && (
-                <Text fz="sm" c="dimmed">{optimalSolutions[0].moveCount} moves, {optimalSolutions.length} solution{optimalSolutions.length !== 1 ? 's' : ''}</Text>
-              )}
-            </Group>
-          </Card.Section>
-
           <Stack align="center" gap={0}>
             <div style={{ position: 'relative' }}>
               {phase === 'scrambling' ? (
@@ -328,10 +417,11 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
             <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
           </Stack>
 
-          <Card.Section px="xs" py="xs">
+          <Divider label="Scramble" />
+
+          <Box px="xs" py="xs">
             <Group gap={4} wrap="wrap">
-              <Text fz="sm" fw={700} c="dimmed">Scramble:</Text>
-              <Text fz="sm" ff="monospace" c="dimmed">{scramble}</Text>
+              <Text fz="sm" ff="monospace" c="dimmed">{scrambleMoves || scramble}</Text>
             </Group>
             {conn ? (
               computingTransition ? (
@@ -356,10 +446,52 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 <Text fz="sm" c="yellow">connect cube to compute</Text>
               </Group>
             )}
-          </Card.Section>
+          </Box>
+
+          <Divider
+            label={
+              <Group gap={4}>
+                {solutionsOpen ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}
+                <Text fz="xs" fw={500}>Solutions</Text>
+                {solutionsOpen ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}
+              </Group>
+            }
+            labelPosition="center"
+            onClick={() => setSolutionsOpen(o => !o)}
+            style={{ cursor: 'pointer' }}
+          />
+
+          {solutionsOpen && (
+            <Box px="xs" py="xs">
+              {genGroups.length > 0 ? (
+                <>
+                  <SegmentedControl
+                    size="xs"
+                    value={selectedGen}
+                    onChange={(val) => {
+                      // Only allow selecting non-disabled values
+                      const seg = genSegmentData.find(d => d.value === val);
+                      if (seg && !seg.disabled) setSelectedGen(val);
+                    }}
+                    data={genSegmentData}
+                    mb="xs"
+                  />
+                  {activeGroup && (
+                    <Stack gap={2}>
+                      {activeGroup.solutions.map((sol, i) => (
+                        <Text key={i} fz="sm" ff="monospace" c="dimmed">{formatRankedSolution(sol)}</Text>
+                      ))}
+                    </Stack>
+                  )}
+                </>
+              ) : optimalSolutions.length > 0 && optimalSolutions[0].moveCount === 0 ? (
+                <Text fz="sm" c="green" fw={700}>Already solved!</Text>
+              ) : null}
+            </Box>
+          )}
 
           {result && (
-            <Card.Section px="xs" py="xs">
+            <Box px="xs" py="xs">
               {result.userMoves === result.optimal ? (
                 <Text fz="lg" fw={700} c="green">Optimal! ({result.optimal} moves)</Text>
               ) : (
@@ -367,50 +499,73 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                   Solved in {result.userMoves} moves (optimal: {result.optimal})
                 </Text>
               )}
-            </Card.Section>
+            </Box>
           )}
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
         <Stack>
-          <Card withBorder>
+          <Card withBorder padding={0}>
             <Card.Section withBorder px="xs">
-              <Title order={2} mt="xs" mb="xs">Stats (last 50)</Title>
+              <Title order={2} mt="xs" mb="xs">Stats</Title>
             </Card.Section>
-            <Stack gap="xs" p="xs">
-              <Text fz="sm">Total solves: {recentStats.length}</Text>
-              <Text fz="sm">Optimal solves: {optimalCount} ({recentStats.length > 0 ? ((optimalCount / recentStats.length) * 100).toFixed(0) : 0}%)</Text>
-              <Text fz="sm">Avg moves: {avgMoves}</Text>
-              <Text fz="sm">Avg optimal: {avgOptimal}</Text>
-            </Stack>
+            <DataTable
+              ff="monospace"
+              fz="xs"
+              verticalSpacing={0}
+              horizontalSpacing="xs"
+              columns={summaryColumns}
+              records={summaryRecords}
+              defaultColumnProps={{
+                textAlign: 'center',
+              }}
+            />
           </Card>
-          <Card withBorder>
+          <Card withBorder padding={0} style={{ display: 'flex', flexDirection: 'column' as const, maxHeight: 'calc(100vh - 500px)' }}>
             <Card.Section withBorder px="xs">
-              <Title order={2} mt="xs" mb="xs">Recent Solves</Title>
+              <Group justify="space-between">
+                <Title order={2}>Times</Title>
+                <Menu withinPortal position="bottom-end" shadow="sm">
+                  <Menu.Target>
+                    <ActionIcon variant="subtle" color="gray">
+                      <TbDots style={{ width: rem(16), height: rem(16) }} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item leftSection={<TbInfoCircle />} disabled>
+                      Hint: double-click a row to remove that time
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbDownload style={{ width: rem(14), height: rem(14) }} />}
+                      onClick={handleExportData}
+                    >
+                      Export to CSV
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
+                      color="red"
+                      onClick={() => setConfirmDeleteAll(true)}
+                    >
+                      Delete all
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
             </Card.Section>
-            <Box style={{ maxHeight: 'calc(100vh - 500px)', overflow: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '0.75rem', fontFamily: 'monospace', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-                    <th style={{ textAlign: 'left', padding: '2px 6px' }}>#</th>
-                    <th style={{ textAlign: 'right', padding: '2px 6px' }}>Moves</th>
-                    <th style={{ textAlign: 'right', padding: '2px 6px' }}>Optimal</th>
-                    <th style={{ textAlign: 'right', padding: '2px 6px' }}>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {crossStats.slice().reverse().slice(0, 50).map((stat, i) => (
-                    <tr key={i} style={{ backgroundColor: i % 2 === 0 ? 'var(--mantine-color-dark-6)' : undefined }}>
-                      <td style={{ padding: '2px 6px' }}>{crossStats.length - i}</td>
-                      <td style={{ textAlign: 'right', padding: '2px 6px', color: stat.userMoveCount === stat.optimalMoveCount ? 'var(--mantine-color-green-5)' : undefined }}>
-                        {stat.userMoveCount}
-                      </td>
-                      <td style={{ textAlign: 'right', padding: '2px 6px' }}>{stat.optimalMoveCount}</td>
-                      <td style={{ textAlign: 'right', padding: '2px 6px' }}>{(stat.timeMs / 1000).toFixed(3)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <Box style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <DataTable
+                ff="monospace"
+                fz="xs"
+                withRowBorders={false}
+                verticalSpacing={0}
+                horizontalSpacing="xs"
+                highlightOnHover
+                striped
+                columns={timesColumns}
+                records={crossStats.toReversed().slice(0, 50).map((stat, index) => ({ ...stat, id: index }))}
+                onRowDoubleClick={({ index }) => handleDeleteStat(crossStats.length - 1 - index)}
+                rowStyle={() => ({ cursor: 'not-allowed' })}
+              />
             </Box>
           </Card>
         </Stack>
@@ -443,6 +598,13 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           </Stack>
         </Card>
       </Grid.Col>
+      <Modal opened={confirmDeleteAll} onClose={() => setConfirmDeleteAll(false)} title="Delete All Times" centered>
+        <Text mb="md">Are you sure you want to delete all cross trainer times? This can't be undone.</Text>
+        <Group justify="flex-end">
+          <Button variant="default" onClick={() => setConfirmDeleteAll(false)}>Cancel</Button>
+          <Button color="red" onClick={() => { handleDeleteAll(); setConfirmDeleteAll(false); }}>Delete All</Button>
+        </Group>
+      </Modal>
     </Grid>
   );
 };
