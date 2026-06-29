@@ -269,7 +269,7 @@ export function solveGenRestricted(
     if (dfs(pieces, orientations, 0, limit, -1, [])) {
       return {
         moveCount: foundPath!.length,
-        solution: foundPath!.map(invertHTMMove).join(' '),
+        solution: foundPath!.join(' '),
       };
     }
   }
