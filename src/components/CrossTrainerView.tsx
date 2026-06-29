@@ -68,6 +68,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [result, setResult] = useState<{ userMoves: number; optimal: number; time: number } | null>(null);
+  const [moveCount, setMoveCount] = useState(0);
+  const [genCount, setGenCount] = useState(0);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
@@ -197,6 +199,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
+    setMoveCount(0);
+    setGenCount(0);
     setStartTime(Date.now());
     setShowSliceWarning(false);
     setTransitionMoves([]);
@@ -254,6 +258,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const newMove = { move: event.move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
+    const moveStrs = newMoves.map(m => m.move);
+    setMoveCount(movesToHTM(moveStrs));
+    setGenCount(new Set(moveStrs.map(m => m.charAt(0))).size);
     playerRef.current?.experimentalAddMove(event.move);
 
     const moveString = newMoves.map(m => m.move).join(' ');
@@ -306,6 +313,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
+    setMoveCount(0);
+    setGenCount(0);
     setStartTime(Date.now());
     setShowSliceWarning(false);
     setTransitionMoves([]);
@@ -417,30 +426,43 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           <Stack align="center" gap={0}>
             <div style={{ position: 'relative' }}>
               {phase === 'scrambling' ? (
-                <Text fz="48px" fw={600} ff="monospace" c="dimmed" py="xs">0.000</Text>
+                <Text fz="48px" fw={600} ff="monospace" c="dimmed" lh={1}>0.000</Text>
               ) : (
                 <TimerView key={startTime} ref={timerRef} startTime={startTime} />
               )}
               {showSliceWarning && (
                 <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
-                  <span style={{ position: 'absolute', top: 12, right: -18, lineHeight: 0 }}>
+                  <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
                     <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
                   </span>
                 </Tooltip>
               )}
             </div>
             <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
+            {result ? (
+              result.userMoves === result.optimal ? (
+                <Text fz="lg" fw={700} c="green">Optimal! ({result.optimal} moves, {genCount}-gen)</Text>
+              ) : (
+                <Text fz="lg" fw={700} c="red">
+                  {result.userMoves} moves, {genCount}-gen (optimal: {result.optimal})
+                </Text>
+              )
+            ) : (
+              <Text fz="lg" fw={700} c="dimmed">
+                Moves: {phase === 'solving' ? moveCount : 0} ({phase === 'solving' ? genCount : 0}-gen)
+              </Text>
+            )}
           </Stack>
 
           <Divider label="Scramble" />
 
           <Box px="xs" py="xs">
+            <Text fz="sm" fw={700} c={CROSS_CHIP_COLORS[crossFace]} mb={2}>
+              Solve: {CROSS_NAMES[crossFace]} Cross
+            </Text>
             <Group gap={4} wrap="wrap">
               <Text fz="sm" ff="monospace" c="dimmed">{scrambleMoves || scramble}</Text>
             </Group>
-            <Text fz="sm" fw={700} c={CROSS_CHIP_COLORS[crossFace]}>
-              Solve: {CROSS_NAMES[crossFace]} Cross
-            </Text>
             {conn ? (
               computingTransition ? (
                 <Group gap={4} wrap="wrap" mt={4}>
@@ -508,17 +530,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
             </Box>
           )}
 
-          {result && (
-            <Box px="xs" py="xs">
-              {result.userMoves === result.optimal ? (
-                <Text fz="lg" fw={700} c="green">Optimal! ({result.optimal} moves)</Text>
-              ) : (
-                <Text fz="lg" fw={700} c="yellow">
-                  Solved in {result.userMoves} moves (optimal: {result.optimal})
-                </Text>
-              )}
-            </Box>
-          )}
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
