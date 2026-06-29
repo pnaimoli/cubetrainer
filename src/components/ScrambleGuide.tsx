@@ -186,6 +186,23 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
       }
 
       // Additional wrong move while in error state
+      // If this move cancels the last wrong move, remove both
+      const lastWrong = prev.wrongMoves[prev.wrongMoves.length - 1];
+      if (lastWrong && actual === invertQuarterTurn(lastWrong)) {
+        const trimmed = prev.wrongMoves.slice(0, -1);
+        if (trimmed.length === 0) {
+          // All wrong moves cancelled, back to executing
+          const newStatuses = [...prev.moveStatuses];
+          newStatuses[prev.moveIndex] = 'pending';
+          return {
+            mode: 'executing',
+            moveIndex: prev.moveIndex,
+            moveStatuses: newStatuses,
+            partialMoves: [],
+          };
+        }
+        return { ...prev, wrongMoves: trimmed, undoIndex: 0 };
+      }
       return { ...prev, wrongMoves: [...prev.wrongMoves, actual], undoIndex: 0 };
     });
   }, [moves, moveInfos, onComplete]);
