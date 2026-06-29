@@ -3,7 +3,7 @@ import { KPattern } from 'cubing/kpuzzle';
 
 export interface RankedSolution {
   solution: string;   // rewritten moves
-  rotation: string;   // e.g. "" | "y" | "y'" | "y2"
+  rotation: string;   // e.g. "" | "y" | "x2 y'"
   genCount: number;
   qtm: number;
 }
@@ -14,83 +14,88 @@ export interface GenGroup {
   solutions: RankedSolution[];
 }
 
-// Rotation rewrites per axis. Each axis has 4 rotations (identity + 3 non-trivial).
-// The rewrite maps: if the solution has face X, replace it with rewriteMap[X].
-// D/U cross: y-axis (preserves D and U)
-// F/B cross: z-axis (preserves F and B)
-// R/L cross: x-axis (preserves R and L)
+// All solutions are displayed with cross on the D face.
+// For non-D crosses, a mandatory base rotation puts the cross face on D,
+// then y rotations are used for gen optimization.
 
-interface RotationConfig {
-  rotations: readonly string[];
-  rewrites: Record<string, Record<string, string>>;
-  inverses: Record<string, Record<string, string>>;
+const FACE_NAMES = ['U', 'L', 'F', 'R', 'B', 'D'] as const;
+
+// Rotation to put each cross face on the D position
+const BASE_ROTATION: Record<string, string> = {
+  D: '', U: 'x2', F: "x'", B: 'x', R: 'z', L: "z'",
+};
+
+// How each base rotation remaps faces (solver frame -> display frame)
+const BASE_REWRITE: Record<string, Record<string, string>> = {
+  D: {},
+  U: { U: 'D', D: 'U', F: 'B', B: 'F' },
+  F: { U: 'F', F: 'D', D: 'B', B: 'U' },
+  B: { U: 'B', B: 'D', D: 'F', F: 'U' },
+  R: { U: 'R', R: 'D', D: 'L', L: 'U' },
+  L: { U: 'L', L: 'D', D: 'R', R: 'U' },
+};
+
+const Y_ROTATIONS = ['', 'y', "y'", 'y2'] as const;
+const Y_REWRITES: Record<string, Record<string, string>> = {
+  '': {},
+  'y': { R: 'F', F: 'L', L: 'B', B: 'R' },
+  "y'": { R: 'B', B: 'L', L: 'F', F: 'R' },
+  'y2': { R: 'L', L: 'R', F: 'B', B: 'F' },
+};
+
+function composeFaceMap(first: Record<string, string>, second: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const face of FACE_NAMES) {
+    const afterFirst = first[face] ?? face;
+    const afterSecond = second[afterFirst] ?? afterFirst;
+    if (afterSecond !== face) result[face] = afterSecond;
+  }
+  return result;
 }
 
-const Y_CONFIG: RotationConfig = {
-  rotations: ['', 'y', "y'", 'y2'],
-  rewrites: {
-    '': {},
-    'y': { R: 'F', F: 'L', L: 'B', B: 'R' },
-    "y'": { R: 'B', B: 'L', L: 'F', F: 'R' },
-    'y2': { R: 'L', L: 'R', F: 'B', B: 'F' },
-  },
-  inverses: {
-    '': {},
-    'y': { F: 'R', L: 'F', B: 'L', R: 'B' },
-    "y'": { B: 'R', L: 'B', F: 'L', R: 'F' },
-    'y2': { L: 'R', R: 'L', B: 'F', F: 'B' },
-  },
-};
+function invertFaceMap(map: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const face of FACE_NAMES) {
+    const mapped = map[face] ?? face;
+    if (mapped !== face) result[mapped] = face;
+  }
+  return result;
+}
 
-const Z_CONFIG: RotationConfig = {
-  rotations: ['', 'z', "z'", 'z2'],
-  rewrites: {
-    '': {},
-    'z': { U: 'R', R: 'D', D: 'L', L: 'U' },
-    "z'": { U: 'L', L: 'D', D: 'R', R: 'U' },
-    'z2': { U: 'D', D: 'U', R: 'L', L: 'R' },
-  },
-  inverses: {
-    '': {},
-    'z': { R: 'U', D: 'R', L: 'D', U: 'L' },
-    "z'": { L: 'U', D: 'L', R: 'D', U: 'R' },
-    'z2': { D: 'U', U: 'D', L: 'R', R: 'L' },
-  },
-};
+interface RotationEntry {
+  label: string;
+  rewrite: Record<string, string>;
+  inverse: Record<string, string>;
+}
 
-const X_CONFIG: RotationConfig = {
-  rotations: ['', 'x', "x'", 'x2'],
-  rewrites: {
-    '': {},
-    'x': { U: 'F', F: 'D', D: 'B', B: 'U' },
-    "x'": { U: 'B', B: 'D', D: 'F', F: 'U' },
-    'x2': { U: 'D', D: 'U', F: 'B', B: 'F' },
-  },
-  inverses: {
-    '': {},
-    'x': { F: 'U', D: 'F', B: 'D', U: 'B' },
-    "x'": { B: 'U', D: 'B', F: 'D', U: 'F' },
-    'x2': { D: 'U', U: 'D', B: 'F', F: 'B' },
-  },
-};
+const rotationCache = new Map<string, RotationEntry[]>();
 
-const CROSS_ROTATION_CONFIG: Record<string, RotationConfig> = {
-  D: Y_CONFIG, U: Y_CONFIG,
-  F: Z_CONFIG, B: Z_CONFIG,
-  R: X_CONFIG, L: X_CONFIG,
-};
+function getRotationEntries(crossFace: string): RotationEntry[] {
+  let entries = rotationCache.get(crossFace);
+  if (entries) return entries;
+
+  const base = BASE_ROTATION[crossFace] ?? '';
+  const baseRewrite = BASE_REWRITE[crossFace] ?? {};
+
+  entries = Y_ROTATIONS.map(yRot => {
+    const composed = composeFaceMap(baseRewrite, Y_REWRITES[yRot]);
+    const label = [base, yRot].filter(Boolean).join(' ');
+    return { label, rewrite: composed, inverse: invertFaceMap(composed) };
+  });
+
+  rotationCache.set(crossFace, entries);
+  return entries;
+}
 
 function rewriteMove(move: string, rewriteMap: Record<string, string>): string {
   const face = move.charAt(0);
   const suffix = move.slice(1);
-  const newFace = rewriteMap[face] ?? face;
-  return newFace + suffix;
+  return (rewriteMap[face] ?? face) + suffix;
 }
 
-function rewriteSolution(solution: string, rotation: string, config: RotationConfig): string {
-  if (rotation === '') return solution;
-  const map = config.rewrites[rotation];
-  return solution.split(' ').filter(Boolean).map(m => rewriteMove(m, map)).join(' ');
+function rewriteSolution(solution: string, rewriteMap: Record<string, string>): string {
+  if (Object.keys(rewriteMap).length === 0) return solution;
+  return solution.split(' ').filter(Boolean).map(m => rewriteMove(m, rewriteMap)).join(' ');
 }
 
 function countGens(solution: string): number {
@@ -129,13 +134,13 @@ function combinations<T>(arr: T[], n: number): T[][] {
   return [...withFirst, ...withoutFirst];
 }
 
-function bestRotation(sol: CrossSolution, config: RotationConfig): RankedSolution {
+function bestRotation(sol: CrossSolution, entries: RotationEntry[]): RankedSolution {
   let best: RankedSolution | null = null;
-  for (const rotation of config.rotations) {
-    const rewritten = rewriteSolution(sol.solution, rotation, config);
+  for (const entry of entries) {
+    const rewritten = rewriteSolution(sol.solution, entry.rewrite);
     const candidate: RankedSolution = {
       solution: rewritten,
-      rotation,
+      rotation: entry.label,
       genCount: countGens(rewritten),
       qtm: computeQTM(rewritten),
     };
@@ -159,7 +164,7 @@ export function rankCrossSolutions(
   scrambledPattern?: KPattern,
   crossFace: string = 'D',
 ): GenGroup[] {
-  const config = CROSS_ROTATION_CONFIG[crossFace] ?? Y_CONFIG;
+  const entries = getRotationEntries(crossFace);
   const mustIncludeFaceIdx = faceCharToIndex(crossFace);
 
   // Step 1: For each solution, pick best rotation (dedup rotation equivalents)
@@ -167,7 +172,7 @@ export function rankCrossSolutions(
   const seen = new Set<string>();
   for (const sol of solutions) {
     if (!sol.solution) continue;
-    const best = bestRotation(sol, config);
+    const best = bestRotation(sol, entries);
     if (!seen.has(best.solution)) {
       seen.add(best.solution);
       bestPerSolution.push(best);
@@ -202,12 +207,10 @@ export function rankCrossSolutions(
 
       const faceCombos = combinations(ALL_FACES, targetGen);
 
-      for (const rotation of config.rotations) {
-        const inverseMap = config.inverses[rotation];
-
+      for (const entry of entries) {
         for (const faces of faceCombos) {
           const actualFaces = new Set(faces.map(f => {
-            const actual = inverseMap[f] ?? f;
+            const actual = entry.inverse[f] ?? f;
             return faceCharToIndex(actual);
           }));
 
@@ -216,12 +219,12 @@ export function rankCrossSolutions(
 
           const result = solveGenRestricted(scrambledPattern, actualFaces, 4, crossFace);
           if (result && result.solution) {
-            const rewritten = rewriteSolution(result.solution, rotation, config);
+            const rewritten = rewriteSolution(result.solution, entry.rewrite);
             if (!genSeen.has(rewritten)) {
               genSeen.add(rewritten);
               genSolutions.push({
                 solution: rewritten,
-                rotation,
+                rotation: entry.label,
                 genCount: countGens(rewritten),
                 qtm: computeQTM(rewritten),
               });
@@ -230,26 +233,27 @@ export function rankCrossSolutions(
         }
       }
 
-      // Further dedup: different face combos under different rotations may produce
-      // rotation-equivalent solutions. Group by canonical form.
+      // Dedup rotation-equivalent solutions
       const canonical = new Map<string, RankedSolution>();
       for (const rs of genSolutions) {
-        let canonKey = rs.solution;
-        let best = rs;
-        for (const rot of config.rotations) {
-          if (rot === rs.rotation) continue;
-          const inverseMap = config.inverses[rs.rotation];
-          const originalSol = rs.rotation ? rs.solution.split(' ').filter(Boolean).map(m => rewriteMove(m, inverseMap)).join(' ') : rs.solution;
-          const variant = rewriteSolution(originalSol, rot, config);
-          if (variant < canonKey) canonKey = variant;
-          const variantRanked: RankedSolution = {
+        const currentEntry = entries.find(e => e.label === rs.rotation)!;
+        // Recover original (solver-frame) solution
+        const originalSol = rewriteSolution(rs.solution, currentEntry.inverse);
+
+        let canonKey = '';
+        let best: RankedSolution = rs;
+        for (const entry of entries) {
+          const variant = rewriteSolution(originalSol, entry.rewrite);
+          if (!canonKey || variant < canonKey) canonKey = variant;
+          const ranked: RankedSolution = {
             solution: variant,
-            rotation: rot,
+            rotation: entry.label,
             genCount: countGens(variant),
             qtm: computeQTM(variant),
           };
-          if (compareSolutions(variantRanked, best) < 0) best = variantRanked;
+          if (compareSolutions(ranked, best) < 0) best = ranked;
         }
+
         const existing = canonical.get(canonKey);
         if (!existing || compareSolutions(best, existing) < 0) {
           canonical.set(canonKey, best);
