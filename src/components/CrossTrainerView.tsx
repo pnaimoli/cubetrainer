@@ -311,7 +311,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         };
         if (isRetryRef.current) {
           const idx = crossStats.findLastIndex(s => s.scramble === scramble);
-          setCrossStats(prev => idx >= 0 ? prev.map((s, i) => i === idx ? stat : s) : [...prev, stat]);
+          setCrossStats(prev => idx >= 0 ? prev.map((s, i) => i === idx ? (stat.executionMs < s.executionMs ? stat : s) : s) : [...prev, stat]);
         } else {
           setCrossStats(prev => [...prev, stat]);
         }
