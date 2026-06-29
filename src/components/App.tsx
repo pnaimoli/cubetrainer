@@ -81,6 +81,32 @@ const App: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, []);
 
+  const cachedMacProvider = async (_device: BluetoothDevice, isFallback?: boolean): Promise<string | null> => {
+    if (!isFallback) return null;
+    const cached = localStorage.getItem('ganCubeMac');
+    return cached || null;
+  };
+
+  const setupConnection = async (connection: GanCubeConnection) => {
+    localStorage.setItem('ganCubeMac', connection.deviceMAC);
+    const sub = connection.events$.subscribe((event) => {
+      if (event.type === 'HARDWARE' && event.hardwareName) {
+        setCubeName(event.hardwareName);
+      } else if (event.type === 'BATTERY') {
+        setBatteryLevel(event.batteryLevel);
+      } else if (event.type === 'DISCONNECT') {
+        setConn(null);
+        setCubeName('GAN Cube');
+        setBatteryLevel(null);
+        sub.unsubscribe();
+      }
+    });
+    await connection.sendCubeCommand({ type: "REQUEST_FACELETS" });
+    await connection.sendCubeCommand({ type: "REQUEST_HARDWARE" });
+    setTimeout(() => connection.sendCubeCommand({ type: "REQUEST_BATTERY" }), 500);
+    setConn(connection);
+  };
+
   const handleBluetoothConnect = async () => {
     setError(null);
     setLoading(true);
@@ -92,27 +118,29 @@ const App: React.FC = () => {
       setLoading(false);
     } else {
       try {
-        const connection = await connectGanCube();
-        const sub = connection.events$.subscribe((event) => {
-          if (event.type === 'HARDWARE' && event.hardwareName) {
-            setCubeName(event.hardwareName);
-          } else if (event.type === 'BATTERY') {
-            setBatteryLevel(event.batteryLevel);
-          } else if (event.type === 'DISCONNECT') {
-            setConn(null);
-            setCubeName('GAN Cube');
-            setBatteryLevel(null);
-            sub.unsubscribe();
-          }
-        });
-        await connection.sendCubeCommand({ type: "REQUEST_FACELETS" });
-        await connection.sendCubeCommand({ type: "REQUEST_HARDWARE" });
-        setTimeout(() => connection.sendCubeCommand({ type: "REQUEST_BATTERY" }), 500);
-        setConn(connection);
+        const connection = await connectGanCube(cachedMacProvider);
+        await setupConnection(connection);
         setLoading(false);
       } catch (error) {
-        setLoading(false);
         const e = error as Error;
+        // If MAC retrieval failed, force-disconnect the stale GATT and retry once
+        if (e.message?.includes('MAC address')) {
+          try {
+            localStorage.removeItem('ganCubeMac');
+            const connection = await connectGanCube();
+            await setupConnection(connection);
+            setLoading(false);
+            return;
+          } catch (retryError) {
+            const re = retryError as Error;
+            setLoading(false);
+            if (re.name !== 'NotFoundError') {
+              setError(re.message);
+            }
+            return;
+          }
+        }
+        setLoading(false);
         if (e.name !== 'NotFoundError') {
           setError(e.message);
         }
