@@ -4,6 +4,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { isPatternSolved } from './SolveChecker';
 import { SolvedState } from './interfaces';
 import { initCrossSolver, solveCross } from './crossSolver';
+import { rankCrossSolutions } from './crossSolutionRanker';
 
 let kpuzzle: KPuzzle;
 
@@ -59,6 +60,49 @@ describe('Cross solving per face', () => {
     const solutionsDefault = solveCross(pattern);
     expect(solutions.length).to.equal(solutionsDefault.length);
     expect(solutions[0].moveCount).to.equal(solutionsDefault[0].moveCount);
+  });
+
+  it('B (blue) cross: specific scramble produces correct 5-move optimal', () => {
+    const scramble = "R B L' U2 B F' B' U L R' L B' F2 D2 U2";
+    const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    const solutions = solveCross(pattern, 'B');
+    expect(solutions.length).to.be.greaterThan(0);
+    expect(solutions[0].moveCount).to.equal(5);
+    // Verify solutions using raw edge data (independent of isPatternSolved)
+    // B cross edges: UB=2, BR=10, DB=6, BL=11
+    const B_CROSS_EDGES = [2, 10, 6, 11];
+    for (const sol of solutions) {
+      const finalPattern = pattern.applyAlg(sol.solution);
+      const edgeData = finalPattern.patternData['EDGES'];
+      for (const idx of B_CROSS_EDGES) {
+        expect(edgeData.pieces[idx], `Solution "${sol.solution}": edge at pos ${idx} should be piece ${idx}`).to.equal(idx);
+        expect(edgeData.orientation[idx], `Solution "${sol.solution}": edge at pos ${idx} should have orientation 0`).to.equal(0);
+      }
+    }
+  });
+
+  it('B (blue) cross: ranked solutions (including gen-restricted) are valid', () => {
+    const scramble = "L F R L' B L B2 U D' U2 L D L2 B2 F2";
+    const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    const solutions = solveCross(pattern, 'B');
+    expect(solutions.length).to.be.greaterThan(0);
+
+    const groups = rankCrossSolutions(solutions, pattern, 'B');
+    expect(groups.length).to.be.greaterThan(0);
+
+    // Verify every ranked solution (including gen-restricted) actually solves B cross.
+    // The rotation label (e.g. "x", "x y'") puts B on D. Applying the rotation
+    // to the scrambled pattern, then the display-frame solution, should solve D cross.
+    for (const group of groups) {
+      for (const ranked of group.solutions) {
+        const rotatedPattern = pattern.applyAlg(ranked.rotation);
+        const solvedPattern = rotatedPattern.applyAlg(ranked.solution);
+        expect(
+          isPatternSolved(solvedPattern, SolvedState.CROSS, 'D'),
+          `${group.genCount}-gen "[${ranked.rotation}] ${ranked.solution}" should solve B cross`
+        ).to.be.true;
+      }
+    }
   });
 
   it('different faces produce different solutions for same scramble', () => {
