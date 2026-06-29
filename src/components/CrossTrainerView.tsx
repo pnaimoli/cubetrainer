@@ -14,7 +14,8 @@ import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
-import { initCrossSolver, generateScrambleFromState, solveCross, CrossSolution } from '../util/crossSolver';
+import { randomScrambleForEvent } from 'cubing/scramble';
+import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
 import { requestFacelets, computeTransitionMoves, simplifyMoves, movesToHTM } from '../util/cubeState';
 import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import { CROSS_NAMES, CROSS_CHIP_COLORS } from '../util/crossRotation';
@@ -192,13 +193,14 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   }, [kpuzzle, conn, handleScrambleComplete]);
 
   // Generate new scramble from solved, then compute differential from cube state
-  const generateNewScramble = useCallback(() => {
+  const generateNewScramble = useCallback(async () => {
     if (!kpuzzle || !solverReady) return;
 
     const colors = crossColorsRef.current;
     const face = colors[Math.floor(Math.random() * colors.length)];
-    const { scrambleMoves: moves, targetPattern } = generateScrambleFromState(kpuzzle.defaultPattern(), undefined, 25);
-
+    const scrambleAlg = await randomScrambleForEvent('333');
+    const moves = scrambleAlg.toString();
+    const targetPattern = kpuzzle.defaultPattern().applyAlg(moves);
     const solutions = solveCross(targetPattern, face);
 
     scrambleRef.current = moves;
@@ -417,6 +419,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     {
       accessor: 'executionMs', title: 'Exec', textAlign: 'right',
       render: (record: CrossStat) => (record.executionMs / 1000).toFixed(3),
+    },
+    {
+      accessor: 'tps', title: 'TPS', textAlign: 'right',
+      render: (record: CrossStat) => record.executionMs > 0 ? (record.userMoveCount / (record.executionMs / 1000)).toFixed(1) : '-',
     },
   ];
 
