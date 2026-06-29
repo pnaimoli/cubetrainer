@@ -12,6 +12,7 @@ import { CTAlg } from '../util/CTAlg';
 import { Settings, AlgSet, Alg, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
+import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { getNextAlg, ShuffleQueue } from '../util/playlist';
 import TimerView, { TimerViewHandle } from './TimerView';
 import SummaryStatsView from './SummaryStatsView';
@@ -93,6 +94,7 @@ interface TrainerViewProps {
   conn: GanCubeConnection | null;
   settings: Settings;
   initialAlg: Alg | null;
+  disableAlgSelection?: boolean;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -130,7 +132,7 @@ export interface SolvedStateBadgesHandle {
   notify: () => void;
 }
 
-const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateBadgesProps>(
+export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateBadgesProps>(
   ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef }, ref) => {
     const [, setMoveCount] = useState(0);
 
@@ -249,7 +251,7 @@ const DebugMovesTable = React.forwardRef<DebugMovesTableHandle>((_, ref) => {
 ///////////////////////////////////////////////////////////////////////////////
 // TrainerView
 ///////////////////////////////////////////////////////////////////////////////
-const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg }) => {
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg, disableAlgSelection = false }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const movesRef = useRef<Move[]>([]);
@@ -469,6 +471,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
         dateNowDelta: now - startTime,
         cubeTimestampDelta: 0,
       });
+
+      // Mask after first move: grey out all stickers for blind practice
+      if (settings.maskAfterFirstMove && kpuzzle && playerRef.current) {
+        const blindMask = new PuzzleStickering(kpuzzle);
+        const mgr = new StickeringManager(kpuzzle);
+        blindMask.set(mgr.all(), PieceStickering.Ignored);
+        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(blindMask.toStickeringMask());
+      }
     } else {
       debugTableRef.current?.addMove({
         move: event.move,
@@ -625,9 +635,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [playerRef, stickeringMask]);
 
   useEffect(() => {
-    if (movesRef.current.length === 0 && playerRef.current)
+    if (movesRef.current.length === 0 && playerRef.current) {
       playerRef.current.alg = '';
-  }, [playerRef, startTime]);
+      // Clear blind mask on new case (re-apply normal stickering mask or null)
+      if (settings.maskAfterFirstMove) {
+        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
+      }
+    }
+  }, [playerRef, startTime, settings.maskAfterFirstMove, stickeringMask]);
 
   useEffect(() => {
     return () => {
@@ -741,7 +756,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
             <Title order={2} mt="xs" mb="xs">Settings</Title>
           </Card.Section>
           <Box pt="xs">
-            <SettingsView />
+            <SettingsView disableAlgSelection={disableAlgSelection} />
           </Box>
         </Card>
       </Grid.Col>

@@ -78,6 +78,7 @@ export interface Settings {
   randomizeMirrorAcrossS: boolean;
   showHintFacelets: boolean;
   useMaskings: boolean;
+  maskAfterFirstMove: boolean;
   fullColourNeutrality: boolean;
   firstRotation: string;
   randomRotations1: string;

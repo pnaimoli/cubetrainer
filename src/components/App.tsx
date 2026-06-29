@@ -7,12 +7,17 @@ import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
-import { AlgSet, Settings, Alg, SolveStat } from '../util/interfaces';
+import { AlgSet, Settings, Alg, SolveStat, ValidMove, SolvedState } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
 import { defaultSettings } from './SettingsView';
 import WelcomeView from './WelcomeView';
 import ReportsView from './ReportsView';
+import MinigamesSection from './MinigamesSection';
+import CrossTrainerView from './CrossTrainerView';
+import OLLPredictionView from './FinalF2LView';
+import { F2L_DB } from '../util/algDatabase';
+import { generateFRFLSample } from '../util/f2lGenerator';
 
 // One-time migration: assign ids to AlgSets and re-key stats.
 // Runs synchronously before hooks read localStorage so every useLocalStorage
@@ -156,6 +161,20 @@ const App: React.FC = () => {
     </Flex>
   );
 
+  const handleFRFL = () => {
+    const csv = generateFRFLSample(F2L_DB, 100);
+    const algs: Alg[] = csv.trim().split('\n').map(line => {
+      const parts = line.split(',').map(s => s.trim());
+      const [name, alg] = parts;
+      const algMoves = alg.split(/\s+/) as ValidMove[];
+      return { name, alg: algMoves, solved: SolvedState.F2L };
+    });
+    const algSet: AlgSet = { id: 'minigame-frfl', name: 'FR+FL Slot Game', algs };
+    setInitialAlg(null);
+    setCurrentAlgSet(algSet);
+    setView('TrainerView');
+  };
+
   const renderView = (): React.ReactNode => {
     switch (view) {
       case 'Welcome':
@@ -173,7 +192,7 @@ const App: React.FC = () => {
         }} />;
       case 'TrainerView':
         if (currentAlgSet)
-          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} />;
+          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} disableAlgSelection={currentAlgSet.id.startsWith('minigame-')} />;
         else
           return <WelcomeView />;
       case 'ReportsView':
@@ -181,6 +200,10 @@ const App: React.FC = () => {
           return <ReportsView key={currentAlgSet.id} currentAlgSet={currentAlgSet} />;
         else
           return <WelcomeView />;
+      case 'CrossTrainerView':
+        return <CrossTrainerView conn={conn} settings={settings} />;
+      case 'FinalF2LView':
+        return <OLLPredictionView conn={conn} settings={settings} />;
       default:
         return <WelcomeView />;
     }
@@ -216,6 +239,11 @@ const App: React.FC = () => {
       </AppShell.Header>
       <AppShell.Navbar>
         <ScrollArea scrollbars="y">
+          <MinigamesSection
+            onFRFL={handleFRFL}
+            onOptimalCross={() => setView('CrossTrainerView')}
+            onFinalF2L={() => setView('FinalF2LView')}
+          />
           <Button
             leftSection={<FaPlus />}
             fullWidth

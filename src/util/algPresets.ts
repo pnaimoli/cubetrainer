@@ -1,6 +1,4 @@
-import { generateFRFLSample } from './f2lGenerator';
-
-const ALG_PRESETS_BASE: { [key: string]: string } = {
+export const ALG_PRESETS: { [key: string]: string } = {
 	"PLL": `
 Aa, x (R' U R') D2 (R U' R') D2 R2 x'
 Ab, x R2 D2 (R U R') D2 (R U' R) x'
@@ -187,17 +185,3 @@ Gd-4, U R U R' U' D R2 U' R U' R' U R' U R2 D'
 9, F' U F U2' R U R' U, F2L
 `,
 };
-
-export const ALG_PRESETS: { [key: string]: string } = new Proxy(ALG_PRESETS_BASE, {
-  get(target, prop: string) {
-    if (prop === 'FR+FL Minigame') return generateFRFLSample(target['F2L'], 100);
-    return target[prop];
-  },
-  ownKeys(target) {
-    return [...Object.keys(target), 'FR+FL Minigame'];
-  },
-  getOwnPropertyDescriptor(target, prop: string) {
-    if (prop === 'FR+FL Minigame') return { configurable: true, enumerable: true, value: '' };
-    return Object.getOwnPropertyDescriptor(target, prop);
-  },
-});

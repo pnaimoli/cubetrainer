@@ -12,7 +12,7 @@ const Y_REMAP: Record<string, string>[] = [
  * Handles y, y', y2 rotations and d/d' wide moves (d = y' U, d' = U' y).
  * The resulting alg has the same piece effect with no rotations.
  */
-function derotateAlg(alg: string): string {
+export function derotateAlg(alg: string): string {
   const moves = alg.split(/\s+/);
   let rot = 0; // accumulated y rotation (0-3)
   const output: string[] = [];
@@ -59,9 +59,11 @@ function mirrorMoveOverM(move: string): string {
   return `${newFace}${count}${newPrime}`;
 }
 
-function mirrorAlg(alg: string): string {
+export function mirrorAlg(alg: string): string {
   return alg.split(/\s+/).map(mirrorMoveOverM).join(' ');
 }
+
+import type { AlgEntry } from './algDatabase';
 
 interface F2LCase {
   name: string;
@@ -89,8 +91,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export function generateFRFLSample(f2lPreset: string, count: number): string {
-  const cases = parseF2L(f2lPreset);
+export function generateFRFLSample(f2lPreset: string, count: number): string;
+export function generateFRFLSample(entries: AlgEntry[], count: number): string;
+export function generateFRFLSample(input: string | AlgEntry[], count: number): string {
+  const cases: F2LCase[] = typeof input === 'string'
+    ? parseF2L(input)
+    : input.map(e => ({ name: e.name, alg: e.alg }));
 
   // Generate all combos as [frIndex, flIndex] pairs
   const allCombos: [number, number][] = [];

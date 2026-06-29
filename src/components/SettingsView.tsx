@@ -16,49 +16,60 @@ export const defaultSettings: Settings = {
   randomizeMirrorAcrossS: false,
   showHintFacelets: false,
   useMaskings: false,
+  maskAfterFirstMove: false,
   fullColourNeutrality: false,
   firstRotation: '',
   randomRotations1: '',
   postSolveDelay: 1
 };
 
-const SettingsView: React.FC = () => {
+interface SettingsViewProps {
+  disableAlgSelection?: boolean;
+}
+
+const SettingsView: React.FC<SettingsViewProps> = ({ disableAlgSelection = false }) => {
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
 
   return (
     <Stack>
       <Divider label="Alg Selection" />
       <Group>
-        <Group gap="xs" onClick={() => setSettings(cycleSetting(settings, "playlistMode"))} style={{ cursor: 'pointer' }}>
+        <Group
+          gap="xs"
+          onClick={() => !disableAlgSelection && setSettings(cycleSetting(settings, "playlistMode"))}
+          style={{ cursor: disableAlgSelection ? 'not-allowed' : 'pointer', opacity: disableAlgSelection ? 0.4 : 1 }}
+        >
           <Text fz="sm">Order:</Text>
           <Tooltip withArrow label={
+            disableAlgSelection ? 'Not available in minigame mode' :
             settings.playlistMode === 'ordered' ? 'Ordered - play algs in sequence' :
             settings.playlistMode === 'shuffle' ? 'Shuffle - cycle through all algs in random order before repeating' :
             'Random - pick a random alg each time'
           }>
-            <ActionIcon variant="subtle">
-              {settings.playlistMode === 'ordered' && <TbListNumbers style={{ color: 'gray' }} />}
-              {settings.playlistMode === 'shuffle' && <TbArrowsShuffle style={{ color: 'green' }} />}
-              {settings.playlistMode === 'random' && <TbArrowsRandom style={{ color: 'green' }} />}
+            <ActionIcon variant="subtle" disabled={disableAlgSelection}>
+              {settings.playlistMode === 'ordered' && <TbListNumbers style={{ color: disableAlgSelection ? 'gray' : 'gray' }} />}
+              {settings.playlistMode === 'shuffle' && <TbArrowsShuffle style={{ color: disableAlgSelection ? 'gray' : 'green' }} />}
+              {settings.playlistMode === 'random' && <TbArrowsRandom style={{ color: disableAlgSelection ? 'gray' : 'green' }} />}
             </ActionIcon>
           </Tooltip>
         </Group>
         <Group
           gap="xs"
-          onClick={() => settings.playlistMode !== 'random' && setSettings(cycleSetting(settings, "loopMode"))}
-          style={{ cursor: settings.playlistMode === 'random' ? 'not-allowed' : 'pointer', opacity: settings.playlistMode === 'random' ? 0.4 : 1 }}
+          onClick={() => !disableAlgSelection && settings.playlistMode !== 'random' && setSettings(cycleSetting(settings, "loopMode"))}
+          style={{ cursor: disableAlgSelection || settings.playlistMode === 'random' ? 'not-allowed' : 'pointer', opacity: disableAlgSelection || settings.playlistMode === 'random' ? 0.4 : 1 }}
         >
           <Text fz="sm">Loop:</Text>
           <Tooltip withArrow label={
+            disableAlgSelection ? 'Not available in minigame mode' :
             settings.playlistMode === 'random' ? 'Loop has no effect in random mode - only Repeat Once is meaningful' :
             settings.loopMode === 'no loop' ? 'No Loop - stop after the last alg' :
             settings.loopMode === 'loop' ? 'Loop - restart from the beginning after finishing' :
             'Repeat Once - keep repeating the current alg'
           }>
-            <ActionIcon variant="subtle" disabled={settings.playlistMode === 'random'}>
+            <ActionIcon variant="subtle" disabled={disableAlgSelection || settings.playlistMode === 'random'}>
               {settings.loopMode === 'no loop' && <TbRepeatOff style={{ color: 'gray' }} />}
-              {settings.loopMode === 'loop' && <TbRepeat style={{ color: 'green' }} />}
-              {settings.loopMode === 'loop1' && <TbRepeatOnce style={{ color: 'green' }} />}
+              {settings.loopMode === 'loop' && <TbRepeat style={{ color: disableAlgSelection ? 'gray' : 'green' }} />}
+              {settings.loopMode === 'loop1' && <TbRepeatOnce style={{ color: disableAlgSelection ? 'gray' : 'green' }} />}
             </ActionIcon>
           </Tooltip>
         </Group>
@@ -145,6 +156,15 @@ const SettingsView: React.FC = () => {
             label="Use Maskings"
             checked={settings.useMaskings}
             onChange={(event) => setSettings({ ...settings, useMaskings: event.currentTarget.checked })}
+          />
+        </Box>
+      </Tooltip>
+      <Tooltip label="Grey out all stickers after the first cube move for blind solving practice" withArrow>
+        <Box display="inline-flex">
+          <Checkbox
+            label="Mask After First Move"
+            checked={settings.maskAfterFirstMove}
+            onChange={(event) => setSettings({ ...settings, maskAfterFirstMove: event.currentTarget.checked })}
           />
         </Box>
       </Tooltip>
