@@ -3,7 +3,7 @@ import { KPattern } from 'cubing/kpuzzle';
 
 export interface RankedSolution {
   solution: string;   // rewritten moves
-  rotation: string;   // "" | "y" | "y'" | "y2"
+  rotation: string;   // e.g. "" | "y" | "y'" | "y2"
   genCount: number;
   qtm: number;
 }
@@ -14,23 +14,71 @@ export interface GenGroup {
   solutions: RankedSolution[];
 }
 
-// Y-axis rotation rewrites (preserves D cross)
-const Y_REWRITES: Record<string, Record<string, string>> = {
-  '': {},
-  'y': { R: 'F', F: 'L', L: 'B', B: 'R' },
-  "y'": { R: 'B', B: 'L', L: 'F', F: 'R' },
-  'y2': { R: 'L', L: 'R', F: 'B', B: 'F' },
+// Rotation rewrites per axis. Each axis has 4 rotations (identity + 3 non-trivial).
+// The rewrite maps: if the solution has face X, replace it with rewriteMap[X].
+// D/U cross: y-axis (preserves D and U)
+// F/B cross: z-axis (preserves F and B)
+// R/L cross: x-axis (preserves R and L)
+
+interface RotationConfig {
+  rotations: readonly string[];
+  rewrites: Record<string, Record<string, string>>;
+  inverses: Record<string, Record<string, string>>;
+}
+
+const Y_CONFIG: RotationConfig = {
+  rotations: ['', 'y', "y'", 'y2'],
+  rewrites: {
+    '': {},
+    'y': { R: 'F', F: 'L', L: 'B', B: 'R' },
+    "y'": { R: 'B', B: 'L', L: 'F', F: 'R' },
+    'y2': { R: 'L', L: 'R', F: 'B', B: 'F' },
+  },
+  inverses: {
+    '': {},
+    'y': { F: 'R', L: 'F', B: 'L', R: 'B' },
+    "y'": { B: 'R', L: 'B', F: 'L', R: 'F' },
+    'y2': { L: 'R', R: 'L', B: 'F', F: 'B' },
+  },
 };
 
-// Inverse y-rotation rewrites: map rewritten face back to original face
-const Y_INVERSE: Record<string, Record<string, string>> = {
-  '': {},
-  'y': { F: 'R', L: 'F', B: 'L', R: 'B' },
-  "y'": { B: 'R', L: 'B', F: 'L', R: 'F' },
-  'y2': { L: 'R', R: 'L', B: 'F', F: 'B' },
+const Z_CONFIG: RotationConfig = {
+  rotations: ['', 'z', "z'", 'z2'],
+  rewrites: {
+    '': {},
+    'z': { U: 'R', R: 'D', D: 'L', L: 'U' },
+    "z'": { U: 'L', L: 'D', D: 'R', R: 'U' },
+    'z2': { U: 'D', D: 'U', R: 'L', L: 'R' },
+  },
+  inverses: {
+    '': {},
+    'z': { R: 'U', D: 'R', L: 'D', U: 'L' },
+    "z'": { L: 'U', D: 'L', R: 'D', U: 'R' },
+    'z2': { D: 'U', U: 'D', L: 'R', R: 'L' },
+  },
 };
 
-const ROTATIONS = ['', 'y', "y'", 'y2'] as const;
+const X_CONFIG: RotationConfig = {
+  rotations: ['', 'x', "x'", 'x2'],
+  rewrites: {
+    '': {},
+    'x': { U: 'F', F: 'D', D: 'B', B: 'U' },
+    "x'": { U: 'B', B: 'D', D: 'F', F: 'U' },
+    'x2': { U: 'D', D: 'U', F: 'B', B: 'F' },
+  },
+  inverses: {
+    '': {},
+    'x': { F: 'U', D: 'F', B: 'D', U: 'B' },
+    "x'": { B: 'U', D: 'B', F: 'D', U: 'F' },
+    'x2': { D: 'U', U: 'D', B: 'F', F: 'B' },
+  },
+};
+
+const CROSS_ROTATION_CONFIG: Record<string, RotationConfig> = {
+  D: Y_CONFIG, U: Y_CONFIG,
+  F: Z_CONFIG, B: Z_CONFIG,
+  R: X_CONFIG, L: X_CONFIG,
+};
 
 function rewriteMove(move: string, rewriteMap: Record<string, string>): string {
   const face = move.charAt(0);
@@ -39,9 +87,9 @@ function rewriteMove(move: string, rewriteMap: Record<string, string>): string {
   return newFace + suffix;
 }
 
-function rewriteSolution(solution: string, rotation: string): string {
+function rewriteSolution(solution: string, rotation: string, config: RotationConfig): string {
   if (rotation === '') return solution;
-  const map = Y_REWRITES[rotation];
+  const map = config.rewrites[rotation];
   return solution.split(' ').filter(Boolean).map(m => rewriteMove(m, map)).join(' ');
 }
 
@@ -70,10 +118,8 @@ function computeQTM(solution: string): number {
   return qtm;
 }
 
-// All 6 faces
 const ALL_FACES = ['R', 'L', 'U', 'D', 'F', 'B'];
 
-// Generate all combinations of n items from arr
 function combinations<T>(arr: T[], n: number): T[][] {
   if (n === 0) return [[]];
   if (arr.length < n) return [];
@@ -83,14 +129,10 @@ function combinations<T>(arr: T[], n: number): T[][] {
   return [...withFirst, ...withoutFirst];
 }
 
-/**
- * For a single CrossSolution, try all 4 y-rotations and pick the single
- * best representative: lowest gen count, then fewest L/B moves, then lowest QTM.
- */
-function bestRotation(sol: CrossSolution): RankedSolution {
+function bestRotation(sol: CrossSolution, config: RotationConfig): RankedSolution {
   let best: RankedSolution | null = null;
-  for (const rotation of ROTATIONS) {
-    const rewritten = rewriteSolution(sol.solution, rotation);
+  for (const rotation of config.rotations) {
+    const rewritten = rewriteSolution(sol.solution, rotation, config);
     const candidate: RankedSolution = {
       solution: rewritten,
       rotation,
@@ -112,22 +154,20 @@ function compareSolutions(a: RankedSolution, b: RankedSolution): number {
   return a.qtm - b.qtm;
 }
 
-/**
- * Rank cross solutions and find gen-restricted alternatives.
- *
- * Returns GenGroups sorted by genCount DESC (highest gen first = optimal).
- * Each group contains deduplicated solutions sorted by LB penalty then QTM.
- */
 export function rankCrossSolutions(
   solutions: CrossSolution[],
   scrambledPattern?: KPattern,
+  crossFace: string = 'D',
 ): GenGroup[] {
-  // Step 1: For each solution, pick best y-rotation (dedup rotation equivalents)
+  const config = CROSS_ROTATION_CONFIG[crossFace] ?? Y_CONFIG;
+  const mustIncludeFaceIdx = faceCharToIndex(crossFace);
+
+  // Step 1: For each solution, pick best rotation (dedup rotation equivalents)
   const bestPerSolution: RankedSolution[] = [];
   const seen = new Set<string>();
   for (const sol of solutions) {
     if (!sol.solution) continue;
-    const best = bestRotation(sol);
+    const best = bestRotation(sol, config);
     if (!seen.has(best.solution)) {
       seen.add(best.solution);
       bestPerSolution.push(best);
@@ -162,8 +202,8 @@ export function rankCrossSolutions(
 
       const faceCombos = combinations(ALL_FACES, targetGen);
 
-      for (const rotation of ROTATIONS) {
-        const inverseMap = Y_INVERSE[rotation];
+      for (const rotation of config.rotations) {
+        const inverseMap = config.inverses[rotation];
 
         for (const faces of faceCombos) {
           const actualFaces = new Set(faces.map(f => {
@@ -171,13 +211,12 @@ export function rankCrossSolutions(
             return faceCharToIndex(actual);
           }));
 
-          // Must include D (face index 3) for cross
-          if (!actualFaces.has(3)) continue;
+          // Must include the cross face
+          if (!actualFaces.has(mustIncludeFaceIdx)) continue;
 
-          const result = solveGenRestricted(scrambledPattern, actualFaces);
+          const result = solveGenRestricted(scrambledPattern, actualFaces, 4, crossFace);
           if (result && result.solution) {
-            const rewritten = rewriteSolution(result.solution, rotation);
-            // Dedup: pick best rotation for this underlying solution
+            const rewritten = rewriteSolution(result.solution, rotation, config);
             if (!genSeen.has(rewritten)) {
               genSeen.add(rewritten);
               genSolutions.push({
@@ -195,17 +234,13 @@ export function rankCrossSolutions(
       // rotation-equivalent solutions. Group by canonical form.
       const canonical = new Map<string, RankedSolution>();
       for (const rs of genSolutions) {
-        // Find the canonical form: try all rotations, pick lexicographically smallest
         let canonKey = rs.solution;
         let best = rs;
-        for (const rot of ROTATIONS) {
+        for (const rot of config.rotations) {
           if (rot === rs.rotation) continue;
-          // We need to un-rotate then re-rotate to get the other variant
-          // Actually, we can just compute all 4 rotations of the rewritten solution
-          // and pick the one with fewest L/B
-          const inverseMap = Y_INVERSE[rs.rotation];
+          const inverseMap = config.inverses[rs.rotation];
           const originalSol = rs.rotation ? rs.solution.split(' ').filter(Boolean).map(m => rewriteMove(m, inverseMap)).join(' ') : rs.solution;
-          const variant = rewriteSolution(originalSol, rot);
+          const variant = rewriteSolution(originalSol, rot, config);
           if (variant < canonKey) canonKey = variant;
           const variantRanked: RankedSolution = {
             solution: variant,
@@ -240,7 +275,6 @@ export function rankCrossSolutions(
     }
   }
 
-  // Sort groups by genCount DESC (highest gen first = optimal)
   groups.sort((a, b) => b.genCount - a.genCount);
 
   return groups;

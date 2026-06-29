@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, NumberInput, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl, Chip } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -13,9 +13,11 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { initCrossSolver, generateScrambleFromState, CrossSolution } from '../util/crossSolver';
+import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
+import { initCrossSolver, generateScrambleFromState, solveCross, CrossSolution } from '../util/crossSolver';
 import { requestFacelets, computeTransitionMoves, simplifyMoves, movesToHTM } from '../util/cubeState';
 import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
+import { CROSS_NAMES, CROSS_CHIP_COLORS } from '../util/crossRotation';
 import ScrambleGuide from './ScrambleGuide';
 import TimerView, { TimerViewHandle } from './TimerView';
 
@@ -72,11 +74,15 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
   const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [] });
   const [showHintFacelets, setShowHintFacelets] = useState(settings.showHintFacelets);
-  const [postSolveDelay, setPostSolveDelay] = useState(settings.postSolveDelay);
+  const [useMaskings, setUseMaskings] = useState(settings.useMaskings);
+  const [maskAfterFirstMove, setMaskAfterFirstMove] = useState(settings.maskAfterFirstMove);
+  const [crossColors, setCrossColors] = useLocalStorage<string[]>({ key: 'crossColors', defaultValue: ['D'], getInitialValueInEffect: false });
+  const crossColorsRef = useRef(crossColors);
+  crossColorsRef.current = crossColors;
+  const [crossFace, setCrossFace] = useState('D');
 
   const playerRef = useRef<TwistyPlayer>(null);
   const timerRef = useRef<TimerViewHandle>(null);
-  const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrambleRef = useRef<string>('');
 
   // Setup alg for the 3D cube (the full scramble from solved)
@@ -84,15 +90,15 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
   // Stickering mask for cross (show only cross-relevant stickers)
   const stickeringMask = useMemo(() => {
-    if (!kpuzzle || !scramble) return null;
+    if (!useMaskings || !kpuzzle || !scramble) return null;
     const setupPattern = kpuzzle.defaultPattern().applyAlg(scramble);
-    return generateStickeringMask(setupPattern, SolvedState.CROSS);
-  }, [kpuzzle, scramble]);
+    return generateStickeringMask(setupPattern, SolvedState.CROSS, crossFace);
+  }, [useMaskings, kpuzzle, scramble, crossFace]);
 
   // Ranked solution groups by gen level
   const genGroups = useMemo(() =>
-    rankCrossSolutions(optimalSolutions, scrambledPattern ?? undefined),
-    [optimalSolutions, scrambledPattern],
+    rankCrossSolutions(optimalSolutions, scrambledPattern ?? undefined, crossFace),
+    [optimalSolutions, scrambledPattern, crossFace],
   );
 
   // Active gen group based on segmented control
@@ -146,7 +152,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   // Compute transition moves from current cube state to desired scramble state (retry only)
   const computeTransition = useCallback(async (targetScramble: string) => {
     if (!kpuzzle || !conn) {
-      setTransitionMoves(targetScramble.split(/\s+/).filter(Boolean));
+      setTransitionMoves(simplifyMoves(targetScramble.split(/\s+/).filter(Boolean)));
       return;
     }
 
@@ -176,13 +182,18 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const generateNewScramble = useCallback(() => {
     if (!kpuzzle || !solverReady) return;
 
-    const { scrambleMoves: moves, targetPattern, solutions } = generateScrambleFromState(kpuzzle.defaultPattern());
+    const colors = crossColorsRef.current;
+    const face = colors[Math.floor(Math.random() * colors.length)];
+    const { scrambleMoves: moves, targetPattern } = generateScrambleFromState(kpuzzle.defaultPattern());
+
+    const solutions = solveCross(targetPattern, face);
 
     scrambleRef.current = moves;
     setScramble(moves);
     setScrambleMoves(moves);
     setOptimalSolutions(solutions);
     setScrambledPattern(targetPattern);
+    setCrossFace(face);
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
@@ -202,11 +213,15 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
   }, [stickeringMask]);
 
-  // Reset player alg on new scramble
+  // Reset player alg on new scramble, clear blind mask
   useEffect(() => {
-    if (movesRef.current.length === 0 && playerRef.current)
+    if (movesRef.current.length === 0 && playerRef.current) {
       playerRef.current.alg = '';
-  }, [startTime]);
+      if (maskAfterFirstMove) {
+        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
+      }
+    }
+  }, [startTime, maskAfterFirstMove, stickeringMask]);
 
   // Handle cube moves during solving
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
@@ -227,6 +242,13 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
     if (movesRef.current.length === 0) {
       setShowSliceWarning(false);
+      // Mask after first move: grey out all stickers for blind practice
+      if (maskAfterFirstMove && kpuzzle && playerRef.current) {
+        const blindMask = new PuzzleStickering(kpuzzle);
+        const mgr = new StickeringManager(kpuzzle);
+        blindMask.set(mgr.all(), PieceStickering.Ignored);
+        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(blindMask.toStickeringMask());
+      }
     }
 
     const newMove = { move: event.move, timeOfMove };
@@ -237,7 +259,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const moveString = newMoves.map(m => m.move).join(' ');
     if (kpuzzle) {
       const currentPattern = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(moveString);
-      const isSolved = isPatternSolved(currentPattern, SolvedState.CROSS);
+      const isSolved = isPatternSolved(currentPattern, SolvedState.CROSS, crossFace);
 
       if (isSolved) {
         const timeMs = newMoves[newMoves.length - 1].timeOfMove - newMoves[0].timeOfMove;
@@ -264,7 +286,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         setCrossStats(prev => [...prev, stat]);
       }
     }
-  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats]);
+  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace]);
 
   const handleCubeMoveEventRef = useRef(handleCubeMoveEvent);
   useEffect(() => {
@@ -279,13 +301,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       return () => sub.unsubscribe();
     }
   }, [conn]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (postSolveTimeoutRef.current) clearTimeout(postSolveTimeoutRef.current);
-    };
-  }, []);
 
   const handleRetry = () => {
     setPhase('scrambling');
@@ -423,6 +438,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
             <Group gap={4} wrap="wrap">
               <Text fz="sm" ff="monospace" c="dimmed">{scrambleMoves || scramble}</Text>
             </Group>
+            <Text fz="sm" fw={700} c={CROSS_CHIP_COLORS[crossFace]}>
+              Solve: {CROSS_NAMES[crossFace]} Cross
+            </Text>
             {conn ? (
               computingTransition ? (
                 <Group gap={4} wrap="wrap" mt={4}>
@@ -576,25 +594,42 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
             <Title order={2} mt="xs" mb="xs">Settings</Title>
           </Card.Section>
           <Stack gap="xs" p="xs">
+            <Divider label="Display Settings" />
             <Checkbox
               label="Show Hint Facelets"
               checked={showHintFacelets}
               onChange={(e) => setShowHintFacelets(e.currentTarget.checked)}
             />
-            <Group gap="xs" align="center">
-              <Text fz="sm">Post-Solve Delay (s):</Text>
-              <NumberInput
-                value={postSolveDelay}
-                onChange={(value) => setPostSolveDelay(typeof value === 'number' ? value : 0)}
-                min={0}
-                max={10}
-                step={0.1}
-                decimalScale={1}
-                hideControls
-                maw="60px"
-                size="xs"
-              />
-            </Group>
+            <Tooltip label="3D cube can optionally grey out unimportant stickers to your current case" withArrow>
+              <Box display="inline-flex">
+                <Checkbox
+                  label="Use Maskings"
+                  checked={useMaskings}
+                  onChange={(e) => setUseMaskings(e.currentTarget.checked)}
+                />
+              </Box>
+            </Tooltip>
+            <Tooltip label="Grey out all stickers after the first cube move for blind solving practice" withArrow>
+              <Box display="inline-flex">
+                <Checkbox
+                  label="Mask After First Move"
+                  checked={maskAfterFirstMove}
+                  onChange={(e) => setMaskAfterFirstMove(e.currentTarget.checked)}
+                />
+              </Box>
+            </Tooltip>
+            <Divider label="Cross Color" />
+            <Chip.Group multiple value={crossColors} onChange={(val: string[]) => {
+              if (val.length > 0) setCrossColors(val);
+            }}>
+              <Group gap="xs">
+                {(['D', 'U', 'F', 'B', 'R', 'L'] as const).map(face => (
+                  <Chip key={face} value={face} color={CROSS_CHIP_COLORS[face]} size="xs">
+                    {CROSS_NAMES[face]}
+                  </Chip>
+                ))}
+              </Group>
+            </Chip.Group>
           </Stack>
         </Card>
       </Grid.Col>

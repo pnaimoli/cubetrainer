@@ -1,11 +1,18 @@
 import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 
 // BFS-based optimal cross solver.
-// State: positions + orientations of 4 D-layer edges (DF, DR, DB, DL).
-// Indices in EDGES orbit: DF=4, DR=5, DB=6, DL=7.
+// State: positions + orientations of 4 cross edges for a given face.
 // State space: 12P4 * 2^4 = 190,080, max optimal depth = 8.
 
-const CROSS_EDGE_INDICES = [4, 5, 6, 7]; // DF, DR, DB, DL in EDGES orbit
+// Edge orbit positions: UF=0, UR=1, UB=2, UL=3, DF=4, DR=5, DB=6, DL=7, FR=8, FL=9, BR=10, BL=11
+const FACE_CROSS_EDGES: Record<string, number[]> = {
+  D: [4, 5, 6, 7],
+  U: [0, 1, 2, 3],
+  F: [0, 8, 4, 9],
+  B: [2, 10, 6, 11],
+  R: [1, 5, 8, 10],
+  L: [3, 7, 9, 11],
+};
 
 const MOVE_NAMES = [
   'R', "R'", 'R2',
@@ -24,7 +31,6 @@ function moveFaceIndex(moveIndex: number): number {
 // Encode cross-edge state as a unique integer key.
 // We track where each of the 4 cross edges is and its orientation.
 // For each edge: position (0-11) and orientation (0-1).
-// Key = p0 + 12*(o0 + 2*(p1 + 12*(o1 + 2*(p2 + 12*(o2 + 2*(p3 + 12*o3))))))
 function encodeState(pieces: number[], orientations: number[]): number {
   let key = 0;
   for (let i = 3; i >= 0; i--) {
@@ -33,14 +39,12 @@ function encodeState(pieces: number[], orientations: number[]): number {
   return key;
 }
 
-function extractCrossState(pattern: KPattern): { pieces: number[]; orientations: number[] } {
+function extractCrossState(pattern: KPattern, edgeIndices: number[]): { pieces: number[]; orientations: number[] } {
   const edgeData = pattern.patternData['EDGES'];
   const pieces: number[] = [];
   const orientations: number[] = [];
 
-  // For each cross edge slot, find where it currently is
-  for (const targetIdx of CROSS_EDGE_INDICES) {
-    // Find where piece targetIdx currently sits
+  for (const targetIdx of edgeIndices) {
     const pos = edgeData.pieces.indexOf(targetIdx);
     pieces.push(pos);
     orientations.push(edgeData.orientation[pos]);
@@ -51,16 +55,13 @@ function extractCrossState(pattern: KPattern): { pieces: number[]; orientations:
 
 interface BFSEntry {
   depth: number;
-  parents: { lastMoveIndex: number; parentKey: number }[]; // all optimal-length paths
+  parents: { lastMoveIndex: number; parentKey: number }[];
 }
 
-let bfsTable: Map<number, BFSEntry> | null = null;
+const bfsTables = new Map<string, Map<number, BFSEntry>>();
 let moveTransforms: { perm: number[]; orient: number[] }[][] | null = null;
 
 // Pre-compute how each of the 18 moves transforms the edge orbit.
-// cubing.js permutation convention: permutation[i] = source position for target position i.
-// We need the inverse: given a piece at oldPos, find its newPos after the move.
-// inversePerm[oldPos] = newPos, i.e., inversePerm[perm[i]] = i.
 function buildMoveTransforms(kpuzzle: KPuzzle): void {
   moveTransforms = [];
   for (const moveName of MOVE_NAMES) {
@@ -78,7 +79,6 @@ function buildMoveTransforms(kpuzzle: KPuzzle): void {
   }
 }
 
-// Apply a move transform to a cross-edge state
 function applyMoveToState(
   pieces: number[], orientations: number[],
   moveIdx: number
@@ -89,26 +89,21 @@ function applyMoveToState(
 
   for (let i = 0; i < 4; i++) {
     const oldPos = pieces[i];
-    const newPos = mt.perm[oldPos]; // inversePerm: piece at oldPos goes to newPos
+    const newPos = mt.perm[oldPos];
     newPieces.push(newPos);
-    newOrientations.push((orientations[i] + mt.orient[newPos]) % 2); // delta at target position
+    newOrientations.push((orientations[i] + mt.orient[newPos]) % 2);
   }
 
   return { pieces: newPieces, orientations: newOrientations };
 }
 
-export function initCrossSolver(kpuzzle: KPuzzle): void {
-  if (bfsTable !== null) return;
-
-  buildMoveTransforms(kpuzzle);
-
-  // BFS from solved state outward
-  const solvedPieces = CROSS_EDGE_INDICES.slice(); // [4, 5, 6, 7] - each in home position
+function buildBFSTable(edgeIndices: number[]): Map<number, BFSEntry> {
+  const solvedPieces = edgeIndices.slice();
   const solvedOrientations = [0, 0, 0, 0];
   const solvedKey = encodeState(solvedPieces, solvedOrientations);
 
-  bfsTable = new Map();
-  bfsTable.set(solvedKey, { depth: 0, parents: [] });
+  const table = new Map<number, BFSEntry>();
+  table.set(solvedKey, { depth: 0, parents: [] });
 
   const queue: { key: number; pieces: number[]; orientations: number[]; depth: number }[] = [
     { key: solvedKey, pieces: solvedPieces, orientations: solvedOrientations, depth: 0 }
@@ -117,15 +112,11 @@ export function initCrossSolver(kpuzzle: KPuzzle): void {
   let head = 0;
   while (head < queue.length) {
     const { key: parentKey, pieces, orientations, depth } = queue[head++];
-    const parentEntry = bfsTable.get(parentKey)!;
+    const parentEntry = table.get(parentKey)!;
 
-    // Collect last-move faces from ALL parent paths to prune correctly
-    // For simplicity, we enumerate moves and check per-parent-path pruning
-    // But since we store multiple parents, we need to allow a move if ANY parent path allows it
     for (let mi = 0; mi < 18; mi++) {
       const face = moveFaceIndex(mi);
 
-      // Check if this move is valid for at least one parent path
       const validForSomePath = parentEntry.parents.length === 0 || parentEntry.parents.some(p => {
         const parentFace = moveFaceIndex(p.lastMoveIndex);
         if (face === parentFace) return false;
@@ -137,19 +128,38 @@ export function initCrossSolver(kpuzzle: KPuzzle): void {
       const { pieces: newPieces, orientations: newOrientations } = applyMoveToState(pieces, orientations, mi);
       const newKey = encodeState(newPieces, newOrientations);
 
-      const existing = bfsTable.get(newKey);
+      const existing = table.get(newKey);
       if (existing) {
-        // Add another optimal path if same depth
         if (existing.depth === depth + 1) {
           existing.parents.push({ lastMoveIndex: mi, parentKey });
         }
         continue;
       }
 
-      bfsTable.set(newKey, { depth: depth + 1, parents: [{ lastMoveIndex: mi, parentKey }] });
+      table.set(newKey, { depth: depth + 1, parents: [{ lastMoveIndex: mi, parentKey }] });
       queue.push({ key: newKey, pieces: newPieces, orientations: newOrientations, depth: depth + 1 });
     }
   }
+
+  return table;
+}
+
+export function initCrossSolver(kpuzzle: KPuzzle): void {
+  if (moveTransforms !== null) return;
+  buildMoveTransforms(kpuzzle);
+  // Build D-cross table immediately (default)
+  bfsTables.set('D', buildBFSTable(FACE_CROSS_EDGES['D']));
+}
+
+function ensureBFSTable(crossFace: string): Map<number, BFSEntry> {
+  let table = bfsTables.get(crossFace);
+  if (!table) {
+    const edgeIndices = FACE_CROSS_EDGES[crossFace];
+    if (!edgeIndices) throw new Error(`Unknown cross face: ${crossFace}`);
+    table = buildBFSTable(edgeIndices);
+    bfsTables.set(crossFace, table);
+  }
+  return table;
 }
 
 export interface CrossSolution {
@@ -157,12 +167,14 @@ export interface CrossSolution {
   solution: string;
 }
 
-export function solveCross(pattern: KPattern): CrossSolution[] {
-  if (!bfsTable) throw new Error('Cross solver not initialized. Call initCrossSolver() first.');
+export function solveCross(pattern: KPattern, crossFace: string = 'D'): CrossSolution[] {
+  if (!moveTransforms) throw new Error('Cross solver not initialized. Call initCrossSolver() first.');
 
-  const { pieces, orientations } = extractCrossState(pattern);
+  const table = ensureBFSTable(crossFace);
+  const edgeIndices = FACE_CROSS_EDGES[crossFace];
+  const { pieces, orientations } = extractCrossState(pattern, edgeIndices);
   const key = encodeState(pieces, orientations);
-  const entry = bfsTable.get(key);
+  const entry = table.get(key);
 
   if (!entry) {
     return [];
@@ -172,13 +184,12 @@ export function solveCross(pattern: KPattern): CrossSolution[] {
     return [{ moveCount: 0, solution: '' }];
   }
 
-  // Reconstruct all optimal paths via DFS through parent links
   const MAX_SOLUTIONS = 50;
   const allPaths: string[][] = [];
 
   function reconstruct(currentKey: number, pathSoFar: string[]) {
     if (allPaths.length >= MAX_SOLUTIONS) return;
-    const e = bfsTable!.get(currentKey)!;
+    const e = table.get(currentKey)!;
     if (e.parents.length === 0) {
       allPaths.push([...pathSoFar].map(invertHTMMove));
       return;
@@ -203,30 +214,29 @@ export function solveCross(pattern: KPattern): CrossSolution[] {
 const FACE_NAMES = ['R', 'L', 'U', 'D', 'F', 'B'];
 
 // Solve cross using only moves from a restricted set of faces.
-// Uses IDA* with the BFS table as a perfect heuristic.
-// Returns the first optimal solution found for the given face restriction, or null.
 export function solveGenRestricted(
   pattern: KPattern,
-  allowedFaces: Set<number>, // set of face indices (0=R,1=L,2=U,3=D,4=F,5=B)
-  maxExtraMoves: number = 4, // how many moves beyond unrestricted optimal to search
+  allowedFaces: Set<number>,
+  maxExtraMoves: number = 4,
+  crossFace: string = 'D',
 ): CrossSolution | null {
-  if (!bfsTable || !moveTransforms) throw new Error('Cross solver not initialized.');
+  if (!moveTransforms) throw new Error('Cross solver not initialized.');
 
-  const { pieces, orientations } = extractCrossState(pattern);
+  const table = ensureBFSTable(crossFace);
+  const edgeIndices = FACE_CROSS_EDGES[crossFace];
+  const { pieces, orientations } = extractCrossState(pattern, edgeIndices);
   const startKey = encodeState(pieces, orientations);
-  const startEntry = bfsTable.get(startKey);
+  const startEntry = table.get(startKey);
   if (!startEntry) return null;
   if (startEntry.depth === 0) return { moveCount: 0, solution: '' };
 
   const maxDepth = Math.min(startEntry.depth + maxExtraMoves, 10);
 
-  // Build allowed move indices
   const allowedMoves: number[] = [];
   for (let mi = 0; mi < 18; mi++) {
     if (allowedFaces.has(moveFaceIndex(mi))) allowedMoves.push(mi);
   }
 
-  // IDA* search
   let foundPath: string[] | null = null;
 
   function dfs(
@@ -234,13 +244,13 @@ export function solveGenRestricted(
     path: string[],
   ): boolean {
     const key = encodeState(pcs, oris);
-    const entry = bfsTable!.get(key);
-    if (!entry) return false; // unreachable state
+    const entry = table.get(key);
+    if (!entry) return false;
     if (entry.depth === 0) {
       foundPath = [...path];
       return true;
     }
-    if (depth + entry.depth > limit) return false; // prune: can't reach in time
+    if (depth + entry.depth > limit) return false;
 
     for (const mi of allowedMoves) {
       const face = moveFaceIndex(mi);
@@ -267,7 +277,6 @@ export function solveGenRestricted(
   return null;
 }
 
-// Get face index from face character
 export function faceCharToIndex(face: string): number {
   return FACE_NAMES.indexOf(face);
 }
@@ -278,7 +287,6 @@ function invertHTMMove(move: string): string {
   return move + "'";
 }
 
-// Generate random face moves, no consecutive same-face
 function generateRandomMoves(numMoves: number): string {
   const moves: string[] = [];
   let lastFace = -1;
@@ -295,13 +303,10 @@ function generateRandomMoves(numMoves: number): string {
   return moves.join(' ');
 }
 
-// Generate a random scramble: 20 random face moves, no consecutive same-face
 export function generateRandomScramble(): string {
   return generateRandomMoves(20);
 }
 
-// Generate a scramble from a given cube state. Returns the scramble moves,
-// the resulting target pattern, and optimal cross solutions for that target.
 export function generateScrambleFromState(
   currentPattern: KPattern,
   _kpuzzle?: KPuzzle,

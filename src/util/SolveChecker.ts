@@ -95,7 +95,16 @@ function isStickerCorrect(reidPieces: string[], stickerName: string): boolean {
   return actualSticker === expectedSticker;
 }
 
-export function isPatternSolved(pattern: KPattern, solvedStates: number): boolean {
+const CROSS_EDGES: Record<string, string[]> = {
+  D: ["DF", "DR", "DB", "DL"],
+  U: ["UF", "UR", "UB", "UL"],
+  F: ["UF", "FR", "DF", "FL"],
+  B: ["UB", "BR", "DB", "BL"],
+  R: ["UR", "DR", "FR", "BR"],
+  L: ["UL", "DL", "FL", "BL"],
+};
+
+export function isPatternSolved(pattern: KPattern, solvedStates: number, crossFace: string = 'D'): boolean {
   if (pattern.kpuzzle.definition.name !== '3x3x3') {
     throw new Error('Unsupported puzzle type. Only 3x3x3 is supported.');
   }
@@ -107,7 +116,7 @@ export function isPatternSolved(pattern: KPattern, solvedStates: number): boolea
 
   // Check if the pattern matches the solved states
   if (solvedStates & SolvedState.CROSS) {
-    const crossEdges = ["DF", "DR", "DB", "DL"];
+    const crossEdges = CROSS_EDGES[crossFace] ?? CROSS_EDGES['D'];
     for (const edge of crossEdges) {
       if (!isPieceCorrect(reidPieces, edge)) {
         return false;

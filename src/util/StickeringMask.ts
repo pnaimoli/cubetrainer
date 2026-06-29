@@ -63,7 +63,7 @@ export const getRotationsToInitialState = (kpattern: KPattern): [number, number,
   return [x, y, 0];
 };
 
-export const generateStickeringMask = (kpattern: KPattern, solvedState: number): StickeringMask => {
+export const generateStickeringMask = (kpattern: KPattern, solvedState: number, crossFace: string = 'D'): StickeringMask => {
   const kpuzzle = kpattern.kpuzzle;
   const puzzleStickering = new PuzzleStickering(kpuzzle);
   const m = new StickeringManager(kpuzzle);
@@ -86,7 +86,7 @@ export const generateStickeringMask = (kpattern: KPattern, solvedState: number):
   // Always sticker centers for now
   puzzleStickering.set(CENTERS(), PieceStickering.Regular);
 
-  const CROSS = (): PieceSet => m.and([m.move("D"), EDGES()]);
+  const CROSS = (): PieceSet => m.and([m.move(crossFace), EDGES()]);
   const LL = (): PieceSet => m.move("U");
   // const F2L = (): PieceSet => m.and([m.not(LL()), CROSS()]);
 
