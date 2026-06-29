@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
@@ -63,6 +63,23 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [cubeName, setCubeName] = useState<string>('GAN Cube');
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+
+  // Disconnect BLE on page reload so the cube doesn't get stuck in a
+  // zombie GATT connection. The library's disconnect() is async so we
+  // synchronously call device.gatt.disconnect() on the underlying
+  // BluetoothDevice (a public property on GanCubeClassicConnection).
+  const connRef = useRef(conn);
+  useEffect(() => { connRef.current = conn; }, [conn]);
+  useEffect(() => {
+    const handleUnload = () => {
+      try {
+        const c = connRef.current as unknown as { device?: { gatt?: { connected: boolean; disconnect(): void } } };
+        if (c?.device?.gatt?.connected) c.device.gatt.disconnect();
+      } catch { /* best effort */ }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
 
   const handleBluetoothConnect = async () => {
     setError(null);
