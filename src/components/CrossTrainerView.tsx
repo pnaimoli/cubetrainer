@@ -30,7 +30,8 @@ interface CrossStat {
   scramble: string;
   userMoveCount: number;
   optimalMoveCount: number;
-  timeMs: number;
+  inspectionMs: number;
+  executionMs: number;
   timestamp: string;
 }
 
@@ -67,7 +68,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [computingTransition, setComputingTransition] = useState(false);
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [result, setResult] = useState<{ userMoves: number; optimal: number; time: number } | null>(null);
+  const [firstMoveTime, setFirstMoveTime] = useState<number | null>(null);
+  const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
   const [moveCount, setMoveCount] = useState(0);
   const [genCount, setGenCount] = useState(0);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
@@ -83,8 +85,16 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   crossColorsRef.current = crossColors;
   const [crossFace, setCrossFace] = useState('D');
 
+  // Clear old stats that lack the new inspectionMs/executionMs fields
+  useEffect(() => {
+    if (crossStats.length > 0 && !('executionMs' in crossStats[0])) {
+      setCrossStats([]);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const playerRef = useRef<TwistyPlayer>(null);
-  const timerRef = useRef<TimerViewHandle>(null);
+  const inspectionTimerRef = useRef<TimerViewHandle>(null);
+  const executionTimerRef = useRef<TimerViewHandle>(null);
   const scrambleRef = useRef<string>('');
 
   // Setup alg for the 3D cube (the full scramble from solved)
@@ -198,6 +208,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setCrossFace(face);
     setPhase('scrambling');
     setResult(null);
+    setFirstMoveTime(null);
     movesRef.current = [];
     setMoveCount(0);
     setGenCount(0);
@@ -246,6 +257,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
     if (movesRef.current.length === 0) {
       setShowSliceWarning(false);
+      setFirstMoveTime(timeOfMove);
+      inspectionTimerRef.current?.stopAt(timeOfMove);
       // Mask after first move: grey out all stickers for blind practice
       if (maskAfterFirstMove && kpuzzle && playerRef.current) {
         const blindMask = new PuzzleStickering(kpuzzle);
@@ -269,25 +282,29 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       const isSolved = isPatternSolved(currentPattern, SolvedState.CROSS, crossFace);
 
       if (isSolved) {
-        const timeMs = newMoves[newMoves.length - 1].timeOfMove - newMoves[0].timeOfMove;
+        const firstMove = newMoves[0].timeOfMove;
+        const lastMove = newMoves[newMoves.length - 1].timeOfMove;
+        const inspectionMs = firstMove - startTime;
+        const executionMs = lastMove - firstMove;
         const userMoves = movesToHTM(newMoves.map(m => m.move));
         const optimal = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : -1;
 
-        setResult({ userMoves, optimal, time: timeMs });
+        setResult({ userMoves, optimal, inspectionMs, executionMs });
         setPhase('solved');
 
         if (isSliceRecovery) {
           setShowSliceWarning(true);
-          timerRef.current?.stopAt(timeOfMove);
+          executionTimerRef.current?.stopAt(timeOfMove);
         } else {
-          timerRef.current?.stop();
+          executionTimerRef.current?.stop();
         }
 
         const stat: CrossStat = {
           scramble,
           userMoveCount: userMoves,
           optimalMoveCount: optimal,
-          timeMs,
+          inspectionMs,
+          executionMs,
           timestamp: new Date().toISOString(),
         };
         setCrossStats(prev => [...prev, stat]);
@@ -312,6 +329,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const handleRetry = () => {
     setPhase('scrambling');
     setResult(null);
+    setFirstMoveTime(null);
     movesRef.current = [];
     setMoveCount(0);
     setGenCount(0);
@@ -334,12 +352,12 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
   const getBestTime = () => {
     if (recentStats.length === 0) return '-';
-    return (Math.min(...recentStats.map(s => s.timeMs)) / 1000).toFixed(3);
+    return (Math.min(...recentStats.map(s => s.executionMs)) / 1000).toFixed(3);
   };
 
   const getAoTime = (n: number) => {
     if (recentStats.length < n) return '-';
-    const times = recentStats.slice(-n).map(s => s.timeMs);
+    const times = recentStats.slice(-n).map(s => s.executionMs);
     return (times.reduce((a, b) => a + b, 0) / n / 1000).toFixed(3);
   };
 
@@ -385,8 +403,12 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     },
     { accessor: 'optimalMoveCount', title: 'Optimal', textAlign: 'right' },
     {
-      accessor: 'timeMs', title: 'Time', textAlign: 'right',
-      render: (record: CrossStat) => (record.timeMs / 1000).toFixed(3),
+      accessor: 'inspectionMs', title: 'Insp', textAlign: 'right',
+      render: (record: CrossStat) => (record.inspectionMs / 1000).toFixed(3),
+    },
+    {
+      accessor: 'executionMs', title: 'Exec', textAlign: 'right',
+      render: (record: CrossStat) => (record.executionMs / 1000).toFixed(3),
     },
   ];
 
@@ -425,11 +447,24 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         <Card withBorder>
           <Stack align="center" gap={0}>
             <div style={{ position: 'relative' }}>
-              {phase === 'scrambling' ? (
-                <Text fz="48px" fw={600} ff="monospace" c="dimmed" lh={1}>0.000</Text>
-              ) : (
-                <TimerView key={startTime} ref={timerRef} startTime={startTime} />
-              )}
+              <Group justify="center" gap="lg" w="100%">
+                <Stack align="flex-end" gap={0} style={{ flex: 1 }}>
+                  <Text fz="xs" c="dimmed">Inspection</Text>
+                  {phase === 'scrambling' ? (
+                    <Text fz="36px" fw={600} ff="monospace" c="dimmed" lh={1} ta="right" style={{ minWidth: '7ch' }}>0.000</Text>
+                  ) : (
+                    <TimerView key={`insp-${startTime}`} ref={inspectionTimerRef} startTime={startTime} />
+                  )}
+                </Stack>
+                <Stack align="flex-end" gap={0} style={{ flex: 1 }}>
+                  <Text fz="xs" c="dimmed">Execution</Text>
+                  {!firstMoveTime ? (
+                    <Text fz="36px" fw={600} ff="monospace" c="dimmed" lh={1} ta="right" style={{ minWidth: '7ch' }}>0.000</Text>
+                  ) : (
+                    <TimerView key={`exec-${firstMoveTime}`} ref={executionTimerRef} startTime={firstMoveTime} />
+                  )}
+                </Stack>
+              </Group>
               {showSliceWarning && (
                 <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
                   <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>

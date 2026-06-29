@@ -42,7 +42,7 @@ const TimerView = React.forwardRef<TimerViewHandle, TimerViewProps>(({ startTime
   }, []);
 
   return (
-    <Text ff="monospace" fw={600} fz="48px" lh={1}>
+    <Text ff="monospace" fw={600} fz="36px" lh={1} ta="right" style={{ minWidth: '7ch' }}>
       {((currentTime - startTime)/1000).toFixed(3)}
     </Text>
   );
