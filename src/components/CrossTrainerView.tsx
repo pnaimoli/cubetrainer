@@ -439,19 +439,22 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
               )}
             </div>
             <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
-            {result ? (
-              result.userMoves === result.optimal ? (
-                <Text fz="lg" fw={700} c="green">Optimal! ({result.optimal} moves, {genCount}-gen)</Text>
-              ) : (
-                <Text fz="lg" fw={700} c="red">
-                  {result.userMoves} moves, {genCount}-gen (optimal: {result.optimal})
+            {(() => {
+              const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
+              const optimalGen = genGroups.length > 0 ? genGroups[0].genCount : 0;
+              const curMoves = phase === 'solving' ? moveCount : (result ? result.userMoves : 0);
+              const curGen = phase === 'solving' ? genCount : (result ? genCount : 0);
+              const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+              const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+              return (
+                <Text fz="lg" fw={700} c="dimmed">
+                  <Text span c={moveColor} inherit>{curMoves} moves</Text>
+                  {' ('}
+                  <Text span c={gColor} inherit>{curGen}-gen</Text>
+                  {')'}
                 </Text>
-              )
-            ) : (
-              <Text fz="lg" fw={700} c="dimmed">
-                Moves: {phase === 'solving' ? moveCount : 0} ({phase === 'solving' ? genCount : 0}-gen)
-              </Text>
-            )}
+              );
+            })()}
           </Stack>
 
           <Divider label="Scramble" />
@@ -536,7 +539,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         <Stack>
           <Card withBorder padding={0}>
             <Card.Section withBorder px="xs">
-              <Title order={2} mt="xs" mb="xs">Stats</Title>
+              <Title order={4} my={4}>Stats</Title>
             </Card.Section>
             <DataTable
               ff="monospace"
@@ -553,7 +556,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           <Card withBorder padding={0} style={{ display: 'flex', flexDirection: 'column' as const, maxHeight: 'calc(100vh - 500px)' }}>
             <Card.Section withBorder px="xs">
               <Group justify="space-between">
-                <Title order={2}>Times</Title>
+                <Title order={4} my={4}>Times</Title>
                 <Menu withinPortal position="bottom-end" shadow="sm">
                   <Menu.Target>
                     <ActionIcon variant="subtle" color="gray">
