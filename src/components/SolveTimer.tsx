@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, Group, Stack } from '@mantine/core';
 
 export interface SolveTimerHandle {
+  /** Mark the beginning of inspection (starts the clock) */
+  start: (time?: number) => void;
   /** Call when the user makes their first move */
   firstMove: (time?: number) => void;
   /** Call when the solve is complete (uses Date.now()) */
@@ -16,50 +18,71 @@ function formatTime(ms: number): string {
   return (ms / 1000).toFixed(3);
 }
 
-const SolveTimer = React.forwardRef<SolveTimerHandle, {}>((_, ref) => {
-  const startTime = useRef(Date.now());
+interface SolveTimerProps {
+  /** When true (default), timer starts counting on mount. When false, stays at 0 until start() is called. */
+  autoStart?: boolean;
+}
+
+const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoStart = true }, ref) => {
+  const startTime = useRef<number | null>(autoStart ? Date.now() : null);
   const firstMoveAt = useRef<number | null>(null);
   const endTime = useRef<number | null>(null);
   const [now, setNow] = useState(Date.now());
   const intervalRef = useRef<number>();
 
+  const startInterval = () => {
+    if (intervalRef.current === undefined) {
+      intervalRef.current = window.setInterval(() => setNow(Date.now()), 13);
+    }
+  };
+
   React.useImperativeHandle(ref, () => ({
+    start: (time?: number) => {
+      startTime.current = time ?? Date.now();
+      startInterval();
+    },
     firstMove: (time?: number) => {
       if (firstMoveAt.current === null) {
+        if (!startTime.current) {
+          startTime.current = time ?? Date.now();
+          startInterval();
+        }
         firstMoveAt.current = time ?? Date.now();
       }
     },
     stop: () => {
       endTime.current = Date.now();
-      if (intervalRef.current !== undefined) clearInterval(intervalRef.current);
+      if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
       setNow(Date.now());
     },
     stopAt: (time: number) => {
       endTime.current = time;
-      if (intervalRef.current !== undefined) clearInterval(intervalRef.current);
+      if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
       setNow(time);
     },
     getTimes: () => {
+      const start = startTime.current ?? Date.now();
       const end = endTime.current ?? Date.now();
       const first = firstMoveAt.current ?? end;
       return {
-        inspectionMs: first - startTime.current,
+        inspectionMs: first - start,
         executionMs: end - first,
       };
     },
   }));
 
   useEffect(() => {
-    intervalRef.current = window.setInterval(() => setNow(Date.now()), 13);
+    if (autoStart) startInterval();
     return () => {
-      if (intervalRef.current !== undefined) clearInterval(intervalRef.current);
+      if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const start = startTime.current;
   const current = endTime.current ?? now;
-  const totalMs = current - startTime.current;
-  const inspectionMs = firstMoveAt.current
-    ? firstMoveAt.current - startTime.current
+  const totalMs = start ? current - start : 0;
+  const inspectionMs = start && firstMoveAt.current
+    ? firstMoveAt.current - start
     : totalMs;
   const executionMs = firstMoveAt.current
     ? current - firstMoveAt.current

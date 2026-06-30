@@ -1,7 +1,10 @@
 import { Group, Chip } from '@mantine/core';
-import { CROSS_NAMES, FACE_COLORS } from '../util/crossRotation';
+import { FACE_COLORS } from '../util/crossRotation';
 
 const FACES = ['D', 'U', 'F', 'B', 'R', 'L'] as const;
+const SHORT_NAMES: Record<string, string> = {
+  D: 'W', U: 'Y', F: 'G', B: 'B', R: 'R', L: 'O'
+};
 
 interface FaceColorPickerProps {
   value: string[];
@@ -13,7 +16,7 @@ export default function FaceColorPicker({ value, onChange }: FaceColorPickerProp
     <Chip.Group multiple value={value} onChange={(val: string[]) => {
       if (val.length > 0) onChange(val);
     }}>
-      <Group gap="xs">
+      <Group gap={4}>
         {FACES.map(face => {
           const color = FACE_COLORS[face];
           const active = value.includes(face);
@@ -24,21 +27,24 @@ export default function FaceColorPicker({ value, onChange }: FaceColorPickerProp
               size="xs"
               styles={{
                 label: {
-                  backgroundColor: active ? `${color}33` : `${color}15`,
-                  borderColor: active ? color : `${color}44`,
-                  color: face === 'D' ? (active ? '#fff' : '#888') : color,
-                  opacity: active ? 1 : 0.5,
+                  backgroundColor: active ? `${color}44` : 'transparent',
+                  borderColor: active ? color : 'var(--mantine-color-default-border)',
+                  color: active ? (face === 'D' ? '#fff' : color) : 'var(--mantine-color-dimmed)',
+                  opacity: active ? 1 : 0.3,
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                  minWidth: 0,
                   '&[dataChecked]': {
-                    backgroundColor: `${color}33`,
+                    backgroundColor: `${color}44`,
                     borderColor: color,
                   },
                 },
                 iconWrapper: {
-                  color: face === 'D' ? '#fff' : color,
+                  display: 'none',
                 },
               }}
             >
-              {CROSS_NAMES[face]}
+              {SHORT_NAMES[face]}
             </Chip>
           );
         })}

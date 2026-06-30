@@ -9,7 +9,8 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { CTAlg } from '../util/CTAlg';
-import { Settings, AlgSet, Alg, SolvedState, CUBE_ROTATIONS, SolveStat, Move } from '../util/interfaces';
+import { Settings, AlgSet, Alg, SolvedState, SolveStat, Move } from '../util/interfaces';
+import { FACE_TO_D_ROTATION } from '../util/crossRotation';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
@@ -39,34 +40,28 @@ const recomputeRandomYs = (randomYs: boolean): number => {
 };
 
 const recomputePreorientationMoves = (
-  fullColourNeutrality: boolean,
-  firstRotation: string | undefined,
+  crossFaces: string[],
   randomRotations1: string | undefined
-): Move[] => {
-  const preorientationMoves: Move[] = [];
+): { moves: Move[], crossFace: string } => {
+  const faces = crossFaces?.length ? crossFaces : ['D'];
+  const crossFace = faces[Math.floor(Math.random() * faces.length)];
+  const moves: Move[] = [];
 
-  if (fullColourNeutrality) {
-    for (let i = 0; i < 6; i++) {
-      const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
-      preorientationMoves.push({ move: randomRotation, timeOfMove: Date.now() });
-    }
-  } else {
-    if (firstRotation) {
-      preorientationMoves.push({ move: firstRotation, timeOfMove: Date.now() });
-    }
-    if (randomRotations1) {
-      const randomRotations = Math.floor(Math.random() * 4);
-      if (randomRotations === 0) {
-        // Do nothing
-      } else if (randomRotations === 1) {
-        preorientationMoves.push({ move: randomRotations1, timeOfMove: Date.now() });
-      } else {
-        preorientationMoves.push({ move: `${randomRotations1}${randomRotations}`, timeOfMove: Date.now() });
-      }
+  const rotation = FACE_TO_D_ROTATION[crossFace];
+  if (rotation) {
+    moves.push({ move: rotation, timeOfMove: Date.now() });
+  }
+
+  if (randomRotations1) {
+    const count = Math.floor(Math.random() * 4);
+    if (count === 1) {
+      moves.push({ move: randomRotations1, timeOfMove: Date.now() });
+    } else if (count > 1) {
+      moves.push({ move: `${randomRotations1}${count}`, timeOfMove: Date.now() });
     }
   }
 
-  return preorientationMoves;
+  return { moves, crossFace };
 };
 
 const recomputeMirrorAcrossM = (mirrorAcrossM: boolean, randomizeMirrorAcrossM: boolean): boolean => {
@@ -126,6 +121,7 @@ interface SolvedStateBadgesProps {
   setupAlg: string;
   effectiveSolvedState: number;
   movesRef: React.RefObject<Move[]>;
+  crossFace?: string;
 }
 
 export interface SolvedStateBadgesHandle {
@@ -133,7 +129,7 @@ export interface SolvedStateBadgesHandle {
 }
 
 export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateBadgesProps>(
-  ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef }, ref) => {
+  ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef, crossFace }, ref) => {
     const [, setMoveCount] = useState(0);
 
     React.useImperativeHandle(ref, () => ({
@@ -141,6 +137,10 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
     }));
 
     if (!kpuzzle) return <Group />;
+
+    // For non-D cross faces, rotate the pattern to D-frame so the
+    // hardcoded F2L slot checks (FR/DRF etc.) work correctly.
+    const rotation = crossFace && crossFace !== 'D' ? FACE_TO_D_ROTATION[crossFace] : '';
 
     return (
       <Group gap="xs" mt="xs">
@@ -150,7 +150,8 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
             const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
             const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
             const moveString = (movesRef.current ?? []).map((move) => move.move).join(' ');
-            const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+            let currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+            if (rotation) currentPattern = currentPattern.applyAlg(rotation);
             const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
 
             return (
@@ -256,7 +257,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+  const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
+  const preorientationMoves = preorientationResult.moves;
   const [randomPreUs, setRandomPreUs] = useState<number>(recomputeRandomUs(settings.randomPreAUF));
   const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(settings.randomAUF));
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(settings.randomYs));
@@ -544,7 +546,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setCurrentAlg(newCurrentAlg);
       setShuffleQueue(newShuffleQueue);
       setHistoryOffset(0);
-      setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+      setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
       setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
       setRandomUs(recomputeRandomUs(settings.randomAUF));
       setRandomYs(recomputeRandomYs(settings.randomYs));
@@ -619,8 +621,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [initialAlg, settings.randomYs]);
 
   useEffect(() => {
-    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
-  }, [initialAlg, settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1]);
+    setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
+  }, [initialAlg, settings.crossFaces, settings.randomRotations1]);
 
   useEffect(() => {
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
@@ -683,7 +685,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
     setCurrentAlg(newCurrentAlg);
     setShuffleQueue(newShuffleQueue);
-    setPreorientationMoves(recomputePreorientationMoves(settings.fullColourNeutrality, settings.firstRotation, settings.randomRotations1));
+    setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
     setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
     setRandomUs(recomputeRandomUs(settings.randomAUF));
     setRandomYs(recomputeRandomYs(settings.randomYs));

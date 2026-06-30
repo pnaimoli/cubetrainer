@@ -18,12 +18,14 @@ export default function DifferentialScramble({
 }: DifferentialScrambleProps) {
   const [transitionMoves, setTransitionMoves] = useState<string[]>([]);
   const [computing, setComputing] = useState(false);
+  const hasComputed = useRef(false);
   const scrambleRef = useRef(scramble);
   scrambleRef.current = scramble;
 
   const compute = useCallback(async (targetScramble: string) => {
     if (!kpuzzle || !conn) {
       setTransitionMoves(simplifyMoves(targetScramble.split(/\s+/).filter(Boolean)));
+      hasComputed.current = true;
       return;
     }
 
@@ -34,6 +36,7 @@ export default function DifferentialScramble({
       const simplified = simplifyMoves(rawMoves);
       if (scrambleRef.current === targetScramble) {
         if (simplified.length === 0) {
+          hasComputed.current = true;
           onScrambleComplete();
           return;
         }
@@ -46,12 +49,14 @@ export default function DifferentialScramble({
       }
     } finally {
       setComputing(false);
+      hasComputed.current = true;
     }
   }, [kpuzzle, conn, onScrambleComplete]);
 
   // Recompute when scramble changes
   useEffect(() => {
     if (scramble) {
+      hasComputed.current = false;
       setTransitionMoves([]);
       compute(scramble);
     }
@@ -89,6 +94,14 @@ export default function DifferentialScramble({
         </Group>
       );
     }
+    if (!hasComputed.current) {
+      return (
+        <Group gap={4} wrap="wrap" mt={4}>
+          <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
+          <Text fz="sm" c="dimmed">computing...</Text>
+        </Group>
+      );
+    }
     return (
       <Group gap={4} wrap="wrap" mt={4}>
         <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
@@ -99,6 +112,7 @@ export default function DifferentialScramble({
 
   return (
     <>
+      <Text fz="xs" c="dimmed" mb={2}>Scramble with White on U, Green on F</Text>
       <Group gap={4} wrap="wrap">
         <Text fz="sm" ff="monospace" c="dimmed">{scramble}</Text>
       </Group>

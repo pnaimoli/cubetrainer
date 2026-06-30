@@ -79,8 +79,7 @@ export interface Settings {
   showHintFacelets: boolean;
   useMaskings: boolean;
   maskAfterFirstMove: boolean;
-  fullColourNeutrality: boolean;
-  firstRotation: string;
+  crossFaces: string[];
   randomRotations1: string;
   postSolveDelay: number;
 }

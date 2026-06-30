@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl, Skeleton, Select } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -18,10 +18,11 @@ import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
 import { movesToHTM } from '../util/cubeState';
 import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
-import { CROSS_NAMES, FACE_COLORS } from '../util/crossRotation';
+import { FACE_TO_D_ROTATION, translateMove, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
 import DifferentialScramble from './DifferentialScramble';
 import SolveTimer, { SolveTimerHandle } from './SolveTimer';
+import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
 
 interface CrossTrainerViewProps {
   conn: GanCubeConnection | null;
@@ -84,6 +85,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const crossColorsRef = useRef(crossColors);
   crossColorsRef.current = crossColors;
   const [crossFace, setCrossFace] = useState('D');
+  const [randomRotationAxis, setRandomRotationAxis] = useLocalStorage<string>({ key: 'crossRandomRotation', defaultValue: '' });
+  const randomRotationAxisRef = useRef(randomRotationAxis);
+  randomRotationAxisRef.current = randomRotationAxis;
+  const [extraRotation, setExtraRotation] = useState('');
 
   // Clear old stats that lack the new inspectionMs/executionMs fields
   useEffect(() => {
@@ -94,10 +99,15 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
   const playerRef = useRef<TwistyPlayer>(null);
   const timerRef = useRef<SolveTimerHandle>(null);
+  const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const scrambleRef = useRef<string>('');
 
-  // Setup alg for the 3D cube (the full scramble from solved)
-  const setupAlg = useMemo(() => scramble, [scramble]);
+  // Setup alg for the 3D cube: scramble + rotation to show cross on D
+  const displayRotation = [FACE_TO_D_ROTATION[crossFace], extraRotation].filter(Boolean).join(' ');
+  const setupAlg = useMemo(() =>
+    displayRotation ? `${scramble} ${displayRotation}` : scramble,
+    [scramble, displayRotation],
+  );
 
   // Stickering mask for cross (show only cross-relevant stickers)
   const stickeringMask = useMemo(() => {
@@ -157,7 +167,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const handleScrambleComplete = useCallback(() => {
     setPhase('solving');
     movesRef.current = [];
-    setStartTime(Date.now());
+    timerRef.current?.start();
   }, []);
 
   // Generate new scramble from solved, then compute differential from cube state
@@ -177,6 +187,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setOptimalSolutions(solutions);
     setScrambledPattern(targetPattern);
     setCrossFace(face);
+    setExtraRotation(randomRotationString(randomRotationAxisRef.current));
     isRetryRef.current = false;
     setPhase('scrambling');
     setResult(null);
@@ -264,7 +275,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const moveStrs = newMoves.map(m => m.move);
     setMoveCount(movesToHTM(moveStrs));
     setGenCount(new Set(moveStrs.map(m => m.charAt(0))).size);
-    playerRef.current?.experimentalAddMove(event.move);
+    playerRef.current?.experimentalAddMove(translateMove(event.move, displayRotation));
+    badgesRef.current?.notify();
 
     const moveString = newMoves.map(m => m.move).join(' ');
     if (kpuzzle) {
@@ -306,7 +318,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         }
       }
     }
-  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace]);
+  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace, displayRotation]);
 
   const handleCubeMoveEventRef = useRef(handleCubeMoveEvent);
   useEffect(() => {
@@ -441,55 +453,61 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
               </Group>
             </Group>
           </Card.Section>
+          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS} crossFace={crossFace} movesRef={movesRef} />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder>
-          <Stack align="center" gap={0}>
-            <div style={{ position: 'relative' }}>
-              <SolveTimer key={startTime} ref={timerRef} />
-              {showSliceWarning && (
-                <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
-                  <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
-                    <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
-                  </span>
-                </Tooltip>
-              )}
-            </div>
-            <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
-            {(() => {
-              const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
-              const optimalGen = genGroups.length > 0 ? genGroups[0].genCount : 0;
-              const curMoves = phase === 'solving' ? moveCount : (result ? result.userMoves : 0);
-              const curGen = phase === 'solving' ? genCount : (result ? genCount : 0);
-              const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-              const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-              return (
-                <Text fz="lg" fw={700} c="dimmed">
-                  <Text span c={moveColor} inherit>{curMoves} moves</Text>
-                  {' ('}
-                  <Text span c={gColor} inherit>{curGen}-gen</Text>
-                  {')'}
-                </Text>
-              );
-            })()}
-          </Stack>
+          {!scramble ? (
+            <Stack align="center" gap="xs" p="md">
+              <Skeleton height={300} width={300} />
+              <Skeleton height={20} width={200} />
+              <Skeleton height={60} width="100%" />
+            </Stack>
+          ) : (
+            <>
+              <Stack align="center" gap={0}>
+                <div style={{ position: 'relative' }}>
+                  <SolveTimer key={startTime} ref={timerRef} autoStart={false} />
+                  {showSliceWarning && (
+                    <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
+                      <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
+                        <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
+                <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
+                {(() => {
+                  const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
+                  const optimalGen = genGroups.length > 0 ? genGroups[0].genCount : 0;
+                  const curMoves = phase === 'solving' ? moveCount : (result ? result.userMoves : 0);
+                  const curGen = phase === 'solving' ? genCount : (result ? genCount : 0);
+                  const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+                  const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+                  return (
+                    <Text fz="lg" fw={700} c="dimmed">
+                      <Text span c={moveColor} inherit>{curMoves} moves</Text>
+                      {' ('}
+                      <Text span c={gColor} inherit>{curGen}-gen</Text>
+                      {')'}
+                    </Text>
+                  );
+                })()}
+              </Stack>
 
-          <Divider label="Scramble" />
+              <Divider label="Scramble" />
 
-          <Box px="xs" py="xs">
-            <Text fz="sm" fw={700} c={FACE_COLORS[crossFace]} mb={2}>
-              Solve: {CROSS_NAMES[crossFace]} Cross
-            </Text>
-            <DifferentialScramble
-              key={diffKey}
-              conn={conn}
-              kpuzzle={kpuzzle}
-              scramble={scramble}
-              phase={phase}
-              onScrambleComplete={handleScrambleComplete}
-            />
-          </Box>
+              <Box px="xs" py="xs">
+                <DifferentialScramble
+                  key={diffKey}
+                  conn={conn}
+                  kpuzzle={kpuzzle}
+                  scramble={scramble}
+                  phase={phase}
+                  onScrambleComplete={handleScrambleComplete}
+                />
+              </Box>
 
           <Divider
             label={
@@ -532,7 +550,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
               ) : null}
             </Box>
           )}
-
+            </>
+          )}
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
@@ -632,8 +651,25 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 />
               </Box>
             </Tooltip>
-            <Divider label="Cross Color" />
-            <FaceColorPicker value={crossColors} onChange={setCrossColors} />
+            <Divider label="Preorientation" />
+            <Group gap="xs" align="center">
+              <Text fz="sm">Cross:</Text>
+              <FaceColorPicker value={crossColors} onChange={setCrossColors} />
+            </Group>
+            <Group gap="xs" align="center">
+              <Tooltip label="Add random rotations around an axis after preorientation to train solving from different angles" withArrow multiline w={250}>
+                <Text fz="sm" style={{ cursor: 'help', textDecoration: 'underline dotted' }}>Random:</Text>
+              </Tooltip>
+              <Select
+                value={randomRotationAxis}
+                maw="70px"
+                size="xs"
+                placeholder="-"
+                clearable
+                onChange={(value) => setRandomRotationAxis(value || '')}
+                data={["x", "y", "z"]}
+              />
+            </Group>
           </Stack>
         </Card>
       </Grid.Col>

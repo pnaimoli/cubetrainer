@@ -9,7 +9,8 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { CTAlg } from '../util/CTAlg';
-import { Settings, SolvedState, Move, CUBE_ROTATIONS } from '../util/interfaces';
+import { Settings, SolvedState, Move } from '../util/interfaces';
+import { FACE_TO_D_ROTATION } from '../util/crossRotation';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
@@ -63,30 +64,28 @@ const recomputeRandomYs = (randomYs: boolean): number => {
 };
 
 const recomputePreorientationMoves = (
-  fullColourNeutrality: boolean,
-  firstRotation: string | undefined,
+  crossFaces: string[],
   randomRotations1: string | undefined
-): Move[] => {
-  const preorientationMoves: Move[] = [];
-  if (fullColourNeutrality) {
-    for (let i = 0; i < 6; i++) {
-      const randomRotation = CUBE_ROTATIONS[Math.floor(Math.random() * CUBE_ROTATIONS.length)];
-      preorientationMoves.push({ move: randomRotation, timeOfMove: Date.now() });
-    }
-  } else {
-    if (firstRotation) {
-      preorientationMoves.push({ move: firstRotation, timeOfMove: Date.now() });
-    }
-    if (randomRotations1) {
-      const randomRotations = Math.floor(Math.random() * 4);
-      if (randomRotations === 1) {
-        preorientationMoves.push({ move: randomRotations1, timeOfMove: Date.now() });
-      } else if (randomRotations > 1) {
-        preorientationMoves.push({ move: `${randomRotations1}${randomRotations}`, timeOfMove: Date.now() });
-      }
+): { moves: Move[], crossFace: string } => {
+  const faces = crossFaces?.length ? crossFaces : ['D'];
+  const crossFace = faces[Math.floor(Math.random() * faces.length)];
+  const moves: Move[] = [];
+
+  const rotation = FACE_TO_D_ROTATION[crossFace];
+  if (rotation) {
+    moves.push({ move: rotation, timeOfMove: Date.now() });
+  }
+
+  if (randomRotations1) {
+    const count = Math.floor(Math.random() * 4);
+    if (count === 1) {
+      moves.push({ move: randomRotations1, timeOfMove: Date.now() });
+    } else if (count > 1) {
+      moves.push({ move: `${randomRotations1}${count}`, timeOfMove: Date.now() });
     }
   }
-  return preorientationMoves;
+
+  return { moves, crossFace };
 };
 
 const recomputeMirrorAcrossM = (mirrorAcrossM: boolean, randomizeMirrorAcrossM: boolean): boolean => {
@@ -129,7 +128,8 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [localSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: settings });
-  const [preorientationMoves, setPreorientationMoves] = useState<Move[]>(recomputePreorientationMoves(localSettings.fullColourNeutrality, localSettings.firstRotation, localSettings.randomRotations1));
+  const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
+  const preorientationMoves = preorientationResult.moves;
   const [randomPreUs, setRandomPreUs] = useState<number>(recomputeRandomUs(localSettings.randomPreAUF));
   const [randomUs, setRandomUs] = useState<number>(recomputeRandomUs(localSettings.randomAUF));
   const [randomYs, setRandomYs] = useState<number>(recomputeRandomYs(localSettings.randomYs));
@@ -271,7 +271,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   const advanceToNext = useCallback(() => {
     setCurrentF2LIndex(selectedF2L.length > 0 ? pickRandom(selectedF2L) : 0);
     setCurrentOLLIndex(selectedOLL.length > 0 ? pickRandom(selectedOLL) : 0);
-    setPreorientationMoves(recomputePreorientationMoves(localSettings.fullColourNeutrality, localSettings.firstRotation, localSettings.randomRotations1));
+    setPreorientationResult(recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
     setRandomPreUs(recomputeRandomUs(localSettings.randomPreAUF));
     setRandomUs(recomputeRandomUs(localSettings.randomAUF));
     setRandomYs(recomputeRandomYs(localSettings.randomYs));
@@ -372,8 +372,8 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   }, [localSettings.randomYs]);
 
   useEffect(() => {
-    setPreorientationMoves(recomputePreorientationMoves(localSettings.fullColourNeutrality, localSettings.firstRotation, localSettings.randomRotations1));
-  }, [localSettings.fullColourNeutrality, localSettings.firstRotation, localSettings.randomRotations1]);
+    setPreorientationResult(recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
+  }, [localSettings.crossFaces, localSettings.randomRotations1]);
 
   useEffect(() => {
     setMirrorAcrossM(recomputeMirrorAcrossM(localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM));

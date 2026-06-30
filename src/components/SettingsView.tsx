@@ -1,8 +1,9 @@
 import React from 'react';
-import { Stack, Checkbox, Select, Tooltip, Group, Collapse, ActionIcon, Text, Divider, Box, NumberInput } from '@mantine/core';
+import { Stack, Checkbox, Select, Tooltip, Group, ActionIcon, Text, Divider, Box, NumberInput } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { TbListNumbers, TbArrowsShuffle, TbArrowsRandom, TbRepeat, TbRepeatOff, TbRepeatOnce } from 'react-icons/tb';
-import { Settings, CUBE_ROTATIONS, cycleSetting } from '../util/interfaces';
+import { Settings, cycleSetting } from '../util/interfaces';
+import FaceColorPicker from './FaceColorPicker';
 
 export const defaultSettings: Settings = {
   randomPreAUF: false,
@@ -17,8 +18,7 @@ export const defaultSettings: Settings = {
   showHintFacelets: false,
   useMaskings: false,
   maskAfterFirstMove: false,
-  fullColourNeutrality: false,
-  firstRotation: '',
+  crossFaces: ['D'],
   randomRotations1: '',
   postSolveDelay: 1
 };
@@ -169,31 +169,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ disableAlgSelection = false
         </Box>
       </Tooltip>
       <Divider label="Preorientation"/>
-      <Group>
-        <Checkbox
-          label="Full Colour Neutrality"
-          checked={settings.fullColourNeutrality}
-          onChange={(event) => setSettings({ ...settings, fullColourNeutrality: event.currentTarget.checked })}
+      <Group gap="xs" align="center">
+        <Text fz="sm">Cross:</Text>
+        <FaceColorPicker
+          value={settings.crossFaces ?? ['D']}
+          onChange={(value) => setSettings({ ...settings, crossFaces: value })}
         />
       </Group>
-      <Collapse in={!settings.fullColourNeutrality}>
-        <Stack gap="xs">
-            <Select
-              label="Initial Rotation"
-              value={settings.firstRotation}
-              maw="175px"
-              onChange={(value) => setSettings({ ...settings, firstRotation: value || '' })}
-              data={CUBE_ROTATIONS.map((rotation) => ({ value: rotation, label: rotation }))}
-            />
-            <Select
-              label="Subsequent Rotation(s)"
-              value={settings.randomRotations1}
-              maw="175px"
-              onChange={(value) => setSettings({ ...settings, randomRotations1: value || '' })}
-              data={["x", "y", "z"]}
-            />
-        </Stack>
-      </Collapse>
+      <Group gap="xs" align="center">
+        <Tooltip label="Add random rotations around an axis after preorientation to train solving from different angles" withArrow multiline w={250}>
+          <Text fz="sm" style={{ cursor: 'help', textDecoration: 'underline dotted' }}>Random:</Text>
+        </Tooltip>
+        <Select
+          value={settings.randomRotations1}
+          maw="70px"
+          size="xs"
+          placeholder="-"
+          clearable
+          onChange={(value) => setSettings({ ...settings, randomRotations1: value || '' })}
+          data={["x", "y", "z"]}
+        />
+      </Group>
     </Stack>
   );
 };
