@@ -232,15 +232,20 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
   }, [stickeringMask]);
 
-  // Reset player alg on new scramble, clear blind mask
+  // Reset player alg on new scramble, restore stickering mask
   useEffect(() => {
     if (movesRef.current.length === 0 && playerRef.current) {
       playerRef.current.alg = '';
-      if (maskAfterFirstMove) {
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-      }
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
     }
-  }, [startTime, maskAfterFirstMove, stickeringMask]);
+  }, [startTime, stickeringMask]);
+
+  // When maskAfterFirstMove is toggled off, restore normal stickering
+  useEffect(() => {
+    if (!maskAfterFirstMove && playerRef.current) {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
+    }
+  }, [maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle cube moves during solving
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
@@ -280,10 +285,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       inspectionTimerRef.current?.stopAt(timeOfMove);
       // Mask after first move: grey out all stickers for blind practice
       if (maskAfterFirstMove && kpuzzle && playerRef.current) {
-        const blindMask = new PuzzleStickering(kpuzzle);
+        const bm = new PuzzleStickering(kpuzzle);
         const mgr = new StickeringManager(kpuzzle);
-        blindMask.set(mgr.all(), PieceStickering.Ignored);
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(blindMask.toStickeringMask());
+        bm.set(mgr.all(), PieceStickering.Ignored);
+        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(bm.toStickeringMask());
       }
     }
 

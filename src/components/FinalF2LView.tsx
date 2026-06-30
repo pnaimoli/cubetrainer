@@ -249,11 +249,16 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   useEffect(() => {
     if (movesRef.current.length === 0 && playerRef.current) {
       playerRef.current.alg = '';
-      if (localSettings.maskAfterFirstMove) {
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-      }
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
     }
-  }, [startTime, localSettings.maskAfterFirstMove, stickeringMask]);
+  }, [startTime, stickeringMask]);
+
+  // When maskAfterFirstMove is unchecked mid-solve, restore normal stickering
+  useEffect(() => {
+    if (!localSettings.maskAfterFirstMove && playerRef.current) {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
+    }
+  }, [localSettings.maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {

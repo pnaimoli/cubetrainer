@@ -637,12 +637,16 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   useEffect(() => {
     if (movesRef.current.length === 0 && playerRef.current) {
       playerRef.current.alg = '';
-      // Clear blind mask on new case (re-apply normal stickering mask or null)
-      if (settings.maskAfterFirstMove) {
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-      }
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
     }
-  }, [playerRef, startTime, settings.maskAfterFirstMove, stickeringMask]);
+  }, [playerRef, startTime, stickeringMask]);
+
+  // When maskAfterFirstMove is unchecked mid-solve, restore normal stickering
+  useEffect(() => {
+    if (!settings.maskAfterFirstMove && playerRef.current) {
+      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
+    }
+  }, [settings.maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
