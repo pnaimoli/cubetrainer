@@ -22,7 +22,7 @@ import { movesToHTM } from '../util/cubeState';
 import { CROSS_NAMES, FACE_COLORS } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
 import DifferentialScramble from './DifferentialScramble';
-import TimerView, { TimerViewHandle } from './TimerView';
+import SolveTimer, { SolveTimerHandle } from './SolveTimer';
 
 // Map from slot name to the SolvedState flag for that F2L pair
 const SLOT_SOLVED_STATE: Record<string, SolvedState> = {
@@ -82,7 +82,6 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const [diffKey, setDiffKey] = useState(0);
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [firstMoveTime, setFirstMoveTime] = useState<number | null>(null);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
   const [moveCount, setMoveCount] = useState(0);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
@@ -111,8 +110,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playerRef = useRef<TwistyPlayer>(null);
-  const inspectionTimerRef = useRef<TimerViewHandle>(null);
-  const executionTimerRef = useRef<TimerViewHandle>(null);
+  const timerRef = useRef<SolveTimerHandle>(null);
   const scrambleRef = useRef<string>('');
 
   const setupAlg = useMemo(() => scramble, [scramble]);
@@ -159,7 +157,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     isRetryRef.current = false;
     setPhase('scrambling');
     setResult(null);
-    setFirstMoveTime(null);
+
     movesRef.current = [];
     setMoveCount(0);
     setStartTime(Date.now());
@@ -231,7 +229,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       isRetryRef.current = true;
       setPhase('scrambling');
       setResult(null);
-      setFirstMoveTime(null);
+  
       movesRef.current = [];
       setMoveCount(0);
       setStartTime(Date.now());
@@ -255,8 +253,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
     if (movesRef.current.length === 0) {
       setShowSliceWarning(false);
-      setFirstMoveTime(timeOfMove);
-      inspectionTimerRef.current?.stopAt(timeOfMove);
+      timerRef.current?.firstMove(timeOfMove);
       if (maskAfterFirstMove && kpuzzle && playerRef.current) {
         const bm = new PuzzleStickering(kpuzzle);
         const mgr = new StickeringManager(kpuzzle);
@@ -291,9 +288,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
         if (isSliceRecovery) {
           setShowSliceWarning(true);
-          executionTimerRef.current?.stopAt(timeOfMove);
+          timerRef.current?.stopAt(timeOfMove);
         } else {
-          executionTimerRef.current?.stop();
+          timerRef.current?.stop();
         }
 
         const stat: XCrossStat = {
@@ -333,7 +330,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     isRetryRef.current = true;
     setPhase('scrambling');
     setResult(null);
-    setFirstMoveTime(null);
+
     movesRef.current = [];
     setMoveCount(0);
     setStartTime(Date.now());
@@ -458,26 +455,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder>
-          <Stack align="center" gap={0}>
+          <Stack align="center" gap={0} mt="xs">
             <div style={{ position: 'relative' }}>
-              <Group justify="center" gap="lg" w="100%">
-                <Stack align="flex-end" gap={0} style={{ flex: 1 }}>
-                  <Text fz="xs" c="dimmed">Inspection</Text>
-                  {phase === 'scrambling' ? (
-                    <Text fz="36px" fw={600} ff="monospace" c="dimmed" lh={1} ta="right" style={{ minWidth: '7ch' }}>0.000</Text>
-                  ) : (
-                    <TimerView key={`insp-${startTime}`} ref={inspectionTimerRef} startTime={startTime} />
-                  )}
-                </Stack>
-                <Stack align="flex-end" gap={0} style={{ flex: 1 }}>
-                  <Text fz="xs" c="dimmed">Execution</Text>
-                  {!firstMoveTime ? (
-                    <Text fz="36px" fw={600} ff="monospace" c="dimmed" lh={1} ta="right" style={{ minWidth: '7ch' }}>0.000</Text>
-                  ) : (
-                    <TimerView key={`exec-${firstMoveTime}`} ref={executionTimerRef} startTime={firstMoveTime} />
-                  )}
-                </Stack>
-              </Group>
+              <SolveTimer key={startTime} ref={timerRef} />
               {showSliceWarning && (
                 <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
                   <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>

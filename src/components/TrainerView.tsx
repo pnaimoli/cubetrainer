@@ -14,7 +14,7 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { getNextAlg, ShuffleQueue } from '../util/playlist';
-import TimerView, { TimerViewHandle } from './TimerView';
+import SolveTimer, { SolveTimerHandle } from './SolveTimer';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
 import SettingsView from './SettingsView';
@@ -271,7 +271,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const debugTableRef = useRef<DebugMovesTableHandle>(null);
   const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
   const playerRef = useRef<TwistyPlayer>(null);
-  const timerRef = useRef<TimerViewHandle>(null);
+  const timerRef = useRef<SolveTimerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -463,6 +463,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     // On first move, clear previous debug data and set baselines
     if (movesRef.current.length === 0) {
+      timerRef.current?.firstMove(timeOfMove);
       debugStartRef.current = { dateNow: now, cubeTimestamp: cubeTs };
       setShowSliceWarning(false);
       debugTableRef.current?.clear();
@@ -732,12 +733,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Card.Section withBorder={true} px="xs">
             <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
-          <Stack align="center" gap={0}>
+          <Stack align="center" gap={0} mt="xs">
             <div style={{ position: 'relative' }}>
-              <TimerView key={startTime} ref={timerRef} startTime={startTime} />
+              <SolveTimer key={startTime} ref={timerRef} />
               {showSliceWarning && (
                 <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted to match the paired face turn." withArrow>
-                  <span style={{ position: 'absolute', top: 12, right: -18, lineHeight: 0 }}>
+                  <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
                     <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
                   </span>
                 </Tooltip>
