@@ -24,7 +24,7 @@ interface SolveTimerProps {
 }
 
 const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoStart = true }, ref) => {
-  const startTime = useRef<number | null>(autoStart ? Date.now() : null);
+  const startTime = useRef<number | null>(null);
   const firstMoveAt = useRef<number | null>(null);
   const endTime = useRef<number | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -72,7 +72,10 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoSt
   }));
 
   useEffect(() => {
-    if (autoStart) startInterval();
+    if (autoStart) {
+      startTime.current = Date.now();
+      startInterval();
+    }
     return () => {
       if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
     };
