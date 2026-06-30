@@ -150,24 +150,22 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     timerRef.current?.start();
   }, []);
 
+  const moveRangeRef = useRef(xcrossMoveRange);
+  moveRangeRef.current = xcrossMoveRange;
+
   const generateNewScramble = useCallback(async () => {
     if (!kpuzzle || !solverReady) return;
 
     const colors = crossColorsRef.current;
     const face = colors[Math.floor(Math.random() * colors.length)];
-    const scrambleAlg = await randomScrambleForEvent('333');
-    const moves = scrambleAlg.toString();
-    const targetPattern = kpuzzle.defaultPattern().applyAlg(moves);
-
-    scrambleRef.current = moves;
-    setScramble(moves);
+    const slotsToUse = selectedSlots.length > 0 ? selectedSlots : ['FR', 'FL', 'BL', 'BR'];
+    const [minMoves, maxMoves] = moveRangeRef.current;
 
     setCrossFace(face);
     setExtraRotation(randomRotationString(randomRotationAxisRef.current));
     isRetryRef.current = false;
     setPhase('scrambling');
     setResult(null);
-
     movesRef.current = [];
     setMoveCount(0);
     setStartTime(Date.now());
@@ -177,16 +175,37 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setOptimalSolutions([]);
     setTargetSlot('');
 
-    // Solve XCross in a microtask so UI stays responsive
-    const slotsToUse = selectedSlots.length > 0 ? selectedSlots : ['FR', 'FL', 'BL', 'BR'];
-    setTimeout(() => {
-      const solutions = solveXCross(targetPattern, face, slotsToUse);
-      setOptimalSolutions(solutions);
-      if (solutions.length > 0) {
-        setTargetSlot(solutions[0].slot);
+    // Generate scrambles until one has solutions in the move range
+    const findValidScramble = async () => {
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const scrambleAlg = await randomScrambleForEvent('333');
+        const moves = scrambleAlg.toString();
+        const targetPattern = kpuzzle.defaultPattern().applyAlg(moves);
+        const solutions = solveXCross(targetPattern, face, slotsToUse);
+        const inRange = solutions.filter(s => s.moveCount >= minMoves && s.moveCount <= maxMoves);
+        if (inRange.length > 0) {
+          return { moves, solutions };
+        }
+      }
+      return null;
+    };
+
+    findValidScramble().then((result) => {
+      if (result) {
+        const { moves, solutions } = result;
+        scrambleRef.current = moves;
+        setScramble(moves);
+        setOptimalSolutions(solutions);
+        const inRange = solutions.filter(s => s.moveCount >= minMoves && s.moveCount <= maxMoves);
+        setTargetSlot((inRange.length > 0 ? inRange[0] : solutions[0]).slot);
+      } else {
+        scrambleRef.current = '';
+        setScramble('');
+        setOptimalSolutions([]);
+        setTargetSlot('');
       }
       setSolving(false);
-    }, 0);
+    });
   }, [kpuzzle, solverReady, selectedSlots]);
 
   useEffect(() => {
@@ -472,7 +491,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder>
-          {!scramble ? (
+          {!scramble && !solving && !solverReady ? (
             <Stack align="center" gap="xs" p="md">
               <Skeleton height={300} width={300} />
               <Skeleton height={20} width={200} />
@@ -507,17 +526,20 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               <Divider label="Scramble" />
 
               <Box px="xs" py="xs">
-                {solving && (
-                  <Text fz="sm" c="dimmed" mb={2}>Computing solutions...</Text>
+                {solving ? (
+                  <Text fz="sm" c="dimmed">Searching for a scramble...</Text>
+                ) : !scramble ? (
+                  <Text fz="sm" c="red" fw={700}>No scrambles found!</Text>
+                ) : (
+                  <DifferentialScramble
+                    key={diffKey}
+                    conn={conn}
+                    kpuzzle={kpuzzle}
+                    scramble={scramble}
+                    phase={phase}
+                    onScrambleComplete={handleScrambleComplete}
+                  />
                 )}
-                <DifferentialScramble
-                  key={diffKey}
-                  conn={conn}
-                  kpuzzle={kpuzzle}
-                  scramble={scramble}
-                  phase={phase}
-                  onScrambleComplete={handleScrambleComplete}
-                />
               </Box>
 
           <Divider
