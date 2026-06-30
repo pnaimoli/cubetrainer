@@ -67,19 +67,19 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, {}>((_, ref) => {
 
   return (
     <Stack gap={0} align="center">
-      <Text ff="monospace" fw={600} fz="36px" lh={1} ta="center" style={{ minWidth: '7ch' }}>
+      <Text ff="monospace" fw={600} fz="48px" lh={1} ta="center" style={{ minWidth: '7ch' }}>
         {formatTime(totalMs)}
       </Text>
       <Group justify="center" gap="lg" mt={4}>
         <Stack align="center" gap={0}>
-          <Text fz={10} c="dimmed" lh={1}>Inspection</Text>
-          <Text ff="monospace" fw={500} fz="sm" c={firstMoveAt.current ? 'dimmed' : undefined} lh={1.2} ta="center">
+          <Text fz="xs" c="dimmed" lh={1}>Inspection</Text>
+          <Text ff="monospace" fw={500} fz="md" c={firstMoveAt.current ? 'dimmed' : undefined} lh={1.3} ta="center">
             {formatTime(inspectionMs)}
           </Text>
         </Stack>
         <Stack align="center" gap={0}>
-          <Text fz={10} c="dimmed" lh={1}>Execution</Text>
-          <Text ff="monospace" fw={500} fz="sm" c={!firstMoveAt.current ? 'dimmed' : undefined} lh={1.2} ta="center">
+          <Text fz="xs" c="dimmed" lh={1}>Execution</Text>
+          <Text ff="monospace" fw={500} fz="md" c={!firstMoveAt.current ? 'dimmed' : undefined} lh={1.3} ta="center">
             {formatTime(executionMs)}
           </Text>
         </Stack>

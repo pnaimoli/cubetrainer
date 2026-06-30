@@ -455,7 +455,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       </Grid.Col>
       <Grid.Col span={4}>
         <Card withBorder>
-          <Stack align="center" gap={0} mt="xs">
+          <Stack align="center" gap={0}>
             <div style={{ position: 'relative' }}>
               <SolveTimer key={startTime} ref={timerRef} />
               {showSliceWarning && (

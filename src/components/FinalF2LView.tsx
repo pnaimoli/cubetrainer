@@ -15,6 +15,7 @@ import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { F2L_DB, OLL_DB } from '../util/algDatabase';
 import SettingsView from './SettingsView';
+import SolveTimer, { SolveTimerHandle } from './SolveTimer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
 
 interface OLLPredictionStat {
@@ -139,6 +140,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   const [ollStats, setOllStats] = useLocalStorage<OLLPredictionStat[]>({ key: OLL_STATS_KEY, defaultValue: [] });
 
   const playerRef = useRef<TwistyPlayer>(null);
+  const timerRef = useRef<SolveTimerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -304,6 +306,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     const timeOfMove = isSliceRecovery ? prevMoves[prevMoves.length - 1].timeOfMove : now;
 
     if (movesRef.current.length === 0) {
+      timerRef.current?.firstMove(timeOfMove);
       // Mask after first move
       if (localSettings.maskAfterFirstMove && kpuzzle && playerRef.current) {
         const blindMask = new PuzzleStickering(kpuzzle);
@@ -330,6 +333,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       return;
     }
 
+    timerRef.current?.stopAt(timeOfMove);
     recordStat(true);
 
     const delay = localSettings.postSolveDelay * 1000;
@@ -440,7 +444,8 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
               }: {caseHidden ? '???' : `F2L-${currentF2L.name} + OLL-${currentOLL.name}`}
             </Title>
           </Card.Section>
-          <Stack align="center" gap={0}>
+          <Stack align="center" gap={0} mt="xs">
+            <SolveTimer key={startTime} ref={timerRef} />
             <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={localSettings.showHintFacelets} />
           </Stack>
         </Card>
