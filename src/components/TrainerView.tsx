@@ -122,6 +122,8 @@ interface SolvedStateBadgesProps {
   effectiveSolvedState: number;
   movesRef: React.RefObject<Move[]>;
   crossFace?: string;
+  /** Full display rotation (base + extra y). When provided, used instead of deriving from crossFace. */
+  displayRotation?: string;
 }
 
 export interface SolvedStateBadgesHandle {
@@ -129,7 +131,7 @@ export interface SolvedStateBadgesHandle {
 }
 
 export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, SolvedStateBadgesProps>(
-  ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef, crossFace }, ref) => {
+  ({ kpuzzle, setupAlg, effectiveSolvedState, movesRef, crossFace, displayRotation }, ref) => {
     const [, setMoveCount] = useState(0);
 
     React.useImperativeHandle(ref, () => ({
@@ -138,9 +140,9 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
 
     if (!kpuzzle) return <Group />;
 
-    // For non-D cross faces, rotate the pattern to D-frame so the
-    // hardcoded F2L slot checks (FR/DRF etc.) work correctly.
-    const rotation = crossFace && crossFace !== 'D' ? FACE_TO_D_ROTATION[crossFace] : '';
+    // Rotate the pattern so cross is on D and F2L slots align with the visual display.
+    // displayRotation includes extra y rotations; fall back to base rotation from crossFace.
+    const rotation = displayRotation ?? (crossFace && crossFace !== 'D' ? FACE_TO_D_ROTATION[crossFace] : '');
 
     return (
       <Group gap="xs" mt="xs">

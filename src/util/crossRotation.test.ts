@@ -4,13 +4,23 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { isPatternSolved } from './SolveChecker';
 import { SolvedState } from './interfaces';
 import { initCrossSolver, solveCross } from './crossSolver';
+import { initXCrossSolver, solveXCross } from './xcrossSolver';
 import { rankCrossSolutions } from './crossSolutionRanker';
+import { translateMove, translateSlot, FACE_TO_D_ROTATION } from './crossRotation';
+
+const SLOT_SOLVED_STATE: Record<string, SolvedState> = {
+  FR: SolvedState.F2LFR,
+  FL: SolvedState.F2LFL,
+  BL: SolvedState.F2LBL,
+  BR: SolvedState.F2LBR,
+};
 
 let kpuzzle: KPuzzle;
 
 before(async () => {
   kpuzzle = await cube3x3x3.kpuzzle() as unknown as KPuzzle;
   initCrossSolver(kpuzzle);
+  initXCrossSolver(kpuzzle);
 });
 
 describe('Cross solving per face', () => {
@@ -117,4 +127,143 @@ describe('Cross solving per face', () => {
     const overlap = [...dMoves].filter(s => uMoves.has(s));
     expect(overlap.length).to.be.lessThan(dMoves.size);
   });
+});
+
+describe('translateMove', () => {
+  const MOVES = ['U', "U'", 'U2', 'D', "D'", 'D2', 'R', "R'", 'R2', 'L', "L'", 'L2', 'F', "F'", 'F2', 'B', "B'", 'B2'];
+
+  for (const face of ['U', 'F', 'B', 'R', 'L']) {
+    const rotation = FACE_TO_D_ROTATION[face];
+    it(`${face} face (${rotation}): translated moves produce equivalent state`, () => {
+      const scramble = "R U F' D2 L B' R2 U' F D L2 B R' U2 F'";
+
+      for (const move of MOVES) {
+        // Physical cube: scramble then move
+        const physical = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(move);
+        // Then rotate for display
+        const physicalRotated = physical.applyAlg(rotation);
+
+        // Display: scramble then rotation, then translated move
+        const display = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(rotation);
+        const translated = translateMove(move, rotation);
+        const displayAfterMove = display.applyAlg(translated);
+
+        // These must be identical
+        expect(
+          displayAfterMove.patternData['EDGES'].pieces,
+          `${rotation}: move ${move} -> ${translated} edges should match`,
+        ).to.deep.equal(physicalRotated.patternData['EDGES'].pieces);
+        expect(
+          displayAfterMove.patternData['CORNERS'].pieces,
+          `${rotation}: move ${move} -> ${translated} corners should match`,
+        ).to.deep.equal(physicalRotated.patternData['CORNERS'].pieces);
+      }
+    });
+  }
+});
+
+describe('translateMove with y rotations', () => {
+  const MOVES = ['U', "U'", 'U2', 'D', "D'", 'D2', 'R', "R'", 'R2', 'L', "L'", 'L2', 'F', "F'", 'F2', 'B', "B'", 'B2'];
+
+  for (const composed of ['x y', "x y'", 'x y2', "x' y", 'z y']) {
+    it(`composed rotation "${composed}": translated moves produce equivalent state`, () => {
+      const scramble = "R U F' D2 L B' R2 U' F D L2 B R' U2 F'";
+
+      for (const move of MOVES) {
+        const physical = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(move);
+        const physicalRotated = physical.applyAlg(composed);
+        const display = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(composed);
+        const translated = translateMove(move, composed);
+        const displayAfterMove = display.applyAlg(translated);
+
+        expect(
+          displayAfterMove.patternData['EDGES'].pieces,
+          `${composed}: move ${move} -> ${translated} edges should match`,
+        ).to.deep.equal(physicalRotated.patternData['EDGES'].pieces);
+        expect(
+          displayAfterMove.patternData['CORNERS'].pieces,
+          `${composed}: move ${move} -> ${translated} corners should match`,
+        ).to.deep.equal(physicalRotated.patternData['CORNERS'].pieces);
+      }
+    });
+  }
+});
+
+describe('translateSlot', () => {
+  const ALL_SLOTS = ['FR', 'FL', 'BL', 'BR'];
+
+  it('D face with no rotation is identity', () => {
+    for (const slot of ALL_SLOTS) {
+      expect(translateSlot(slot, 'D', '')).to.equal(slot);
+    }
+  });
+
+  it('B face with x rotation swaps front/back', () => {
+    expect(translateSlot('FR', 'B', 'x')).to.equal('BR');
+    expect(translateSlot('FL', 'B', 'x')).to.equal('BL');
+    expect(translateSlot('BL', 'B', 'x')).to.equal('FL');
+    expect(translateSlot('BR', 'B', 'x')).to.equal('FR');
+  });
+
+  it('U face with x2 rotation swaps front/back', () => {
+    expect(translateSlot('FR', 'U', 'x2')).to.equal('BR');
+    expect(translateSlot('FL', 'U', 'x2')).to.equal('BL');
+    expect(translateSlot('BL', 'U', 'x2')).to.equal('FL');
+    expect(translateSlot('BR', 'U', 'x2')).to.equal('FR');
+  });
+
+  it('mapping is a permutation (bijective) for all faces', () => {
+    for (const face of ['D', 'U', 'F', 'B', 'R', 'L']) {
+      const rot = FACE_TO_D_ROTATION[face];
+      const mapped = ALL_SLOTS.map(s => translateSlot(s, face, rot));
+      expect(new Set(mapped).size).to.equal(4, `face ${face} mapping not bijective`);
+    }
+  });
+
+  it('handles composed rotations (e.g. x y)', () => {
+    // With x y, the belt faces rotate further
+    const mapped = ALL_SLOTS.map(s => translateSlot(s, 'B', 'x y'));
+    expect(new Set(mapped).size).to.equal(4);
+  });
+});
+
+describe('XCross slot translation end-to-end', function() {
+  this.timeout(10000);
+  const NON_D_FACES = ['U', 'F', 'B', 'R', 'L'];
+
+  for (const face of NON_D_FACES) {
+    it(`${face} face: solved xcross slot maps to correct D-frame F2L pair`, () => {
+      const scramble = "R U F' D2 L B' R2 U' F D L2 B R' U2 F'";
+      const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+      const solutions = solveXCross(pattern, face);
+      expect(solutions.length).to.be.greaterThan(0);
+
+      const sol = solutions[0];
+      const solvedPattern = pattern.applyAlg(sol.solution);
+
+      // Rotate to D-frame (same as checkXCrossSolved does)
+      const rotation = FACE_TO_D_ROTATION[face];
+      const rotatedPattern = solvedPattern.applyAlg(rotation);
+
+      // The solver slot must be translated to D-frame slot for correct checking
+      const dFrameSlot = translateSlot(sol.slot, face, rotation);
+      const dFrameSlotState = SLOT_SOLVED_STATE[dFrameSlot];
+      expect(dFrameSlotState, `D-frame slot "${dFrameSlot}" should have a SolvedState`).to.exist;
+
+      // Verify the TRANSLATED slot is solved (this is what the app must do)
+      expect(
+        isPatternSolved(rotatedPattern, SolvedState.CROSS | dFrameSlotState, 'D'),
+        `${face} face solver slot "${sol.slot}" -> D-frame "${dFrameSlot}" should be solved`
+      ).to.be.true;
+
+      // Verify using the RAW solver slot name would be wrong for non-trivial mappings
+      if (dFrameSlot !== sol.slot) {
+        const wrongSlotState = SLOT_SOLVED_STATE[sol.slot];
+        expect(
+          isPatternSolved(rotatedPattern, SolvedState.CROSS | wrongSlotState, 'D'),
+          `Using raw solver slot "${sol.slot}" instead of "${dFrameSlot}" should fail`
+        ).to.be.false;
+      }
+    });
+  }
 });

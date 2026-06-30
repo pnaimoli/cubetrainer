@@ -102,7 +102,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const scrambleRef = useRef<string>('');
 
-  // Setup alg for the 3D cube: scramble + rotation to show cross on D
   const displayRotation = [FACE_TO_D_ROTATION[crossFace], extraRotation].filter(Boolean).join(' ');
   const setupAlg = useMemo(() =>
     displayRotation ? `${scramble} ${displayRotation}` : scramble,
@@ -453,7 +452,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
               </Group>
             </Group>
           </Card.Section>
-          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS} crossFace={crossFace} movesRef={movesRef} />
+          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS} displayRotation={displayRotation} movesRef={movesRef} />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>

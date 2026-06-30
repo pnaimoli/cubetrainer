@@ -261,3 +261,4 @@ export function solveXCross(
   allSolutions.sort((a, b) => a.moveCount - b.moveCount);
   return allSolutions;
 }
+

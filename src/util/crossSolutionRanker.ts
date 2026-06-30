@@ -1,4 +1,5 @@
 import { CrossSolution, solveGenRestricted, faceCharToIndex } from './crossSolver';
+import { XCrossSolution } from './xcrossSolver';
 import { KPattern } from 'cubing/kpuzzle';
 
 export interface RankedSolution {
@@ -6,6 +7,7 @@ export interface RankedSolution {
   rotation: string;   // e.g. "" | "y" | "x2 y'"
   genCount: number;
   qtm: number;
+  slot?: string;      // F2L slot (xcross only)
 }
 
 export interface GenGroup {
@@ -282,4 +284,46 @@ export function rankCrossSolutions(
   groups.sort((a, b) => b.genCount - a.genCount);
 
   return groups;
+}
+
+/** Rank xcross solutions by picking the best y-rotation for each
+ *  (minimize gens, L/B moves, QTM), dedup rotation equivalents. */
+export function rankXCrossSolutions(
+  solutions: XCrossSolution[],
+  crossFace: string = 'D',
+): RankedSolution[] {
+  const entries = getRotationEntries(crossFace);
+
+  const ranked: RankedSolution[] = [];
+  const seen = new Set<string>();
+  for (const sol of solutions) {
+    if (!sol.solution) continue;
+    let best: RankedSolution | null = null;
+    for (const entry of entries) {
+      const rewritten = rewriteSolution(sol.solution, entry.rewrite);
+      const candidate: RankedSolution = {
+        solution: rewritten,
+        rotation: entry.label,
+        genCount: countGens(rewritten),
+        qtm: computeQTM(rewritten),
+        slot: sol.slot,
+      };
+      if (!best || compareSolutions(candidate, best) < 0) {
+        best = candidate;
+      }
+    }
+    if (best && !seen.has(best.solution + ':' + best.slot)) {
+      seen.add(best.solution + ':' + best.slot);
+      ranked.push(best);
+    }
+  }
+
+  ranked.sort((a, b) => {
+    const aLB = countLBMoves(a.solution);
+    const bLB = countLBMoves(b.solution);
+    if (aLB !== bLB) return aLB - bLB;
+    return a.qtm - b.qtm;
+  });
+
+  return ranked;
 }

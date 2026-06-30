@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select, RangeSlider } from '@mantine/core';
-// Chip still imported for F2L slot picker
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select, Slider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -18,8 +17,9 @@ import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/ma
 import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver } from '../util/crossSolver';
 import { initXCrossSolver, solveXCross, XCrossSolution } from '../util/xcrossSolver';
-import { movesToHTM } from '../util/cubeState';
-import { FACE_TO_D_ROTATION, translateMove, randomRotationString } from '../util/crossRotation';
+import { movesToHTM, simplifyMoves } from '../util/cubeState';
+import { rankXCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
+import { FACE_TO_D_ROTATION, translateMove, translateSlot, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
 import DifferentialScramble from './DifferentialScramble';
 import SolveTimer, { SolveTimerHandle } from './SolveTimer';
@@ -103,8 +103,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   // Slot selection
   const [selectedSlots, setSelectedSlots] = useLocalStorage<string[]>({ key: 'xcrossSlots', defaultValue: ['FR', 'FL', 'BL', 'BR'], getInitialValueInEffect: false });
 
-  // Move range filter
-  const [xcrossMoveRange, setXcrossMoveRange] = useLocalStorage<[number, number]>({ key: 'xcrossMoveRange', defaultValue: [1, 10], getInitialValueInEffect: false });
+  // Exact move count filter (0 = any)
+  const [xcrossMoveCount, setXcrossMoveCount] = useLocalStorage<number>({ key: 'xcrossMoveCount', defaultValue: 0, getInitialValueInEffect: false });
 
   // Clear old stats that lack required fields
   useEffect(() => {
@@ -118,19 +118,58 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const scrambleRef = useRef<string>('');
 
+  // Display rotation: base rotation (cross on D) + random y rotation for training
   const displayRotation = [FACE_TO_D_ROTATION[crossFace], extraRotation].filter(Boolean).join(' ');
   const setupAlg = useMemo(() =>
     displayRotation ? `${scramble} ${displayRotation}` : scramble,
     [scramble, displayRotation],
   );
 
+  // Map visual slot names <-> solver slot names based on display rotation.
+  // Chip labels are visual (what the user sees on the rotated display).
+  // The solver uses slot names relative to the cross face.
+  const visualToSolverSlot = useMemo(() => {
+    const ALL_SLOTS = ['FR', 'FL', 'BL', 'BR'];
+    const map: Record<string, string> = {};
+    for (const solverSlot of ALL_SLOTS) {
+      const visualSlot = translateSlot(solverSlot, crossFace, displayRotation);
+      map[visualSlot] = solverSlot;
+    }
+    return map;
+  }, [crossFace, displayRotation]);
+
+  const solverToVisualSlot = useMemo(() => {
+    const inv: Record<string, string> = {};
+    for (const [visual, solver] of Object.entries(visualToSolverSlot)) {
+      inv[solver] = visual;
+    }
+    return inv;
+  }, [visualToSolverSlot]);
+
+  // Map solver slot to D-frame slot for solved checking.
+  // After applying FACE_TO_D_ROTATION, the solver's slots land at different D-frame positions.
+  const solverSlotToDFrame = useMemo(() => {
+    const baseRotation = FACE_TO_D_ROTATION[crossFace] ?? '';
+    const map: Record<string, string> = {};
+    for (const slot of ['FR', 'FL', 'BL', 'BR']) {
+      map[slot] = translateSlot(slot, crossFace, baseRotation);
+    }
+    return map;
+  }, [crossFace]);
+
+  // Get the D-frame SolvedState flag for a solver slot
+  const getDFrameSlotState = useCallback((solverSlot: string): SolvedState => {
+    const dFrameSlot = solverSlotToDFrame[solverSlot] ?? solverSlot;
+    return SLOT_SOLVED_STATE[dFrameSlot] ?? 0;
+  }, [solverSlotToDFrame]);
+
   // Stickering mask: highlight cross edges + target F2L pair
   const stickeringMask = useMemo(() => {
     if (!useMaskings || !kpuzzle || !scramble || !targetSlot) return null;
     const setupPattern = kpuzzle.defaultPattern().applyAlg(scramble);
-    const slotState = SLOT_SOLVED_STATE[targetSlot] ?? 0;
+    const slotState = getDFrameSlotState(targetSlot);
     return generateStickeringMask(setupPattern, SolvedState.CROSS | slotState, crossFace);
-  }, [useMaskings, kpuzzle, scramble, crossFace, targetSlot]);
+  }, [useMaskings, kpuzzle, scramble, crossFace, targetSlot, getDFrameSlotState]);
 
   // Initialize puzzle and solver
   useEffect(() => {
@@ -150,19 +189,33 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     timerRef.current?.start();
   }, []);
 
-  const moveRangeRef = useRef(xcrossMoveRange);
-  moveRangeRef.current = xcrossMoveRange;
+  const moveCountRef = useRef(xcrossMoveCount);
+  moveCountRef.current = xcrossMoveCount;
+
+  const selectedSlotsRef = useRef(selectedSlots);
+  selectedSlotsRef.current = selectedSlots;
 
   const generateNewScramble = useCallback(async () => {
     if (!kpuzzle || !solverReady) return;
 
     const colors = crossColorsRef.current;
     const face = colors[Math.floor(Math.random() * colors.length)];
-    const slotsToUse = selectedSlots.length > 0 ? selectedSlots : ['FR', 'FL', 'BL', 'BR'];
-    const [minMoves, maxMoves] = moveRangeRef.current;
+    const targetMoves = moveCountRef.current;
+    const extra = randomRotationString(randomRotationAxisRef.current);
+    const rotation = [FACE_TO_D_ROTATION[face], extra].filter(Boolean).join(' ');
+
+    // Translate user's visual slot picks to solver slot names for this rotation
+    const visualSlots = selectedSlotsRef.current.length > 0 ? selectedSlotsRef.current : ['FR', 'FL', 'BL', 'BR'];
+    const allSolverSlots = ['FR', 'FL', 'BL', 'BR'];
+    const solverSlots = visualSlots.map(vs => {
+      for (const ss of allSolverSlots) {
+        if (translateSlot(ss, face, rotation) === vs) return ss;
+      }
+      return vs;
+    });
 
     setCrossFace(face);
-    setExtraRotation(randomRotationString(randomRotationAxisRef.current));
+    setExtraRotation(extra);
     isRetryRef.current = false;
     setPhase('scrambling');
     setResult(null);
@@ -175,29 +228,66 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setOptimalSolutions([]);
     setTargetSlot('');
 
-    // Generate scrambles until one has solutions in the move range
+    // Generate a scramble with xcross solutions in the move range.
+    // Strategy: solve xcross for a random scramble, then if the solution is
+    // too long, append prefix moves of the solution to the scramble to shorten it.
     const findValidScramble = async () => {
-      for (let attempt = 0; attempt < 50; attempt++) {
-        const scrambleAlg = await randomScrambleForEvent('333');
-        const moves = scrambleAlg.toString();
-        const targetPattern = kpuzzle.defaultPattern().applyAlg(moves);
-        const solutions = solveXCross(targetPattern, face, slotsToUse);
-        const inRange = solutions.filter(s => s.moveCount >= minMoves && s.moveCount <= maxMoves);
-        if (inRange.length > 0) {
-          return { moves, solutions };
+      const scrambleAlg = await randomScrambleForEvent('333');
+      const baseScramble = scrambleAlg.toString();
+      const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
+      const solutions = solveXCross(basePattern, face, solverSlots);
+
+      if (solutions.length === 0) return null;
+
+      // No filter: use as-is
+      if (targetMoves === 0) {
+        return { moves: baseScramble, solutions };
+      }
+
+      // Check if any solution already matches
+      if (solutions.some(s => s.moveCount === targetMoves)) {
+        return { moves: baseScramble, solutions };
+      }
+
+      // Solution too long: shorten by appending prefix moves to the scramble
+      const best = solutions[0];
+      if (best.moveCount > targetMoves) {
+        const solMoves = best.solution.split(/\s+/).filter(Boolean);
+        const prefixMoves = solMoves.slice(0, solMoves.length - targetMoves);
+        const newScrambleMoves = simplifyMoves([
+          ...baseScramble.split(/\s+/).filter(Boolean),
+          ...prefixMoves,
+        ]);
+        const newScramble = newScrambleMoves.join(' ');
+        const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
+        const newSolutions = solveXCross(newPattern, face, solverSlots);
+        if (newSolutions.some(s => s.moveCount === targetMoves)) {
+          return { moves: newScramble, solutions: newSolutions };
         }
       }
+
+      // Solution too short (rare): just retry a few times
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const retryAlg = await randomScrambleForEvent('333');
+        const retryMoves = retryAlg.toString();
+        const retryPattern = kpuzzle.defaultPattern().applyAlg(retryMoves);
+        const retrySolutions = solveXCross(retryPattern, face, solverSlots);
+        if (retrySolutions.some(s => s.moveCount === targetMoves)) {
+          return { moves: retryMoves, solutions: retrySolutions };
+        }
+      }
+
       return null;
     };
 
-    findValidScramble().then((result) => {
-      if (result) {
-        const { moves, solutions } = result;
+    findValidScramble().then((found) => {
+      if (found) {
+        const { moves, solutions } = found;
         scrambleRef.current = moves;
         setScramble(moves);
         setOptimalSolutions(solutions);
-        const inRange = solutions.filter(s => s.moveCount >= minMoves && s.moveCount <= maxMoves);
-        setTargetSlot((inRange.length > 0 ? inRange[0] : solutions[0]).slot);
+        const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
+        setTargetSlot((match.length > 0 ? match[0] : solutions[0]).slot);
       } else {
         scrambleRef.current = '';
         setScramble('');
@@ -206,7 +296,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       }
       setSolving(false);
     });
-  }, [kpuzzle, solverReady, selectedSlots]);
+  }, [kpuzzle, solverReady]);
 
   useEffect(() => {
     if (solverReady) generateNewScramble();
@@ -233,22 +323,20 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     }
   }, [maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check if XCross is solved (cross + target F2L pair)
-  const checkXCrossSolved = useCallback((currentPattern: KPattern, face: string, slot: string): boolean => {
-    const slotState = SLOT_SOLVED_STATE[slot];
+  // Check if XCross is solved (cross + target F2L pair).
+  // Uses visual slot name + full displayRotation so positions match the visual display.
+  const checkXCrossSolved = useCallback((currentPattern: KPattern, slot: string): boolean => {
+    const visualSlot = solverToVisualSlot[slot] ?? slot;
+    const slotState = SLOT_SOLVED_STATE[visualSlot] ?? 0;
     if (!slotState) return false;
 
-    // For non-D cross faces, rotate pattern into D-frame before checking F2L
-    if (face !== 'D') {
-      const rotation = FACE_TO_D_ROTATION[face];
-      if (rotation) {
-        const rotatedPattern = currentPattern.applyAlg(rotation);
-        return isPatternSolved(rotatedPattern, SolvedState.CROSS | slotState, 'D');
-      }
+    if (displayRotation) {
+      const rotatedPattern = currentPattern.applyAlg(displayRotation);
+      return isPatternSolved(rotatedPattern, SolvedState.CROSS | slotState, 'D');
     }
 
-    return isPatternSolved(currentPattern, SolvedState.CROSS | slotState, face);
-  }, []);
+    return isPatternSolved(currentPattern, SolvedState.CROSS | slotState, crossFace);
+  }, [solverToVisualSlot, displayRotation, crossFace]);
 
   // Handle cube moves during solving
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
@@ -302,7 +390,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     const moveString = newMoves.map(m => m.move).join(' ');
     if (kpuzzle && targetSlot) {
       const currentPattern = kpuzzle.defaultPattern().applyAlg(scramble).applyAlg(moveString);
-      const isSolved = checkXCrossSolved(currentPattern, crossFace, targetSlot);
+      const isSolved = checkXCrossSolved(currentPattern, targetSlot);
 
       if (isSolved) {
         const firstMove = newMoves[0].timeOfMove;
@@ -413,20 +501,21 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     download(csvConfig)(csv);
   };
 
-  // Filter solutions by move range, then group by slot
-  const filteredSolutions = useMemo(() =>
-    optimalSolutions.filter(s => s.moveCount >= xcrossMoveRange[0] && s.moveCount <= xcrossMoveRange[1]),
-    [optimalSolutions, xcrossMoveRange],
-  );
+  // Rank solutions with optimal y-rotation, filter by move count, group by visual slot
+  const rankedSolutions = useMemo(() => {
+    const filtered = xcrossMoveCount > 0 ? optimalSolutions.filter(s => s.moveCount === xcrossMoveCount) : optimalSolutions;
+    return rankXCrossSolutions(filtered, crossFace);
+  }, [optimalSolutions, crossFace, xcrossMoveCount]);
 
   const solutionsBySlot = useMemo(() => {
-    const groups: Record<string, XCrossSolution[]> = {};
-    for (const sol of filteredSolutions) {
-      if (!groups[sol.slot]) groups[sol.slot] = [];
-      groups[sol.slot].push(sol);
+    const groups: Record<string, RankedSolution[]> = {};
+    for (const sol of rankedSolutions) {
+      const visual = solverToVisualSlot[sol.slot ?? ''] ?? sol.slot ?? '';
+      if (!groups[visual]) groups[visual] = [];
+      groups[visual].push(sol);
     }
     return groups;
-  }, [filteredSolutions]);
+  }, [rankedSolutions, solverToVisualSlot]);
 
   // DataTable columns
   const timesColumns: DataTableColumn<XCrossStat & { id: number }>[] = [
@@ -486,7 +575,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               </Group>
             </Group>
           </Card.Section>
-          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS | (SLOT_SOLVED_STATE[targetSlot] ?? 0)} crossFace={crossFace} movesRef={movesRef} />
+          <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS | (SLOT_SOLVED_STATE[solverToVisualSlot[targetSlot] ?? targetSlot] ?? 0)} displayRotation={displayRotation} movesRef={movesRef} />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
@@ -560,20 +649,25 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               {optimalSolutions.length > 0 ? (
                 optimalSolutions[0].moveCount === 0 ? (
                   <Text fz="sm" c="green" fw={700}>Already solved!</Text>
-                ) : filteredSolutions.length === 0 ? (
-                  <Text fz="sm" c="dimmed">No solutions in {xcrossMoveRange[0]}-{xcrossMoveRange[1]} move range</Text>
+                ) : rankedSolutions.length === 0 ? (
+                  <Text fz="sm" c="dimmed">No {xcrossMoveCount}-move solutions</Text>
                 ) : (
                   <Stack gap="xs">
-                    {Object.entries(solutionsBySlot).map(([slot, sols]) => (
-                      <Box key={slot}>
-                        <Text fz="xs" fw={700} c="dimmed" mb={2}>{slot} slot ({sols[0].moveCount} moves)</Text>
-                        <Stack gap={2}>
-                          {sols.slice(0, 10).map((sol, i) => (
-                            <Text key={i} fz="sm" ff="monospace" c="dimmed">{sol.solution}</Text>
-                          ))}
-                        </Stack>
-                      </Box>
-                    ))}
+                    {Object.entries(solutionsBySlot).map(([slot, sols]) => {
+                      const moveCount = sols[0].solution.split(' ').filter(Boolean).length;
+                      return (
+                        <Box key={slot}>
+                          <Text fz="xs" fw={700} c="dimmed" mb={2}>{slot} slot ({moveCount} moves)</Text>
+                          <Stack gap={2}>
+                            {sols.slice(0, 10).map((sol, i) => (
+                              <Text key={i} fz="sm" ff="monospace" c="dimmed">
+                                {sol.rotation ? `[${sol.rotation}] ` : ''}{sol.solution}
+                              </Text>
+                            ))}
+                          </Stack>
+                        </Box>
+                      );
+                    })}
                   </Stack>
                 )
               ) : solving ? (
@@ -702,15 +796,14 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               />
             </Group>
             <Divider label="Solution Filter" />
-            <Text fz="sm">Move range: {xcrossMoveRange[0]}-{xcrossMoveRange[1]}</Text>
-            <RangeSlider
-              min={1}
+            <Text fz="sm">Moves: {xcrossMoveCount === 0 ? 'any' : xcrossMoveCount}</Text>
+            <Slider
+              min={0}
               max={10}
               step={1}
-              value={xcrossMoveRange}
-              onChange={(val) => setXcrossMoveRange(val as [number, number])}
-              marks={[{ value: 1, label: '1' }, { value: 5, label: '5' }, { value: 10, label: '10' }]}
-              minRange={0}
+              value={xcrossMoveCount}
+              onChange={setXcrossMoveCount}
+              marks={[{ value: 0, label: 'any' }, { value: 5, label: '5' }, { value: 10, label: '10' }]}
               size="sm"
               mb="xs"
             />
