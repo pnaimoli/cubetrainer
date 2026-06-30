@@ -15,7 +15,7 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { randomScrambleForEvent } from 'cubing/scramble';
-import { initCrossSolver } from '../util/crossSolver';
+import { initCrossSolver, solveCross } from '../util/crossSolver';
 import { initXCrossSolver, solveXCross, XCrossSolution } from '../util/xcrossSolver';
 import { movesToHTM, simplifyMoves } from '../util/cubeState';
 import { rankXCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
@@ -74,6 +74,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const [solverReady, setSolverReady] = useState(false);
   const [scramble, setScramble] = useState<string>('');
   const [optimalSolutions, setOptimalSolutions] = useState<XCrossSolution[]>([]);
+  const [crossOptimal, setCrossOptimal] = useState<number>(-1);
   const [phase, setPhase] = useState<Phase>('scrambling');
   const [targetSlot, setTargetSlot] = useState<string>('');
   const [diffKey, setDiffKey] = useState(0);
@@ -105,6 +106,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
   // Exact move count filter (0 = any)
   const [xcrossMoveCount, setXcrossMoveCount] = useLocalStorage<number>({ key: 'xcrossMoveCount', defaultValue: 0, getInitialValueInEffect: false });
+
+  // Minimum extra moves beyond cross optimal (0 = just must be strictly harder)
+  const [minExtraMoves, setMinExtraMoves] = useLocalStorage<number>({ key: 'xcrossMinExtra', defaultValue: 0, getInitialValueInEffect: false });
 
   // Clear old stats that lack required fields
   useEffect(() => {
@@ -192,6 +196,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const moveCountRef = useRef(xcrossMoveCount);
   moveCountRef.current = xcrossMoveCount;
 
+  const minExtraRef = useRef(minExtraMoves);
+  minExtraRef.current = minExtraMoves;
+
   const selectedSlotsRef = useRef(selectedSlots);
   selectedSlotsRef.current = selectedSlots;
 
@@ -228,52 +235,59 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setOptimalSolutions([]);
     setTargetSlot('');
 
+    // Solve cross and check that xcross is sufficiently harder.
+    // Returns cross optimal if valid, null if xcross is too easy.
+    const minExtra = minExtraRef.current;
+    const getCrossOptimalIfValid = (pattern: KPattern, xcrossSolutions: XCrossSolution[]): number | null => {
+      if (xcrossSolutions.length === 0) return null;
+      const crossSolutions = solveCross(pattern, face);
+      const crossOpt = crossSolutions.length > 0 ? crossSolutions[0].moveCount : 0;
+      const xcrossOpt = xcrossSolutions[0].moveCount;
+      // Must be strictly harder, and at least minExtra moves beyond cross
+      return xcrossOpt > crossOpt && (xcrossOpt - crossOpt) >= Math.max(1, minExtra) ? crossOpt : null;
+    };
+
     // Generate a scramble with xcross solutions in the move range.
-    // Strategy: solve xcross for a random scramble, then if the solution is
-    // too long, append prefix moves of the solution to the scramble to shorten it.
+    // Rejects scrambles where xcross optimal <= cross optimal (free F2L pair).
     const findValidScramble = async () => {
-      const scrambleAlg = await randomScrambleForEvent('333');
-      const baseScramble = scrambleAlg.toString();
-      const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
-      const solutions = solveXCross(basePattern, face, solverSlots);
+      for (let outerAttempt = 0; outerAttempt < 20; outerAttempt++) {
+        const scrambleAlg = await randomScrambleForEvent('333');
+        const baseScramble = scrambleAlg.toString();
+        const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
+        const solutions = solveXCross(basePattern, face, solverSlots);
 
-      if (solutions.length === 0) return null;
+        if (solutions.length === 0) continue;
+        const crossOpt = getCrossOptimalIfValid(basePattern, solutions);
+        if (crossOpt === null) continue;
 
-      // No filter: use as-is
-      if (targetMoves === 0) {
-        return { moves: baseScramble, solutions };
-      }
-
-      // Check if any solution already matches
-      if (solutions.some(s => s.moveCount === targetMoves)) {
-        return { moves: baseScramble, solutions };
-      }
-
-      // Solution too long: shorten by appending prefix moves to the scramble
-      const best = solutions[0];
-      if (best.moveCount > targetMoves) {
-        const solMoves = best.solution.split(/\s+/).filter(Boolean);
-        const prefixMoves = solMoves.slice(0, solMoves.length - targetMoves);
-        const newScrambleMoves = simplifyMoves([
-          ...baseScramble.split(/\s+/).filter(Boolean),
-          ...prefixMoves,
-        ]);
-        const newScramble = newScrambleMoves.join(' ');
-        const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
-        const newSolutions = solveXCross(newPattern, face, solverSlots);
-        if (newSolutions.some(s => s.moveCount === targetMoves)) {
-          return { moves: newScramble, solutions: newSolutions };
+        // No filter: use as-is
+        if (targetMoves === 0) {
+          return { moves: baseScramble, solutions, crossOptimal: crossOpt };
         }
-      }
 
-      // Solution too short (rare): just retry a few times
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const retryAlg = await randomScrambleForEvent('333');
-        const retryMoves = retryAlg.toString();
-        const retryPattern = kpuzzle.defaultPattern().applyAlg(retryMoves);
-        const retrySolutions = solveXCross(retryPattern, face, solverSlots);
-        if (retrySolutions.some(s => s.moveCount === targetMoves)) {
-          return { moves: retryMoves, solutions: retrySolutions };
+        // Check if any solution already matches
+        if (solutions.some(s => s.moveCount === targetMoves)) {
+          return { moves: baseScramble, solutions, crossOptimal: crossOpt };
+        }
+
+        // Solution too long: shorten by appending prefix moves to the scramble
+        const best = solutions[0];
+        if (best.moveCount > targetMoves) {
+          const solMoves = best.solution.split(/\s+/).filter(Boolean);
+          const prefixMoves = solMoves.slice(0, solMoves.length - targetMoves);
+          const newScrambleMoves = simplifyMoves([
+            ...baseScramble.split(/\s+/).filter(Boolean),
+            ...prefixMoves,
+          ]);
+          const newScramble = newScrambleMoves.join(' ');
+          const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
+          const newSolutions = solveXCross(newPattern, face, solverSlots);
+          if (newSolutions.some(s => s.moveCount === targetMoves)) {
+            const newCrossOpt = getCrossOptimalIfValid(newPattern, newSolutions);
+            if (newCrossOpt !== null) {
+              return { moves: newScramble, solutions: newSolutions, crossOptimal: newCrossOpt };
+            }
+          }
         }
       }
 
@@ -282,16 +296,18 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
     findValidScramble().then((found) => {
       if (found) {
-        const { moves, solutions } = found;
+        const { moves, solutions, crossOptimal: crossOpt } = found;
         scrambleRef.current = moves;
         setScramble(moves);
         setOptimalSolutions(solutions);
+        setCrossOptimal(crossOpt);
         const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
         setTargetSlot((match.length > 0 ? match[0] : solutions[0]).slot);
       } else {
         scrambleRef.current = '';
         setScramble('');
         setOptimalSolutions([]);
+        setCrossOptimal(-1);
         setTargetSlot('');
       }
       setSolving(false);
@@ -653,6 +669,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                   <Text fz="sm" c="dimmed">No {xcrossMoveCount}-move solutions</Text>
                 ) : (
                   <Stack gap="xs">
+                    {crossOptimal >= 0 && (
+                      <Text fz="xs" c="dimmed">Cross optimal: {crossOptimal} moves</Text>
+                    )}
                     {Object.entries(solutionsBySlot).map(([slot, sols]) => {
                       const moveCount = sols[0].solution.split(' ').filter(Boolean).length;
                       return (
@@ -804,6 +823,17 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               value={xcrossMoveCount}
               onChange={setXcrossMoveCount}
               marks={[{ value: 0, label: 'any' }, { value: 5, label: '5' }, { value: 10, label: '10' }]}
+              size="sm"
+              mb="xs"
+            />
+            <Text fz="sm">Min extra over cross: {minExtraMoves}</Text>
+            <Slider
+              min={0}
+              max={5}
+              step={1}
+              value={minExtraMoves}
+              onChange={setMinExtraMoves}
+              marks={[{ value: 0, label: '0' }, { value: 5, label: '5' }]}
               size="sm"
               mb="xs"
             />
