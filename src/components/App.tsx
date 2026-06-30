@@ -15,6 +15,7 @@ import WelcomeView from './WelcomeView';
 import ReportsView from './ReportsView';
 import MinigamesSection from './MinigamesSection';
 import CrossTrainerView from './CrossTrainerView';
+import XCrossTrainerView from './XCrossTrainerView';
 import OLLPredictionView from './FinalF2LView';
 import { F2L_DB } from '../util/algDatabase';
 import { generateFRFLSample } from '../util/f2lGenerator';
@@ -247,6 +248,8 @@ const App: React.FC = () => {
           return <WelcomeView />;
       case 'CrossTrainerView':
         return <CrossTrainerView conn={conn} settings={settings} />;
+      case 'XCrossTrainerView':
+        return <XCrossTrainerView conn={conn} settings={settings} />;
       case 'FinalF2LView':
         return <OLLPredictionView conn={conn} settings={settings} />;
       default:
@@ -287,6 +290,7 @@ const App: React.FC = () => {
           <MinigamesSection
             onFRFL={handleFRFL}
             onOptimalCross={() => setView('CrossTrainerView')}
+            onXCross={() => setView('XCrossTrainerView')}
             onFinalF2L={() => setView('FinalF2LView')}
           />
           <Button

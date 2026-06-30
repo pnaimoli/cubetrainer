@@ -5,10 +5,11 @@ import { TbPuzzle } from 'react-icons/tb';
 interface MinigamesSectionProps {
   onFRFL: () => void;
   onOptimalCross: () => void;
+  onXCross: () => void;
   onFinalF2L: () => void;
 }
 
-const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCross, onFinalF2L }) => {
+const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCross, onXCross, onFinalF2L }) => {
   return (
     <Box>
       <Button
@@ -41,6 +42,16 @@ const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCr
           style={{ borderRadius: '0px' }}
         >
           Optimal Cross
+        </Button>
+        <Button
+          fullWidth
+          variant="subtle"
+          color="orange"
+          size="xs"
+          onClick={onXCross}
+          style={{ borderRadius: '0px' }}
+        >
+          XCross
         </Button>
         <Button
           fullWidth

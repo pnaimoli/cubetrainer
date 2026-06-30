@@ -167,6 +167,27 @@ export interface CrossSolution {
   solution: string;
 }
 
+export function crossDepthFromEdgeState(
+  pieces: number[], orientations: number[], crossFace: string = 'D'
+): number {
+  if (!moveTransforms) throw new Error('Cross solver not initialized. Call initCrossSolver() first.');
+  const table = ensureBFSTable(crossFace);
+  const key = encodeState(pieces, orientations);
+  const entry = table.get(key);
+  return entry ? entry.depth : Infinity;
+}
+
+export function crossOptimalDepth(pattern: KPattern, crossFace: string = 'D'): number {
+  if (!moveTransforms) throw new Error('Cross solver not initialized. Call initCrossSolver() first.');
+
+  const table = ensureBFSTable(crossFace);
+  const edgeIndices = FACE_CROSS_EDGES[crossFace];
+  const { pieces, orientations } = extractCrossState(pattern, edgeIndices);
+  const key = encodeState(pieces, orientations);
+  const entry = table.get(key);
+  return entry ? entry.depth : Infinity;
+}
+
 export function solveCross(pattern: KPattern, crossFace: string = 'D'): CrossSolution[] {
   if (!moveTransforms) throw new Error('Cross solver not initialized. Call initCrossSolver() first.');
 
