@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select, RangeSlider } from '@mantine/core';
 // Chip still imported for F2L slot picker
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
@@ -102,6 +102,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
   // Slot selection
   const [selectedSlots, setSelectedSlots] = useLocalStorage<string[]>({ key: 'xcrossSlots', defaultValue: ['FR', 'FL', 'BL', 'BR'], getInitialValueInEffect: false });
+
+  // Move range filter
+  const [xcrossMoveRange, setXcrossMoveRange] = useLocalStorage<[number, number]>({ key: 'xcrossMoveRange', defaultValue: [1, 10], getInitialValueInEffect: false });
 
   // Clear old stats that lack required fields
   useEffect(() => {
@@ -391,15 +394,20 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     download(csvConfig)(csv);
   };
 
-  // Group solutions by slot
+  // Filter solutions by move range, then group by slot
+  const filteredSolutions = useMemo(() =>
+    optimalSolutions.filter(s => s.moveCount >= xcrossMoveRange[0] && s.moveCount <= xcrossMoveRange[1]),
+    [optimalSolutions, xcrossMoveRange],
+  );
+
   const solutionsBySlot = useMemo(() => {
     const groups: Record<string, XCrossSolution[]> = {};
-    for (const sol of optimalSolutions) {
+    for (const sol of filteredSolutions) {
       if (!groups[sol.slot]) groups[sol.slot] = [];
       groups[sol.slot].push(sol);
     }
     return groups;
-  }, [optimalSolutions]);
+  }, [filteredSolutions]);
 
   // DataTable columns
   const timesColumns: DataTableColumn<XCrossStat & { id: number }>[] = [
@@ -499,11 +507,6 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               <Divider label="Scramble" />
 
               <Box px="xs" py="xs">
-                {targetSlot && (
-                  <Text fz="sm" fw={700} c="dimmed" mb={2}>
-                    Target: {targetSlot} slot
-                  </Text>
-                )}
                 {solving && (
                   <Text fz="sm" c="dimmed" mb={2}>Computing solutions...</Text>
                 )}
@@ -535,6 +538,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               {optimalSolutions.length > 0 ? (
                 optimalSolutions[0].moveCount === 0 ? (
                   <Text fz="sm" c="green" fw={700}>Already solved!</Text>
+                ) : filteredSolutions.length === 0 ? (
+                  <Text fz="sm" c="dimmed">No solutions in {xcrossMoveRange[0]}-{xcrossMoveRange[1]} move range</Text>
                 ) : (
                   <Stack gap="xs">
                     {Object.entries(solutionsBySlot).map(([slot, sols]) => (
@@ -674,6 +679,19 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 data={["x", "y", "z"]}
               />
             </Group>
+            <Divider label="Solution Filter" />
+            <Text fz="sm">Move range: {xcrossMoveRange[0]}-{xcrossMoveRange[1]}</Text>
+            <RangeSlider
+              min={1}
+              max={10}
+              step={1}
+              value={xcrossMoveRange}
+              onChange={(val) => setXcrossMoveRange(val as [number, number])}
+              marks={[{ value: 1, label: '1' }, { value: 5, label: '5' }, { value: 10, label: '10' }]}
+              minRange={0}
+              size="sm"
+              mb="xs"
+            />
             <Divider label="F2L Slots" />
             <Chip.Group multiple value={selectedSlots} onChange={(val: string[]) => {
               if (val.length > 0) setSelectedSlots(val);

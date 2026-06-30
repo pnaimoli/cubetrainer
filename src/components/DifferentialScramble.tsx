@@ -69,54 +69,36 @@ export default function DifferentialScramble({
     }
   }, [conn]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const differential = (() => {
+  const differentialContent = (() => {
     if (!conn) {
-      return (
-        <Group gap={4} wrap="wrap" mt={4}>
-          <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
-          <Text fz="sm" c="yellow">connect cube to compute</Text>
-        </Group>
-      );
+      return null;
     }
     if (computing) {
-      return (
-        <Group gap={4} wrap="wrap" mt={4}>
-          <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
-          <Text fz="sm" c="dimmed">computing...</Text>
-        </Group>
-      );
+      return <Text fz="sm" c="dimmed">computing...</Text>;
     }
     if (transitionMoves.length > 0) {
-      return (
-        <Group gap={4} wrap="wrap" mt={4} align="center">
-          <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
-          <ScrambleGuide moves={transitionMoves} conn={conn} onComplete={onScrambleComplete} />
-        </Group>
-      );
+      return <ScrambleGuide moves={transitionMoves} conn={conn} onComplete={onScrambleComplete} />;
     }
     if (!hasComputed.current) {
-      return (
-        <Group gap={4} wrap="wrap" mt={4}>
-          <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
-          <Text fz="sm" c="dimmed">computing...</Text>
-        </Group>
-      );
+      return <Text fz="sm" c="dimmed">computing...</Text>;
     }
-    return (
-      <Group gap={4} wrap="wrap" mt={4}>
-        <Text fz="sm" fw={700} c="dimmed">Differential:</Text>
-        <Text fz="sm" c="green" fw={700}>{phase === 'scrambling' ? 'already at target state' : 'done'}</Text>
-      </Group>
-    );
+    return <Text fz="sm" c="green" fw={700}>{phase === 'scrambling' ? 'already at target state' : 'done'}</Text>;
   })();
 
   return (
     <>
-      <Text fz="xs" c="dimmed" mb={2}>Scramble with White on U, Green on F</Text>
+      <Text fz="sm" fw={700} c="dimmed" mt={4}>Full Scramble (White on U, Green on F):</Text>
       <Group gap={4} wrap="wrap">
         <Text fz="sm" ff="monospace" c="dimmed">{scramble}</Text>
       </Group>
-      {differential}
+      {conn && (
+        <>
+          <Text fz="sm" fw={700} c="dimmed" mt={4}>Differential (White on U, Green on F):</Text>
+          <Group gap={4} wrap="wrap" align="center">
+            {differentialContent}
+          </Group>
+        </>
+      )}
     </>
   );
 }
