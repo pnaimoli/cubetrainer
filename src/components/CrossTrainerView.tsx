@@ -245,6 +245,21 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   // Handle cube moves during solving
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
     if (event.type !== 'MOVE') return;
+
+    // Auto-retry: any cube move after solve triggers retry (ScrambleGuide tracks it independently)
+    if (phase === 'solved') {
+      isRetryRef.current = true;
+      setPhase('scrambling');
+      setResult(null);
+      setFirstMoveTime(null);
+      movesRef.current = [];
+      setMoveCount(0);
+      setGenCount(0);
+      setStartTime(Date.now());
+      setShowSliceWarning(false);
+      return;
+    }
+
     if (phase !== 'solving') return;
 
     const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
@@ -295,6 +310,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
         setResult({ userMoves, optimal, inspectionMs, executionMs });
         setPhase('solved');
+        setTransitionMoves([]);
+        computeTransition(scramble);
 
         if (isSliceRecovery) {
           setShowSliceWarning(true);
