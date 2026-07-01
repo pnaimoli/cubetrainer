@@ -561,6 +561,17 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     movesRef.current = newMoves;
     playerRef.current?.experimentalAddMove(event.move);
 
+    // D4 / D4' retry shortcut (FRFL minigame only)
+    if (generateAlg && newMoves.length >= 4) {
+      const last4 = newMoves.slice(-4).map(m => m.move);
+      if (last4.every(m => m === 'D') || last4.every(m => m === "D'")) {
+        movesRef.current = [];
+        solvedRef.current = false;
+        setStartTime(Date.now());
+        return;
+      }
+    }
+
     const moveString = newMoves.map(move => move.move).join(' ');
     let isSolved = false;
     if (kpuzzle) {
@@ -784,7 +795,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
                   Previous
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
-                  Retry
+                  Retry{generateAlg ? ' [D4]' : ''}
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
                   {historyOffset > 0 ? 'Forward' : 'Skip'}
