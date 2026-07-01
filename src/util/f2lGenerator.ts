@@ -65,54 +65,15 @@ export function mirrorAlg(alg: string): string {
 
 import type { AlgEntry } from './algDatabase';
 
-interface F2LCase {
-  name: string;
-  alg: string;
-}
+const RANDOM_U_TURNS = ['', 'U', "U'", 'U2'];
 
-let parsedF2L: F2LCase[] | null = null;
-
-function parseF2L(f2lPreset: string): F2LCase[] {
-  if (parsedF2L) return parsedF2L;
-  parsedF2L = f2lPreset.trim().split('\n').map(line => {
-    const parts = line.split(',').map(s => s.trim());
-    return { name: parts[0], alg: parts[1] };
-  });
-  return parsedF2L;
-}
-
-// Fisher-Yates shuffle
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-export function generateFRFLSample(f2lPreset: string, count: number): string;
-export function generateFRFLSample(entries: AlgEntry[], count: number): string;
-export function generateFRFLSample(input: string | AlgEntry[], count: number): string {
-  const cases: F2LCase[] = typeof input === 'string'
-    ? parseF2L(input)
-    : input.map(e => ({ name: e.name, alg: e.alg }));
-
-  // Generate all combos as [frIndex, flIndex] pairs
-  const allCombos: [number, number][] = [];
-  for (let i = 0; i < cases.length; i++) {
-    for (let j = 0; j < cases.length; j++) {
-      allCombos.push([i, j]);
-    }
-  }
-
-  const sampled = shuffle(allCombos).slice(0, count);
-
-  return sampled.map(([fi, fj]) => {
-    const fr = cases[fi];
-    const fl = cases[fj];
-    const derotatedFr = derotateAlg(fr.alg);
-    const derotatedFl = derotateAlg(mirrorAlg(fl.alg));
-    return `${fr.name}+${fl.name}, ${derotatedFr} ${derotatedFl}, F2L`;
-  }).join('\n');
+export function generateOneFRFL(flEntries: AlgEntry[], frEntries: AlgEntry[]): { name: string; alg: string } {
+  const fl = flEntries[Math.floor(Math.random() * flEntries.length)];
+  const fr = frEntries[Math.floor(Math.random() * frEntries.length)];
+  const derotatedFr = derotateAlg(fr.alg);
+  const randomU = RANDOM_U_TURNS[Math.floor(Math.random() * RANDOM_U_TURNS.length)];
+  const derotatedFl = derotateAlg(mirrorAlg(fl.alg));
+  // Solution order: FR then FL. Inverse (setup) scrambles FL first, then FR.
+  const algParts = [derotatedFr, randomU, derotatedFl].filter(Boolean);
+  return { name: `FL:${fl.name} FR:${fr.name}`, alg: algParts.join(' ') };
 }

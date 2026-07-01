@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button, Tooltip, Collapse, UnstyledButton } from '@mantine/core';
+import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button, Tooltip, Collapse, UnstyledButton, Divider, Checkbox } from '@mantine/core';
 import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbAlertTriangle, TbChevronDown, TbChevronUp } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
 import 'cubing/twisty';
@@ -19,6 +19,7 @@ import SolveTimer, { SolveTimerHandle } from './SolveTimer';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
 import SettingsView from './SettingsView';
+import { F2L_DB } from '../util/algDatabase';
 
 const initializeCurrentAlg = (initialAlg: Alg | null, currentAlgSet: AlgSet, settings: Settings): Alg => {
   if (initialAlg) {
@@ -84,12 +85,21 @@ const recomputeMirrorAcrossS = (mirrorAcrossS: boolean, randomizeMirrorAcrossS: 
   }
 };
 
+interface FRFLSelectorProps {
+  selectedFL: number[];
+  setSelectedFL: (selected: number[]) => void;
+  selectedFR: number[];
+  setSelectedFR: (selected: number[]) => void;
+}
+
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
   conn: GanCubeConnection | null;
   settings: Settings;
   initialAlg: Alg | null;
   disableAlgSelection?: boolean;
+  generateAlg?: () => Alg;
+  frflSelector?: FRFLSelectorProps;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -252,11 +262,61 @@ const DebugMovesTable = React.forwardRef<DebugMovesTableHandle>((_, ref) => {
 });
 
 ///////////////////////////////////////////////////////////////////////////////
+// FRFLCaseSelector
+///////////////////////////////////////////////////////////////////////////////
+const F2LSlotSelector: React.FC<{ label: string; selected: number[]; setSelected: (s: number[]) => void }> = ({ label, selected, setSelected }) => {
+  const [show, setShow] = useState(false);
+
+  const toggleCase = (index: number) => {
+    if (selected.includes(index)) {
+      if (selected.length <= 1) return;
+      setSelected(selected.filter(i => i !== index));
+    } else {
+      setSelected([...selected, index]);
+    }
+  };
+
+  return (
+    <>
+      <Divider label={label} />
+      <Group gap="xs">
+        <Button size="xs" variant="subtle" onClick={() => setSelected(F2L_DB.map((_, i) => i))}>All</Button>
+        <Button size="xs" variant="subtle" onClick={() => setSelected([0])}>None</Button>
+        <Button size="xs" variant="subtle" onClick={() => setShow(s => !s)}>
+          {show ? 'Hide' : 'Show'} ({selected.length}/{F2L_DB.length})
+        </Button>
+      </Group>
+      <Collapse in={show}>
+        <Stack gap={2}>
+          {F2L_DB.map((entry, i) => (
+            <Checkbox
+              key={i}
+              label={`${entry.name}: ${entry.alg}`}
+              checked={selected.includes(i)}
+              onChange={() => toggleCase(i)}
+              size="xs"
+              styles={{ label: { fontFamily: 'monospace', fontSize: '0.7rem' } }}
+            />
+          ))}
+        </Stack>
+      </Collapse>
+    </>
+  );
+};
+
+const FRFLCaseSelector: React.FC<FRFLSelectorProps> = ({ selectedFL, setSelectedFL, selectedFR, setSelectedFR }) => (
+  <Stack gap="xs" p="xs">
+    <F2LSlotSelector label="FL Case Selection (1st)" selected={selectedFL} setSelected={setSelectedFL} />
+    <F2LSlotSelector label="FR Case Selection (2nd)" selected={selectedFR} setSelected={setSelectedFR} />
+  </Stack>
+);
+
+///////////////////////////////////////////////////////////////////////////////
 // TrainerView
 ///////////////////////////////////////////////////////////////////////////////
-const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg, disableAlgSelection = false }) => {
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg, disableAlgSelection = false, generateAlg, frflSelector }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
-  const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
+  const [currentAlg, setCurrentAlg] = useState<Alg>(() => generateAlg ? generateAlg() : initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const movesRef = useRef<Move[]>([]);
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
@@ -278,6 +338,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const timerRef = useRef<SolveTimerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const solvedRef = useRef(false);
 
   const currentStats = stats[currentAlgSet.id] || [];
   const historyStat = historyOffset > 0
@@ -449,7 +510,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // Handle cube move event
   /////////////////////////////////////////////////////////////////////////////
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
-    if (event.type !== "MOVE") return;
+    if (event.type !== "MOVE" || solvedRef.current) return;
 
     const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
 
@@ -512,6 +573,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       return;
     }
 
+    solvedRef.current = true;
+
     const newSolveStat: SolveStat = {
       name: displayedAlg.name,
       timeOfSolve: new Date().toISOString(),
@@ -543,10 +606,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           ]
         };
       });
-      const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
-
-      setCurrentAlg(newCurrentAlg);
-      setShuffleQueue(newShuffleQueue);
+      if (generateAlg) {
+        setCurrentAlg(generateAlg());
+      } else {
+        const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
+        setCurrentAlg(newCurrentAlg);
+        setShuffleQueue(newShuffleQueue);
+      }
       setHistoryOffset(0);
       setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
       setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
@@ -555,6 +621,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
       setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
       movesRef.current = [];
+      solvedRef.current = false;
 
       setStartTime(Date.now());
     };
@@ -568,7 +635,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [displayedAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
       kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomPreUs, displayedRandomUs,
       displayedRandomYs, settings, shuffleQueue, displayedPreorientation,
-      currentAlg, setStats]);
+      currentAlg, setStats, generateAlg]);
 
   /////////////////////////////////////////////////////////////////////////////
   // useEffects
@@ -666,12 +733,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (historyOffset >= currentStats.length) return;
     setHistoryOffset(prev => prev + 1);
     movesRef.current = [];
+    solvedRef.current = false;
 
     setStartTime(Date.now());
   };
 
   const handleRestart = () => {
     movesRef.current = [];
+    solvedRef.current = false;
 
     setStartTime(Date.now());
   };
@@ -680,7 +749,8 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (historyOffset > 0) {
       setHistoryOffset(prev => prev - 1);
       movesRef.current = [];
-  
+      solvedRef.current = false;
+
       setStartTime(Date.now());
       return;
     }
@@ -694,6 +764,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
     setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
     movesRef.current = [];
+    solvedRef.current = false;
 
     setStartTime(Date.now());
   };
@@ -767,6 +838,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Box pt="xs">
             <SettingsView disableAlgSelection={disableAlgSelection} />
           </Box>
+          {frflSelector && <FRFLCaseSelector {...frflSelector} />}
         </Card>
       </Grid.Col>
     </Grid>

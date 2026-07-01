@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
@@ -18,7 +18,7 @@ import CrossTrainerView from './CrossTrainerView';
 import XCrossTrainerView from './XCrossTrainerView';
 import OLLPredictionView from './FinalF2LView';
 import { F2L_DB } from '../util/algDatabase';
-import { generateFRFLSample } from '../util/f2lGenerator';
+import { generateOneFRFL } from '../util/f2lGenerator';
 
 // One-time migration: assign ids to AlgSets and re-key stats.
 // Runs synchronously before hooks read localStorage so every useLocalStorage
@@ -207,16 +207,31 @@ const App: React.FC = () => {
     </Flex>
   );
 
+  const [selectedFLCases, setSelectedFLCases] = useLocalStorage<number[]>({
+    key: 'frfl_selectedFL',
+    defaultValue: F2L_DB.map((_, i) => i),
+  });
+  const [selectedFRCases, setSelectedFRCases] = useLocalStorage<number[]>({
+    key: 'frfl_selectedFR',
+    defaultValue: F2L_DB.map((_, i) => i),
+  });
+
+  const generateFRFLAlg = useRef((fl: number[], fr: number[]): Alg => {
+    const flEntries = fl.length > 0 ? fl.map(i => F2L_DB[i]) : [F2L_DB[0]];
+    const frEntries = fr.length > 0 ? fr.map(i => F2L_DB[i]) : [F2L_DB[0]];
+    const { name, alg } = generateOneFRFL(flEntries, frEntries);
+    return { name, alg: alg.split(/\s+/) as ValidMove[], solved: SolvedState.F2L };
+  });
+
+  const frflGenerateAlg = useCallback(
+    () => generateFRFLAlg.current(selectedFLCases, selectedFRCases),
+    [selectedFLCases, selectedFRCases]
+  );
+
   const handleFRFL = () => {
-    const csv = generateFRFLSample(F2L_DB, 100);
-    const algs: Alg[] = csv.trim().split('\n').map(line => {
-      const parts = line.split(',').map(s => s.trim());
-      const [name, alg] = parts;
-      const algMoves = alg.split(/\s+/) as ValidMove[];
-      return { name, alg: algMoves, solved: SolvedState.F2L };
-    });
-    const algSet: AlgSet = { id: 'minigame-frfl', name: 'FR+FL Slot Game', algs };
-    setInitialAlg(null);
+    const initial = frflGenerateAlg();
+    const algSet: AlgSet = { id: 'minigame-frfl', name: 'FR+FL Slot Game', algs: [initial] };
+    setInitialAlg(initial);
     setCurrentAlgSet(algSet);
     setView('TrainerView');
   };
@@ -238,7 +253,7 @@ const App: React.FC = () => {
         }} />;
       case 'TrainerView':
         if (currentAlgSet)
-          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} disableAlgSelection={currentAlgSet.id.startsWith('minigame-')} />;
+          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} disableAlgSelection={currentAlgSet.id.startsWith('minigame-')} generateAlg={currentAlgSet.id === 'minigame-frfl' ? frflGenerateAlg : undefined} frflSelector={currentAlgSet.id === 'minigame-frfl' ? { selectedFL: selectedFLCases, setSelectedFL: setSelectedFLCases, selectedFR: selectedFRCases, setSelectedFR: setSelectedFRCases } : undefined} />;
         else
           return <WelcomeView />;
       case 'ReportsView':
