@@ -84,6 +84,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const [moveCount, setMoveCount] = useState(0);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
   const isRetryRef = useRef(false);
+  const solvedRef = useRef(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [solving, setSolving] = useState(false);
@@ -224,6 +225,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setCrossFace(face);
     setExtraRotation(extra);
     isRetryRef.current = false;
+    solvedRef.current = false;
     setPhase('scrambling');
     setResult(null);
     movesRef.current = [];
@@ -360,9 +362,10 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
     if (phase === 'solved') {
       isRetryRef.current = true;
+      solvedRef.current = false;
       setPhase('scrambling');
       setResult(null);
-  
+
       movesRef.current = [];
       setMoveCount(0);
       setStartTime(Date.now());
@@ -370,7 +373,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       return;
     }
 
-    if (phase !== 'solving') return;
+    if (phase !== 'solving' || solvedRef.current) return;
 
     const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
     const now = Date.now();
@@ -409,6 +412,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       const isSolved = checkXCrossSolved(currentPattern, targetSlot);
 
       if (isSolved) {
+        solvedRef.current = true;
         const firstMove = newMoves[0].timeOfMove;
         const lastMove = newMoves[newMoves.length - 1].timeOfMove;
         const inspectionMs = firstMove - startTime;
@@ -462,6 +466,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
   const handleRetry = () => {
     isRetryRef.current = true;
+    solvedRef.current = false;
     setPhase('scrambling');
     setResult(null);
 
