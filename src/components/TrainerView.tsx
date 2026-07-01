@@ -833,7 +833,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       <Grid.Col span={4}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
-            <Title order={2} mt="xs" mb="xs">Settings</Title>
+            <Title order={2}>Settings</Title>
           </Card.Section>
           <Box pt="xs">
             <SettingsView disableAlgSelection={disableAlgSelection} />

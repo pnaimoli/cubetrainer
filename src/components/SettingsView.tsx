@@ -31,7 +31,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ disableAlgSelection = false
   const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
 
   return (
-    <Stack>
+    <Stack gap="xs">
       <Divider label="Alg Selection" />
       <Group>
         <Group
