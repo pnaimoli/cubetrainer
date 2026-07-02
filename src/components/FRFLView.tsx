@@ -323,9 +323,10 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
 
     cubeTimerRef.current?.stop();
 
-    // Defer stats write to avoid blocking the UI on the final move.
-    // localStorage serialization + cross-component event dispatch is heavy.
-    setTimeout(() => {
+    // Defer stats write until after the post-solve delay so localStorage
+    // serialization doesn't block the main thread during the final move animation.
+    const delay = settings.postSolveDelay * 1000;
+    postSolveTimeoutRef.current = setTimeout(() => {
       setStats(prevStats => ({
         ...prevStats,
         [ALGSET_ID]: [
@@ -333,14 +334,8 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
           newSolveStat
         ]
       }));
-    }, 0);
-
-    const delay = settings.postSolveDelay * 1000;
-    if (delay > 0) {
-      postSolveTimeoutRef.current = setTimeout(advanceToNext, delay);
-    } else {
       advanceToNext();
-    }
+    }, delay);
   }, [currentAlg, setupAlg, effectiveSolvedState, kpuzzle, mirrorAcrossM, mirrorAcrossS,
       randomPreUs, randomUs, randomYs, settings, preorientationMoves, setStats, advanceToNext]);
 
