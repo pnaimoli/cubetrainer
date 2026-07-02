@@ -13,7 +13,7 @@ interface TimesListViewProps {
 }
 
 const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName, maxHeight }) => {
-  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
+  const [allStats, setAllStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {}, getInitialValueInEffect: false });
   const [stats, setStats] = useState<SolveStat[]>([]);
 
   useEffect(() => {

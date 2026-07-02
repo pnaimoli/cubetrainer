@@ -3,8 +3,6 @@ import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Collapse, Divider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { TbArrowRight, TbRefresh, TbEye, TbEyeOff } from 'react-icons/tb';
-import 'cubing/twisty';
-import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -13,10 +11,9 @@ import { Settings, SolvedState, Move } from '../util/interfaces';
 import { FACE_TO_D_ROTATION } from '../util/crossRotation';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { F2L_DB, OLL_DB } from '../util/algDatabase';
 import SettingsView from './SettingsView';
-import SolveTimer, { SolveTimerHandle } from './SolveTimer';
+import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
 
 interface OLLPredictionStat {
@@ -32,24 +29,6 @@ interface OLLPredictionViewProps {
   conn: GanCubeConnection | null;
   settings: Settings;
 }
-
-const CubePlayer = React.memo(({ playerRef, setupAlg, showHintFacelets }: {
-  playerRef: React.RefObject<TwistyPlayer | null>;
-  setupAlg: string;
-  showHintFacelets: boolean;
-}) => (
-  <twisty-player
-    ref={playerRef}
-    visualization="PG3D"
-    control-panel="none"
-    background="none"
-    puzzle="3x3x3"
-    tempo-scale="4"
-    hint-facelets={showHintFacelets ? "true" : "none"}
-    experimental-setup-alg={setupAlg}
-    style={{ width: "300px", height: "300px" }}
-  />
-));
 
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -109,10 +88,12 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   const [selectedF2L, setSelectedF2L] = useLocalStorage<number[]>({
     key: F2L_CASES_KEY,
     defaultValue: F2L_DB.map((_, i) => i),
+    getInitialValueInEffect: false,
   });
   const [selectedOLL, setSelectedOLL] = useLocalStorage<number[]>({
     key: OLL_CASES_KEY,
     defaultValue: OLL_DB.map((_, i) => i),
+    getInitialValueInEffect: false,
   });
   const [showF2LSelector, setShowF2LSelector] = useState(false);
   const [showOLLSelector, setShowOLLSelector] = useState(false);
@@ -126,8 +107,8 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   );
 
   const movesRef = useRef<Move[]>([]);
-  const [startTime, setStartTime] = useState<number>(Date.now());
-  const [localSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: settings });
+  const [caseKey, setCaseKey] = useState(0);
+  const [localSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: settings, getInitialValueInEffect: false });
   const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
   const preorientationMoves = preorientationResult.moves;
   const [randomPreUs, setRandomPreUs] = useState<number>(recomputeRandomUs(localSettings.randomPreAUF));
@@ -137,12 +118,12 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   const [mirrorAcrossS, setMirrorAcrossS] = useState<boolean>(recomputeMirrorAcrossS(localSettings.mirrorAcrossS, localSettings.randomizeMirrorAcrossS));
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
 
-  const [ollStats, setOllStats] = useLocalStorage<OLLPredictionStat[]>({ key: OLL_STATS_KEY, defaultValue: [] });
+  const [ollStats, setOllStats] = useLocalStorage<OLLPredictionStat[]>({ key: OLL_STATS_KEY, defaultValue: [], getInitialValueInEffect: false });
 
-  const playerRef = useRef<TwistyPlayer>(null);
-  const timerRef = useRef<SolveTimerHandle>(null);
+  const cubeTimerRef = useRef<CubeTimerPlayerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSettingsRef = useRef(localSettings);
 
   const currentF2L = F2L_DB[currentF2LIndex];
   const currentOLL = OLL_DB[currentOLLIndex];
@@ -241,27 +222,6 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     fetchPuzzle();
   }, []);
 
-  // Apply stickering mask
-  useEffect(() => {
-    if (!playerRef.current) return;
-    playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-  }, [stickeringMask]);
-
-  // Reset player alg on new case
-  useEffect(() => {
-    if (movesRef.current.length === 0 && playerRef.current) {
-      playerRef.current.alg = '';
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [startTime, stickeringMask]);
-
-  // When maskAfterFirstMove is unchecked mid-solve, restore normal stickering
-  useEffect(() => {
-    if (!localSettings.maskAfterFirstMove && playerRef.current) {
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [localSettings.maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     return () => {
       if (postSolveTimeoutRef.current) clearTimeout(postSolveTimeoutRef.current);
@@ -278,7 +238,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     setMirrorAcrossM(recomputeMirrorAcrossM(localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM));
     setMirrorAcrossS(recomputeMirrorAcrossS(localSettings.mirrorAcrossS, localSettings.randomizeMirrorAcrossS));
     movesRef.current = [];
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   }, [selectedF2L, selectedOLL, localSettings]);
 
   const recordStat = useCallback((correct: boolean) => {
@@ -306,20 +266,13 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     const timeOfMove = isSliceRecovery ? prevMoves[prevMoves.length - 1].timeOfMove : now;
 
     if (movesRef.current.length === 0) {
-      timerRef.current?.firstMove(timeOfMove);
-      // Mask after first move
-      if (localSettings.maskAfterFirstMove && kpuzzle && playerRef.current) {
-        const blindMask = new PuzzleStickering(kpuzzle);
-        const mgr = new StickeringManager(kpuzzle);
-        blindMask.set(mgr.all(), PieceStickering.Ignored);
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(blindMask.toStickeringMask());
-      }
+      cubeTimerRef.current?.firstMove(timeOfMove);
     }
 
     const newMove = { move: event.move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
-    playerRef.current?.experimentalAddMove(event.move);
+    cubeTimerRef.current?.addMove(event.move);
 
     const moveString = newMoves.map(m => m.move).join(' ');
     let isSolved = false;
@@ -333,7 +286,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       return;
     }
 
-    timerRef.current?.stopAt(timeOfMove);
+    cubeTimerRef.current?.stopAt(timeOfMove);
     recordStat(true);
 
     const delay = localSettings.postSolveDelay * 1000;
@@ -358,35 +311,29 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     }
   }, [conn]);
 
-  // Settings effects
+  // Re-randomize only when the user actually changes a setting mid-session.
+  // Comparing against previous values avoids re-rolling on mount/StrictMode re-mount.
   useEffect(() => {
-    setRandomPreUs(recomputeRandomUs(localSettings.randomPreAUF));
-  }, [localSettings.randomPreAUF]);
-
-  useEffect(() => {
-    setRandomUs(recomputeRandomUs(localSettings.randomAUF));
-  }, [localSettings.randomAUF]);
-
-  useEffect(() => {
-    setRandomYs(recomputeRandomYs(localSettings.randomYs));
-  }, [localSettings.randomYs]);
-
-  useEffect(() => {
-    setPreorientationResult(recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
-  }, [localSettings.crossFaces, localSettings.randomRotations1]);
-
-  useEffect(() => {
-    setMirrorAcrossM(recomputeMirrorAcrossM(localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM));
-  }, [localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM]);
-
-  useEffect(() => {
-    setMirrorAcrossS(recomputeMirrorAcrossS(localSettings.mirrorAcrossS, localSettings.randomizeMirrorAcrossS));
-  }, [localSettings.mirrorAcrossS, localSettings.randomizeMirrorAcrossS]);
+    const prev = prevSettingsRef.current;
+    prevSettingsRef.current = localSettings;
+    if (prev.randomPreAUF !== localSettings.randomPreAUF)
+      setRandomPreUs(recomputeRandomUs(localSettings.randomPreAUF));
+    if (prev.randomAUF !== localSettings.randomAUF)
+      setRandomUs(recomputeRandomUs(localSettings.randomAUF));
+    if (prev.randomYs !== localSettings.randomYs)
+      setRandomYs(recomputeRandomYs(localSettings.randomYs));
+    if (prev.crossFaces.join() !== localSettings.crossFaces.join() || prev.randomRotations1 !== localSettings.randomRotations1)
+      setPreorientationResult(recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
+    if (prev.mirrorAcrossM !== localSettings.mirrorAcrossM || prev.randomizeMirrorAcrossM !== localSettings.randomizeMirrorAcrossM)
+      setMirrorAcrossM(recomputeMirrorAcrossM(localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM));
+    if (prev.mirrorAcrossS !== localSettings.mirrorAcrossS || prev.randomizeMirrorAcrossS !== localSettings.randomizeMirrorAcrossS)
+      setMirrorAcrossS(recomputeMirrorAcrossS(localSettings.mirrorAcrossS, localSettings.randomizeMirrorAcrossS));
+  });
 
   const handleRestart = () => {
     if (movesRef.current.length > 0) recordStat(false);
     movesRef.current = [];
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   };
 
   const handleNext = () => {
@@ -444,10 +391,15 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
               }: {caseHidden ? '???' : `F2L-${currentF2L.name} + OLL-${currentOLL.name}`}
             </Title>
           </Card.Section>
-          <Stack align="center" gap={0} mt="xs">
-            <SolveTimer key={startTime} ref={timerRef} />
-            <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={localSettings.showHintFacelets} />
-          </Stack>
+          <CubeTimerPlayer
+            ref={cubeTimerRef}
+            setupAlg={setupAlg}
+            showHintFacelets={localSettings.showHintFacelets}
+            stickeringMask={stickeringMask}
+            kpuzzle={kpuzzle}
+            maskAfterFirstMove={localSettings.maskAfterFirstMove}
+            caseKey={caseKey}
+          />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>

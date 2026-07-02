@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button, Tooltip, Collapse, UnstyledButton, Divider, Checkbox } from '@mantine/core';
-import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbAlertTriangle, TbChevronDown, TbChevronUp } from 'react-icons/tb';
+import { Grid, Card, Box, Text, Badge, Title, Group, Stack, Button, Tooltip } from '@mantine/core';
+import { TbArrowLeft, TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbAlertTriangle } from 'react-icons/tb';
 import { useLocalStorage } from '@mantine/hooks';
-import 'cubing/twisty';
-import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -13,14 +11,11 @@ import { Settings, AlgSet, Alg, SolvedState, SolveStat, Move } from '../util/int
 import { FACE_TO_D_ROTATION } from '../util/crossRotation';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { getNextAlg, ShuffleQueue } from '../util/playlist';
-import SolveTimer, { SolveTimerHandle } from './SolveTimer';
+import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import SummaryStatsView from './SummaryStatsView';
 import TimesListView from './TimesListView';
 import SettingsView from './SettingsView';
-import { F2L_DB } from '../util/algDatabase';
-
 const initializeCurrentAlg = (initialAlg: Alg | null, currentAlgSet: AlgSet, settings: Settings): Alg => {
   if (initialAlg) {
     return initialAlg;
@@ -85,43 +80,13 @@ const recomputeMirrorAcrossS = (mirrorAcrossS: boolean, randomizeMirrorAcrossS: 
   }
 };
 
-interface FRFLSelectorProps {
-  selectedFL: number[];
-  setSelectedFL: (selected: number[]) => void;
-  selectedFR: number[];
-  setSelectedFR: (selected: number[]) => void;
-}
-
 interface TrainerViewProps {
   currentAlgSet: AlgSet;
   conn: GanCubeConnection | null;
   settings: Settings;
   initialAlg: Alg | null;
   disableAlgSelection?: boolean;
-  generateAlg?: () => Alg;
-  frflSelector?: FRFLSelectorProps;
 }
-
-///////////////////////////////////////////////////////////////////////////////
-// CubePlayer - memoized to prevent re-renders from re-applying attributes
-///////////////////////////////////////////////////////////////////////////////
-const CubePlayer = React.memo(({ playerRef, setupAlg, showHintFacelets }: {
-  playerRef: React.RefObject<TwistyPlayer | null>;
-  setupAlg: string;
-  showHintFacelets: boolean;
-}) => (
-  <twisty-player
-    ref={playerRef}
-    visualization="PG3D"
-    control-panel="none"
-    background="none"
-    puzzle="3x3x3"
-    tempo-scale="4"
-    hint-facelets={showHintFacelets ? "true" : "none"}
-    experimental-setup-alg={setupAlg}
-    style={{ width: "300px", height: "300px" }}
-  />
-));
 
 ///////////////////////////////////////////////////////////////////////////////
 // SolvedStateBadges
@@ -182,143 +147,13 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
 );
 
 ///////////////////////////////////////////////////////////////////////////////
-// DebugMovesTable
-///////////////////////////////////////////////////////////////////////////////
-interface DebugMoveEntry {
-  move: string;
-  dateNowDelta: number;
-  cubeTimestampDelta: number | null;
-  sliceRecovered?: boolean;
-}
-
-export interface DebugMovesTableHandle {
-  addMove: (entry: DebugMoveEntry) => void;
-  clear: () => void;
-}
-
-const RECOVERED_TOOLTIP = "This move was recovered from cube history, not received in real time. Its timestamp was adjusted to match the paired slice move.";
-const MISSING_TIMESTAMP_TOOLTIP = "No cube timestamp available. This move was recovered from cube history rather than received via BLE notification.";
-
-const DebugMovesTable = React.forwardRef<DebugMovesTableHandle>((_, ref) => {
-  const [moves, setMoves] = useState<DebugMoveEntry[]>([]);
-  const [opened, setOpened] = useState(false);
-
-  React.useImperativeHandle(ref, () => ({
-    addMove: (entry: DebugMoveEntry) => setMoves(prev => [...prev, entry]),
-    clear: () => setMoves([]),
-  }));
-
-  return (
-    <Card.Section px="xs">
-      <UnstyledButton
-        onClick={() => setOpened(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '2px 0', color: 'var(--mantine-color-dimmed)', fontSize: '0.7rem' }}
-      >
-        {opened ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />} Move Debug {opened ? <TbChevronUp size={14} /> : <TbChevronDown size={14} />}
-      </UnstyledButton>
-      <Collapse in={opened}>
-        <table style={{ width: '100%', fontSize: '0.75rem', fontFamily: 'monospace', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}>
-              <th style={{ textAlign: 'left', padding: '2px 8px' }}>#</th>
-              <th style={{ textAlign: 'left', padding: '2px 8px' }}>Move</th>
-              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Date.now (s)</th>
-              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Cube (s)</th>
-              <th style={{ textAlign: 'right', padding: '2px 8px' }}>Drift (s)</th>
-              <th style={{ textAlign: 'center', padding: '2px 8px' }}>Rec</th>
-            </tr>
-          </thead>
-          <tbody>
-            {moves.map((d, i) => (
-              <tr key={i}>
-                <td style={{ padding: '2px 8px' }}>{i + 1}</td>
-                <td style={{ padding: '2px 8px' }}>{d.move}</td>
-                <td style={{ textAlign: 'right', padding: '2px 8px' }}>{(d.dateNowDelta / 1000).toFixed(3)}</td>
-                <td style={{ textAlign: 'right', padding: '2px 8px' }}>
-                  {d.cubeTimestampDelta != null
-                    ? (d.cubeTimestampDelta / 1000).toFixed(3)
-                    : <Tooltip label={MISSING_TIMESTAMP_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>-</span></Tooltip>
-                  }
-                </td>
-                <td style={{ textAlign: 'right', padding: '2px 8px' }}>
-                  {d.cubeTimestampDelta != null
-                    ? ((d.dateNowDelta - d.cubeTimestampDelta) / 1000).toFixed(3)
-                    : <Tooltip label={MISSING_TIMESTAMP_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>-</span></Tooltip>
-                  }
-                </td>
-                <td style={{ textAlign: 'center', padding: '2px 8px' }}>
-                  {d.sliceRecovered
-                    ? <Tooltip label={RECOVERED_TOOLTIP} withArrow multiline w={250}><span style={{ cursor: 'help' }}>R</span></Tooltip>
-                    : ''
-                  }
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Collapse>
-    </Card.Section>
-  );
-});
-
-///////////////////////////////////////////////////////////////////////////////
-// FRFLCaseSelector
-///////////////////////////////////////////////////////////////////////////////
-const F2LSlotSelector: React.FC<{ label: string; selected: number[]; setSelected: (s: number[]) => void }> = ({ label, selected, setSelected }) => {
-  const [show, setShow] = useState(false);
-
-  const toggleCase = (index: number) => {
-    if (selected.includes(index)) {
-      if (selected.length <= 1) return;
-      setSelected(selected.filter(i => i !== index));
-    } else {
-      setSelected([...selected, index]);
-    }
-  };
-
-  return (
-    <>
-      <Divider label={label} />
-      <Group gap="xs">
-        <Button size="xs" variant="subtle" onClick={() => setSelected(F2L_DB.map((_, i) => i))}>All</Button>
-        <Button size="xs" variant="subtle" onClick={() => setSelected([0])}>None</Button>
-        <Button size="xs" variant="subtle" onClick={() => setShow(s => !s)}>
-          {show ? 'Hide' : 'Show'} ({selected.length}/{F2L_DB.length})
-        </Button>
-      </Group>
-      <Collapse in={show}>
-        <Stack gap={2}>
-          {F2L_DB.map((entry, i) => (
-            <Checkbox
-              key={i}
-              label={`${entry.name}: ${entry.alg}`}
-              checked={selected.includes(i)}
-              onChange={() => toggleCase(i)}
-              size="xs"
-              styles={{ label: { fontFamily: 'monospace', fontSize: '0.7rem' } }}
-            />
-          ))}
-        </Stack>
-      </Collapse>
-    </>
-  );
-};
-
-const FRFLCaseSelector: React.FC<FRFLSelectorProps> = ({ selectedFL, setSelectedFL, selectedFR, setSelectedFR }) => (
-  <Stack gap="xs" p="xs">
-    <F2LSlotSelector label="FL Case Selection (1st)" selected={selectedFL} setSelected={setSelectedFL} />
-    <F2LSlotSelector label="FR Case Selection (2nd)" selected={selectedFR} setSelected={setSelectedFR} />
-  </Stack>
-);
-
-///////////////////////////////////////////////////////////////////////////////
 // TrainerView
 ///////////////////////////////////////////////////////////////////////////////
-const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg, disableAlgSelection = false, generateAlg, frflSelector }) => {
+const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings, initialAlg, disableAlgSelection = false }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
-  const [currentAlg, setCurrentAlg] = useState<Alg>(() => generateAlg ? generateAlg() : initializeCurrentAlg(initialAlg, currentAlgSet, settings));
+  const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const movesRef = useRef<Move[]>([]);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [caseKey, setCaseKey] = useState(0);
   const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
   const preorientationMoves = preorientationResult.moves;
   const [randomPreUs, setRandomPreUs] = useState<number>(recomputeRandomUs(settings.randomPreAUF));
@@ -331,14 +166,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [caseHidden, setCaseHidden] = useState<boolean>(false);
 
   const [showSliceWarning, setShowSliceWarning] = useState(false);
-  const debugStartRef = useRef<{ dateNow: number; cubeTimestamp: number | null }>({ dateNow: 0, cubeTimestamp: null });
-  const debugTableRef = useRef<DebugMovesTableHandle>(null);
-  const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {} });
-  const playerRef = useRef<TwistyPlayer>(null);
-  const timerRef = useRef<SolveTimerHandle>(null);
+  const [stats, setStats] = useLocalStorage<{ [key: string]: SolveStat[] }>({ key: 'stats', defaultValue: {}, getInitialValueInEffect: false });
+  const cubeTimerRef = useRef<CubeTimerPlayerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const postSolveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const solvedRef = useRef(false);
+  const prevSettingsRef = useRef(settings);
+  const prevInitialAlgRef = useRef(initialAlg);
 
   const currentStats = stats[currentAlgSet.id] || [];
   const historyStat = historyOffset > 0
@@ -461,52 +295,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   }, [settings.useMaskings, kpuzzle, setupAlg, effectiveSolvedState]);
 
   /////////////////////////////////////////////////////////////////////////////
-  // KNOWN BUG: Toggling showHintFacelets or useMaskings while moves have been
-  // made causes the cube to briefly show the wrong state (reverts to one move
-  // behind) until the next move is made.
-  //
-  // Root cause: experimentalAddMove() updates the TwistyPlayer's alg
-  // asynchronously (wraps in a Promise that chains multiple awaits). When a
-  // setting change triggers the player to re-render its 3D scene, it reads the
-  // alg which hasn't resolved yet, so it sees the stale (pre-move) value.
-  //
-  // Even player.alg = "string" is async under the hood - TwistyPropSource.set()
-  // calls deriveFromPromiseOrValue() which does `await input` regardless of
-  // whether input is a Promise or a plain value. So there is NO synchronous way
-  // to set the alg on TwistyPlayer.
-  //
-  // Approaches tried (none worked):
-  //  1. Re-applying moves via player.alg = moveString after setting change
-  //     - Still async, same race condition
-  //  2. Moving hint-facelets and experimental-setup-alg from JSX attributes to
-  //     imperative useEffect setters to avoid React re-setting them on render
-  //     - Didn't help; the bug isn't caused by React re-setting attributes
-  //  3. Creating TwistyPlayer imperatively (new TwistyPlayer(), appendChild)
-  //     instead of <twisty-player> JSX to fully remove it from React's lifecycle
-  //     - Didn't help; the async alg is the issue, not React re-rendering
-  //  4. Setting player.alg synchronously + triggering animation via
-  //     experimentalModel.catchUpMove.set() and timestampRequest.set("end")
-  //     - Bug returned; catchUpMove/timestampRequest trigger re-evaluation
-  //  5. Same as #4 but with queueMicrotask() delay on catchUpMove
-  //     - Didn't help
-  //  6. requestAnimationFrame delay before re-applying alg
-  //     - Didn't help
-  //  7. Upgrading cubing.js from 0.49.0 to 0.63.3
-  //     - Same async architecture, didn't help
-  //
-  // What DOES work (but loses animation):
-  //  - Replacing experimentalAddMove with player.alg = moveString
-  //    This resolves faster (single microtask vs multiple awaits) so the alg is
-  //    settled by the time any setting change re-render occurs. But moves snap
-  //    into place instead of animating.
-  //
-  // Related cubing.js issues:
-  //  - https://github.com/cubing/cubing.js/issues/223 (framework sync getters)
-  //  - https://github.com/cubing/cubing.js/issues/313 (React double-apply)
-  //  - https://github.com/cubing/cubing.js/issues/371 (animation on alg write)
-  /////////////////////////////////////////////////////////////////////////////
-
-  /////////////////////////////////////////////////////////////////////////////
   // Handle cube move event
   /////////////////////////////////////////////////////////////////////////////
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
@@ -526,51 +314,15 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     const timeOfMove = isSliceRecovery ? prevMoves[prevMoves.length - 1].timeOfMove : now;
 
-    // On first move, clear previous debug data and set baselines
     if (movesRef.current.length === 0) {
-      timerRef.current?.firstMove(timeOfMove);
-      debugStartRef.current = { dateNow: now, cubeTimestamp: cubeTs };
+      cubeTimerRef.current?.firstMove(timeOfMove);
       setShowSliceWarning(false);
-      debugTableRef.current?.clear();
-      debugTableRef.current?.addMove({
-        move: event.move,
-        dateNowDelta: now - startTime,
-        cubeTimestampDelta: 0,
-      });
-
-      // Mask after first move: grey out all stickers for blind practice
-      if (settings.maskAfterFirstMove && kpuzzle && playerRef.current) {
-        const blindMask = new PuzzleStickering(kpuzzle);
-        const mgr = new StickeringManager(kpuzzle);
-        blindMask.set(mgr.all(), PieceStickering.Ignored);
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(blindMask.toStickeringMask());
-      }
-    } else {
-      debugTableRef.current?.addMove({
-        move: event.move,
-        dateNowDelta: now - startTime,
-        cubeTimestampDelta: cubeTs != null && debugStartRef.current.cubeTimestamp != null
-          ? cubeTs - debugStartRef.current.cubeTimestamp
-          : null,
-        sliceRecovered: isSliceRecovery,
-      });
     }
 
     const newMove = { move: event.move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
-    playerRef.current?.experimentalAddMove(event.move);
-
-    // D4 / D4' retry shortcut (FRFL minigame only)
-    if (generateAlg && newMoves.length >= 4) {
-      const last4 = newMoves.slice(-4).map(m => m.move);
-      if (last4.every(m => m === 'D') || last4.every(m => m === "D'")) {
-        movesRef.current = [];
-        solvedRef.current = false;
-        setStartTime(Date.now());
-        return;
-      }
-    }
+    cubeTimerRef.current?.addMove(event.move);
 
     const moveString = newMoves.map(move => move.move).join(' ');
     let isSolved = false;
@@ -591,7 +343,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       timeOfSolve: new Date().toISOString(),
       moves: newMoves,
       executionTime: newMoves[newMoves.length-1].timeOfMove - newMoves[0].timeOfMove,
-      recognitionTime: newMoves[0].timeOfMove - startTime,
+      recognitionTime: newMoves[0].timeOfMove - (cubeTimerRef.current?.getStartTime() ?? 0),
       preAUFs: displayedRandomPreUs,
       AUFs: displayedRandomUs,
       Ys: displayedRandomYs,
@@ -602,9 +354,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     if (isSliceRecovery) {
       setShowSliceWarning(true);
-      timerRef.current?.stopAt(timeOfMove);
+      cubeTimerRef.current?.stopAt(timeOfMove);
     } else {
-      timerRef.current?.stop();
+      cubeTimerRef.current?.stop();
     }
 
     const advanceToNext = () => {
@@ -617,13 +369,9 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           ]
         };
       });
-      if (generateAlg) {
-        setCurrentAlg(generateAlg());
-      } else {
-        const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
-        setCurrentAlg(newCurrentAlg);
-        setShuffleQueue(newShuffleQueue);
-      }
+      const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
+      setCurrentAlg(newCurrentAlg);
+      setShuffleQueue(newShuffleQueue);
       setHistoryOffset(0);
       setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
       setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
@@ -634,7 +382,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       movesRef.current = [];
       solvedRef.current = false;
 
-      setStartTime(Date.now());
+      setCaseKey(k => k + 1);
     };
 
     const delay = settings.postSolveDelay * 1000;
@@ -643,10 +391,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     } else {
       advanceToNext();
     }
-  }, [displayedAlg, setupAlg, startTime, currentAlgSet, effectiveSolvedState,
+  }, [displayedAlg, setupAlg, currentAlgSet, effectiveSolvedState,
       kpuzzle, displayedMirrorAcrossM, displayedMirrorAcrossS, displayedRandomPreUs, displayedRandomUs,
       displayedRandomYs, settings, shuffleQueue, displayedPreorientation,
-      currentAlg, setStats, generateAlg]);
+      currentAlg, setStats]);
 
   /////////////////////////////////////////////////////////////////////////////
   // useEffects
@@ -685,51 +433,30 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     if (initialAlg === null) return;
     setCurrentAlg(initialAlg);
 
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   }, [initialAlg]);
 
+  // Re-randomize only when the user actually changes a setting or navigates to a specific alg.
+  // Comparing against previous values avoids re-rolling on mount/StrictMode re-mount.
   useEffect(() => {
-    setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
-  }, [initialAlg, settings.randomPreAUF]);
-
-  useEffect(() => {
-    setRandomUs(recomputeRandomUs(settings.randomAUF));
-  }, [initialAlg, settings.randomAUF]);
-
-  useEffect(() => {
-    setRandomYs(recomputeRandomYs(settings.randomYs));
-  }, [initialAlg, settings.randomYs]);
-
-  useEffect(() => {
-    setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
-  }, [initialAlg, settings.crossFaces, settings.randomRotations1]);
-
-  useEffect(() => {
-    setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
-  }, [initialAlg, settings.mirrorAcrossM, settings.randomizeMirrorAcrossM]);
-
-  useEffect(() => {
-    setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
-  }, [initialAlg, settings.mirrorAcrossS, settings.randomizeMirrorAcrossS]);
-
-  useEffect(() => {
-    if (!playerRef.current) return;
-    playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-  }, [playerRef, stickeringMask]);
-
-  useEffect(() => {
-    if (movesRef.current.length === 0 && playerRef.current) {
-      playerRef.current.alg = '';
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [playerRef, startTime, stickeringMask]);
-
-  // When maskAfterFirstMove is unchecked mid-solve, restore normal stickering
-  useEffect(() => {
-    if (!settings.maskAfterFirstMove && playerRef.current) {
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [settings.maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
+    const prev = prevSettingsRef.current;
+    const prevAlg = prevInitialAlgRef.current;
+    prevSettingsRef.current = settings;
+    prevInitialAlgRef.current = initialAlg;
+    const algChanged = prevAlg !== initialAlg;
+    if (algChanged || prev.randomPreAUF !== settings.randomPreAUF)
+      setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
+    if (algChanged || prev.randomAUF !== settings.randomAUF)
+      setRandomUs(recomputeRandomUs(settings.randomAUF));
+    if (algChanged || prev.randomYs !== settings.randomYs)
+      setRandomYs(recomputeRandomYs(settings.randomYs));
+    if (algChanged || prev.crossFaces.join() !== settings.crossFaces.join() || prev.randomRotations1 !== settings.randomRotations1)
+      setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
+    if (algChanged || prev.mirrorAcrossM !== settings.mirrorAcrossM || prev.randomizeMirrorAcrossM !== settings.randomizeMirrorAcrossM)
+      setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+    if (algChanged || prev.mirrorAcrossS !== settings.mirrorAcrossS || prev.randomizeMirrorAcrossS !== settings.randomizeMirrorAcrossS)
+      setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+  });
 
   useEffect(() => {
     return () => {
@@ -746,14 +473,14 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     movesRef.current = [];
     solvedRef.current = false;
 
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   };
 
   const handleRestart = () => {
     movesRef.current = [];
     solvedRef.current = false;
 
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   };
 
   const handleNext = () => {
@@ -762,7 +489,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       movesRef.current = [];
       solvedRef.current = false;
 
-      setStartTime(Date.now());
+      setCaseKey(k => k + 1);
       return;
     }
     const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
@@ -777,7 +504,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
     movesRef.current = [];
     solvedRef.current = false;
 
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
   };
 
   /////////////////////////////////////////////////////////////////////////////
@@ -795,7 +522,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
                   Previous
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
-                  Retry{generateAlg ? ' [D4]' : ''}
+                  Retry
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
                   {historyOffset > 0 ? 'Forward' : 'Skip'}
@@ -819,20 +546,22 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Card.Section withBorder={true} px="xs">
             <Text>{displayedAlg.alg.join(' ')}</Text>
           </Card.Section>
-          <Stack align="center" gap={0} mt="xs">
-            <div style={{ position: 'relative' }}>
-              <SolveTimer key={startTime} ref={timerRef} />
-              {showSliceWarning && (
-                <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted to match the paired face turn." withArrow>
-                  <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
-                    <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
-                  </span>
-                </Tooltip>
-              )}
-            </div>
-            <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={settings.showHintFacelets} />
-          </Stack>
-          <DebugMovesTable ref={debugTableRef} />
+          <CubeTimerPlayer
+            ref={cubeTimerRef}
+            setupAlg={setupAlg}
+            showHintFacelets={settings.showHintFacelets}
+            stickeringMask={stickeringMask}
+            kpuzzle={kpuzzle}
+            maskAfterFirstMove={settings.maskAfterFirstMove}
+            caseKey={caseKey}
+            timerAdornment={showSliceWarning ? (
+              <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted to match the paired face turn." withArrow>
+                <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
+                  <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
+                </span>
+              </Tooltip>
+            ) : undefined}
+          />
         </Card>
       </Grid.Col>
       <Grid.Col span={4}>
@@ -849,7 +578,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <Box pt="xs">
             <SettingsView disableAlgSelection={disableAlgSelection} />
           </Box>
-          {frflSelector && <FRFLCaseSelector {...frflSelector} />}
         </Card>
       </Grid.Col>
     </Grid>

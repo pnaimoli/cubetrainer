@@ -5,15 +5,12 @@ import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
 import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp } from 'react-icons/tb';
-import 'cubing/twisty';
-import { TwistyPlayer } from 'cubing/twisty';
 import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { PuzzleStickering, PieceStickering, StickeringManager } from '../util/mask';
 import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
 import { movesToHTM } from '../util/cubeState';
@@ -21,7 +18,7 @@ import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker'
 import { FACE_TO_D_ROTATION, translateMove, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
 import DifferentialScramble from './DifferentialScramble';
-import SolveTimer, { SolveTimerHandle } from './SolveTimer';
+import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
 
 interface CrossTrainerViewProps {
@@ -40,24 +37,6 @@ interface CrossStat {
 
 type Phase = 'scrambling' | 'solving' | 'solved';
 
-const CubePlayer = React.memo(({ playerRef, setupAlg, showHintFacelets }: {
-  playerRef: React.RefObject<TwistyPlayer | null>;
-  setupAlg: string;
-  showHintFacelets: boolean;
-}) => (
-  <twisty-player
-    ref={playerRef}
-    visualization="PG3D"
-    control-panel="none"
-    background="none"
-    puzzle="3x3x3"
-    tempo-scale="4"
-    hint-facelets={showHintFacelets ? "true" : "none"}
-    experimental-setup-alg={setupAlg}
-    style={{ width: "300px", height: "300px" }}
-  />
-));
-
 const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) => {
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [solverReady, setSolverReady] = useState(false);
@@ -68,7 +47,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [diffKey, setDiffKey] = useState(0);
   const movesRef = useRef<Move[]>([]);
-  const [startTime, setStartTime] = useState<number>(Date.now());
+  const [caseKey, setCaseKey] = useState(0);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
   const [moveCount, setMoveCount] = useState(0);
   const [genCount, setGenCount] = useState(0);
@@ -78,7 +57,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
 
-  const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [] });
+  const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [], getInitialValueInEffect: false });
   const [showHintFacelets, setShowHintFacelets] = useState(settings.showHintFacelets);
   const [useMaskings, setUseMaskings] = useState(settings.useMaskings);
   const [maskAfterFirstMove, setMaskAfterFirstMove] = useState(settings.maskAfterFirstMove);
@@ -86,7 +65,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const crossColorsRef = useRef(crossColors);
   crossColorsRef.current = crossColors;
   const [crossFace, setCrossFace] = useState('D');
-  const [randomRotationAxis, setRandomRotationAxis] = useLocalStorage<string>({ key: 'crossRandomRotation', defaultValue: '' });
+  const [randomRotationAxis, setRandomRotationAxis] = useLocalStorage<string>({ key: 'crossRandomRotation', defaultValue: '', getInitialValueInEffect: false });
   const randomRotationAxisRef = useRef(randomRotationAxis);
   randomRotationAxisRef.current = randomRotationAxis;
   const [extraRotation, setExtraRotation] = useState('');
@@ -98,8 +77,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const playerRef = useRef<TwistyPlayer>(null);
-  const timerRef = useRef<SolveTimerHandle>(null);
+  const cubeTimerRef = useRef<CubeTimerPlayerHandle>(null);
   const badgesRef = useRef<SolvedStateBadgesHandle>(null);
   const scrambleRef = useRef<string>('');
 
@@ -167,7 +145,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const handleScrambleComplete = useCallback(() => {
     setPhase('solving');
     movesRef.current = [];
-    timerRef.current?.start();
+    cubeTimerRef.current?.start();
   }, []);
 
   // Generate new scramble from solved, then compute differential from cube state
@@ -196,7 +174,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     movesRef.current = [];
     setMoveCount(0);
     setGenCount(0);
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
   }, [kpuzzle, solverReady]);
@@ -204,27 +182,6 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   useEffect(() => {
     if (solverReady) generateNewScramble();
   }, [solverReady]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Apply stickering mask
-  useEffect(() => {
-    if (!playerRef.current) return;
-    playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-  }, [stickeringMask]);
-
-  // Reset player alg on new scramble, restore stickering mask
-  useEffect(() => {
-    if (movesRef.current.length === 0 && playerRef.current) {
-      playerRef.current.alg = '';
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [startTime, stickeringMask]);
-
-  // When maskAfterFirstMove is toggled off, restore normal stickering
-  useEffect(() => {
-    if (!maskAfterFirstMove && playerRef.current) {
-      playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(stickeringMask);
-    }
-  }, [maskAfterFirstMove]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle cube moves during solving
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
@@ -240,7 +197,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       movesRef.current = [];
       setMoveCount(0);
       setGenCount(0);
-      setStartTime(Date.now());
+      setCaseKey(k => k + 1);
       setShowSliceWarning(false);
       return;
     }
@@ -261,14 +218,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
     if (movesRef.current.length === 0) {
       setShowSliceWarning(false);
-      timerRef.current?.firstMove(timeOfMove);
-      // Mask after first move: grey out all stickers for blind practice
-      if (maskAfterFirstMove && kpuzzle && playerRef.current) {
-        const bm = new PuzzleStickering(kpuzzle);
-        const mgr = new StickeringManager(kpuzzle);
-        bm.set(mgr.all(), PieceStickering.Ignored);
-        playerRef.current.experimentalModel.twistySceneModel.stickeringMaskRequest.set(bm.toStickeringMask());
-      }
+      cubeTimerRef.current?.firstMove(timeOfMove);
     }
 
     const newMove = { move: event.move, timeOfMove };
@@ -277,7 +227,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const moveStrs = newMoves.map(m => m.move);
     setMoveCount(movesToHTM(moveStrs));
     setGenCount(new Set(moveStrs.map(m => m.charAt(0))).size);
-    playerRef.current?.experimentalAddMove(translateMove(event.move, displayRotation));
+    cubeTimerRef.current?.addMove(translateMove(event.move, displayRotation));
     badgesRef.current?.notify();
 
     const moveString = newMoves.map(m => m.move).join(' ');
@@ -289,7 +239,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         solvedRef.current = true;
         const firstMove = newMoves[0].timeOfMove;
         const lastMove = newMoves[newMoves.length - 1].timeOfMove;
-        const inspectionMs = firstMove - startTime;
+        const inspectionMs = firstMove - (cubeTimerRef.current?.getStartTime() ?? 0);
         const executionMs = lastMove - firstMove;
         const userMoves = movesToHTM(newMoves.map(m => m.move));
         const optimal = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : -1;
@@ -300,9 +250,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
         if (isSliceRecovery) {
           setShowSliceWarning(true);
-          timerRef.current?.stopAt(timeOfMove);
+          cubeTimerRef.current?.stopAt(timeOfMove);
         } else {
-          timerRef.current?.stop();
+          cubeTimerRef.current?.stop();
         }
 
         const stat: CrossStat = {
@@ -346,7 +296,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     movesRef.current = [];
     setMoveCount(0);
     setGenCount(0);
-    setStartTime(Date.now());
+    setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
   };
@@ -470,18 +420,24 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
             </Stack>
           ) : (
             <>
+              <CubeTimerPlayer
+                ref={cubeTimerRef}
+                setupAlg={setupAlg}
+                showHintFacelets={showHintFacelets}
+                stickeringMask={stickeringMask}
+                kpuzzle={kpuzzle}
+                maskAfterFirstMove={maskAfterFirstMove}
+                caseKey={caseKey}
+                manualStart
+                timerAdornment={showSliceWarning ? (
+                  <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
+                    <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
+                      <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
+                    </span>
+                  </Tooltip>
+                ) : undefined}
+              />
               <Stack align="center" gap={0}>
-                <div style={{ position: 'relative' }}>
-                  <SolveTimer key={startTime} ref={timerRef} autoStart={false} />
-                  {showSliceWarning && (
-                    <Tooltip label="A BLE notification was dropped during a slice move. The time was adjusted." withArrow>
-                      <span style={{ position: 'absolute', top: 4, right: -18, lineHeight: 0 }}>
-                        <TbAlertTriangle size={14} color="var(--mantine-color-gray-5)" />
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-                <CubePlayer playerRef={playerRef} setupAlg={setupAlg} showHintFacelets={showHintFacelets} />
                 {(() => {
                   const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
                   const optimalGen = genGroups.length > 0 ? genGroups[0].genCount : 0;

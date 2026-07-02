@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
@@ -7,7 +7,7 @@ import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
-import { AlgSet, Settings, Alg, SolveStat, ValidMove, SolvedState } from '../util/interfaces';
+import { AlgSet, Settings, Alg, SolveStat } from '../util/interfaces';
 import TrainerView from "./TrainerView";
 import AddAlgSetView from "./AddAlgSetView";
 import { defaultSettings } from './SettingsView';
@@ -17,8 +17,8 @@ import MinigamesSection from './MinigamesSection';
 import CrossTrainerView from './CrossTrainerView';
 import XCrossTrainerView from './XCrossTrainerView';
 import OLLPredictionView from './FinalF2LView';
-import { F2L_DB } from '../util/algDatabase';
-import { generateOneFRFL } from '../util/f2lGenerator';
+import FRFLView from './FRFLView';
+
 
 // One-time migration: assign ids to AlgSets and re-key stats.
 // Runs synchronously before hooks read localStorage so every useLocalStorage
@@ -53,8 +53,8 @@ import { generateOneFRFL } from '../util/f2lGenerator';
 
 const App: React.FC = () => {
   const [view, setView] = useState<string>('Welcome');
-  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
-  const [settings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
+  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [], getInitialValueInEffect: false });
+  const [settings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings, getInitialValueInEffect: false });
   const [currentAlgSet, setCurrentAlgSet] = useState<AlgSet | null>(null);
   const [initialAlg, setInitialAlg] = useState<Alg | null>(null);
   const [editingAlgSet, setEditingAlgSet] = useState<AlgSet | null>(null);
@@ -207,33 +207,8 @@ const App: React.FC = () => {
     </Flex>
   );
 
-  const [selectedFLCases, setSelectedFLCases] = useLocalStorage<number[]>({
-    key: 'frfl_selectedFL',
-    defaultValue: F2L_DB.map((_, i) => i),
-  });
-  const [selectedFRCases, setSelectedFRCases] = useLocalStorage<number[]>({
-    key: 'frfl_selectedFR',
-    defaultValue: F2L_DB.map((_, i) => i),
-  });
-
-  const generateFRFLAlg = useRef((fl: number[], fr: number[]): Alg => {
-    const flEntries = fl.length > 0 ? fl.map(i => F2L_DB[i]) : [F2L_DB[0]];
-    const frEntries = fr.length > 0 ? fr.map(i => F2L_DB[i]) : [F2L_DB[0]];
-    const { name, alg } = generateOneFRFL(flEntries, frEntries);
-    return { name, alg: alg.split(/\s+/) as ValidMove[], solved: SolvedState.F2L };
-  });
-
-  const frflGenerateAlg = useCallback(
-    () => generateFRFLAlg.current(selectedFLCases, selectedFRCases),
-    [selectedFLCases, selectedFRCases]
-  );
-
   const handleFRFL = () => {
-    const initial = frflGenerateAlg();
-    const algSet: AlgSet = { id: 'minigame-frfl', name: 'FR+FL Slot Game', algs: [initial] };
-    setInitialAlg(initial);
-    setCurrentAlgSet(algSet);
-    setView('TrainerView');
+    setView('FRFLView');
   };
 
   const renderView = (): React.ReactNode => {
@@ -253,7 +228,7 @@ const App: React.FC = () => {
         }} />;
       case 'TrainerView':
         if (currentAlgSet)
-          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} disableAlgSelection={currentAlgSet.id.startsWith('minigame-')} generateAlg={currentAlgSet.id === 'minigame-frfl' ? frflGenerateAlg : undefined} frflSelector={currentAlgSet.id === 'minigame-frfl' ? { selectedFL: selectedFLCases, setSelectedFL: setSelectedFLCases, selectedFR: selectedFRCases, setSelectedFR: setSelectedFRCases } : undefined} />;
+          return <TrainerView key={currentAlgSet.id} currentAlgSet={currentAlgSet} conn={conn} settings={settings} initialAlg={initialAlg} disableAlgSelection={currentAlgSet.id.startsWith('minigame-')} />;
         else
           return <WelcomeView />;
       case 'ReportsView':
@@ -265,6 +240,8 @@ const App: React.FC = () => {
         return <CrossTrainerView conn={conn} settings={settings} />;
       case 'XCrossTrainerView':
         return <XCrossTrainerView conn={conn} settings={settings} />;
+      case 'FRFLView':
+        return <FRFLView conn={conn} settings={settings} />;
       case 'FinalF2LView':
         return <OLLPredictionView conn={conn} settings={settings} />;
       default:

@@ -37,7 +37,7 @@ interface AddAlgSetViewProps {
 }
 
 const AddAlgSetView: React.FC<AddAlgSetViewProps> = ({ editingAlgSet, onSave }) => {
-  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [] });
+  const [algSets, setAlgSets] = useLocalStorage<AlgSet[]>({ key: 'algSets', defaultValue: [], getInitialValueInEffect: false });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showInstructions, {toggle: toggleInstructions}] = useDisclosure(false);
   const isEditing = !!editingAlgSet;

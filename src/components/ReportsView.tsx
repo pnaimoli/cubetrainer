@@ -57,10 +57,11 @@ const computeMovingAverages = (times: number[]) => {
 };
 
 const ReportsView: React.FC<ReportsViewProps> = ({ currentAlgSet }) => {
-  const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
+  const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {}, getInitialValueInEffect: false });
   const [reportSettings, setReportSettings] = useLocalStorage<ReportSettings>({
     key: 'reportSettings',
     defaultValue: defaultReportSettings,
+    getInitialValueInEffect: false,
   });
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<CaseReport>>({
     columnAccessor: 'name',

@@ -9,7 +9,7 @@ interface SummaryStatsViewProps {
 }
 
 const SummaryStatsView: React.FC<SummaryStatsViewProps> = ({ algSetId }) => {
-  const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {} });
+  const [allStats] = useLocalStorage<Record<string, SolveStat[]>>({ key: 'stats', defaultValue: {}, getInitialValueInEffect: false });
   const [stats, setStats] = useState<SolveStat[]>([]);
   const [selectedTimeType, setSelectedTimeType] = useState<'rec' | 'exec' | 'total'>('total');
 

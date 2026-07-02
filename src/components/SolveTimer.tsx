@@ -24,10 +24,12 @@ interface SolveTimerProps {
 }
 
 const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoStart = true }, ref) => {
-  const startTime = useRef<number | null>(null);
+  // Initialize startTime synchronously so the first render already has it,
+  // avoiding a negative totalMs when parent re-renders before the interval fires.
+  const startTime = useRef<number | null>(autoStart ? Date.now() : null);
   const firstMoveAt = useRef<number | null>(null);
   const endTime = useRef<number | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => startTime.current ?? Date.now());
   const intervalRef = useRef<number>();
 
   const startInterval = () => {
@@ -38,7 +40,12 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoSt
 
   React.useImperativeHandle(ref, () => ({
     start: (time?: number) => {
-      startTime.current = time ?? Date.now();
+      const t = time ?? Date.now();
+      startTime.current = t;
+      firstMoveAt.current = null;
+      endTime.current = null;
+      if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
+      setNow(t);
       startInterval();
     },
     firstMove: (time?: number) => {
@@ -73,7 +80,6 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoSt
 
   useEffect(() => {
     if (autoStart) {
-      startTime.current = Date.now();
       startInterval();
     }
     return () => {

@@ -28,7 +28,7 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ disableAlgSelection = false }) => {
-  const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings });
+  const [settings, setSettings] = useLocalStorage<Settings>({ key: 'settings', defaultValue: defaultSettings, getInitialValueInEffect: false });
 
   return (
     <Stack gap="xs">
