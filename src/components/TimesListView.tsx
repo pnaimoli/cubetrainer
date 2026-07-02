@@ -128,7 +128,7 @@ const TimesListView: React.FC<TimesListViewProps> = ({ algSetId, algSetName, max
           columns={columns}
           records={stats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
           onRowDoubleClick={({ index }) => handleDelete(stats.length - 1 - index)}
-          rowStyle={() => ({ cursor: 'not-allowed' })}
+          rowStyle={() => ({ cursor: 'pointer' })}
         />
       </Box>
     </Card>

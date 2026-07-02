@@ -721,7 +721,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 columns={timesColumns}
                 records={xcrossStats.toReversed().slice(0, 50).map((stat, index) => ({ ...stat, id: index }))}
                 onRowDoubleClick={({ index }) => handleDeleteStat(xcrossStats.length - 1 - index)}
-                rowStyle={() => ({ cursor: 'not-allowed' })}
+                rowStyle={() => ({ cursor: 'pointer' })}
               />
             </Box>
           </Card>
