@@ -450,7 +450,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setRandomUs(recomputeRandomUs(settings.randomAUF));
     if (algChanged || prev.randomYs !== settings.randomYs)
       setRandomYs(recomputeRandomYs(settings.randomYs));
-    if (algChanged || prev.crossFaces.join() !== settings.crossFaces.join() || prev.randomRotations1 !== settings.randomRotations1)
+    if (algChanged || (prev.crossFaces ?? []).join() !== (settings.crossFaces ?? []).join() || prev.randomRotations1 !== settings.randomRotations1)
       setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
     if (algChanged || prev.mirrorAcrossM !== settings.mirrorAcrossM || prev.randomizeMirrorAcrossM !== settings.randomizeMirrorAcrossM)
       setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));

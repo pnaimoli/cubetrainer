@@ -364,7 +364,7 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
       setRandomUs(recomputeRandomUs(settings.randomAUF));
     if (prev.randomYs !== settings.randomYs)
       setRandomYs(recomputeRandomYs(settings.randomYs));
-    if (prev.crossFaces.join() !== settings.crossFaces.join() || prev.randomRotations1 !== settings.randomRotations1)
+    if ((prev.crossFaces ?? []).join() !== (settings.crossFaces ?? []).join() || prev.randomRotations1 !== settings.randomRotations1)
       setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
     if (prev.mirrorAcrossM !== settings.mirrorAcrossM || prev.randomizeMirrorAcrossM !== settings.randomizeMirrorAcrossM)
       setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));

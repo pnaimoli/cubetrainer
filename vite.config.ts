@@ -13,6 +13,9 @@ export default defineConfig(({ command }) => ({
       },
     }),
   ],
+  optimizeDeps: {
+    exclude: ['cubing'],
+  },
   // cubing/search uses web workers that need ES format for production builds.
   // In dev mode (serve), Vite handles workers natively without this setting.
   ...(command === 'build' ? { worker: { format: 'es' as const } } : {}),

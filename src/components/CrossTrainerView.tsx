@@ -58,9 +58,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [solutionsOpen, setSolutionsOpen] = useState(false);
 
   const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [], getInitialValueInEffect: false });
-  const [showHintFacelets, setShowHintFacelets] = useState(settings.showHintFacelets);
-  const [useMaskings, setUseMaskings] = useState(settings.useMaskings);
-  const [maskAfterFirstMove, setMaskAfterFirstMove] = useState(settings.maskAfterFirstMove);
+  const [showHintFacelets, setShowHintFacelets] = useLocalStorage<boolean>({ key: 'cross_showHintFacelets', defaultValue: settings.showHintFacelets, getInitialValueInEffect: false });
+  const [useMaskings, setUseMaskings] = useLocalStorage<boolean>({ key: 'cross_useMaskings', defaultValue: settings.useMaskings, getInitialValueInEffect: false });
+  const [maskAfterFirstMove, setMaskAfterFirstMove] = useLocalStorage<boolean>({ key: 'cross_maskAfterFirstMove', defaultValue: settings.maskAfterFirstMove, getInitialValueInEffect: false });
   const [crossColors, setCrossColors] = useLocalStorage<string[]>({ key: 'crossColors', defaultValue: ['D'], getInitialValueInEffect: false });
   const crossColorsRef = useRef(crossColors);
   crossColorsRef.current = crossColors;

@@ -322,7 +322,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       setRandomUs(recomputeRandomUs(localSettings.randomAUF));
     if (prev.randomYs !== localSettings.randomYs)
       setRandomYs(recomputeRandomYs(localSettings.randomYs));
-    if (prev.crossFaces.join() !== localSettings.crossFaces.join() || prev.randomRotations1 !== localSettings.randomRotations1)
+    if ((prev.crossFaces ?? []).join() !== (localSettings.crossFaces ?? []).join() || prev.randomRotations1 !== localSettings.randomRotations1)
       setPreorientationResult(recomputePreorientationMoves(localSettings.crossFaces, localSettings.randomRotations1));
     if (prev.mirrorAcrossM !== localSettings.mirrorAcrossM || prev.randomizeMirrorAcrossM !== localSettings.randomizeMirrorAcrossM)
       setMirrorAcrossM(recomputeMirrorAcrossM(localSettings.mirrorAcrossM, localSettings.randomizeMirrorAcrossM));
