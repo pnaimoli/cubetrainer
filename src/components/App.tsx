@@ -3,7 +3,7 @@ import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, 
 import { useLocalStorage } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
-import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell, TbEdit, TbReport, TbTrash } from 'react-icons/tb';
+import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell, TbEdit, TbReport, TbTrash, TbChevronDown, TbCube, TbPlugConnectedX } from 'react-icons/tb';
 import { connectGanCube, GanCubeConnection } from 'gan-web-bluetooth';
 import { version } from '../../package.json';
 import ReactLogo from '../assets/logo.svg?react';
@@ -111,40 +111,32 @@ const App: React.FC = () => {
   const handleBluetoothConnect = async () => {
     setError(null);
     setLoading(true);
-    if (conn) {
-      conn.disconnect();
-      setConn(null);
-      setCubeName('GAN Cube');
-      setBatteryLevel(null);
+    try {
+      const connection = await connectGanCube(cachedMacProvider);
+      await setupConnection(connection);
       setLoading(false);
-    } else {
-      try {
-        const connection = await connectGanCube(cachedMacProvider);
-        await setupConnection(connection);
-        setLoading(false);
-      } catch (error) {
-        const e = error as Error;
-        // If MAC retrieval failed, force-disconnect the stale GATT and retry once
-        if (e.message?.includes('MAC address')) {
-          try {
-            localStorage.removeItem('ganCubeMac');
-            const connection = await connectGanCube();
-            await setupConnection(connection);
-            setLoading(false);
-            return;
-          } catch (retryError) {
-            const re = retryError as Error;
-            setLoading(false);
-            if (re.name !== 'NotFoundError') {
-              setError(re.message);
-            }
-            return;
+    } catch (error) {
+      const e = error as Error;
+      // If MAC retrieval failed, force-disconnect the stale GATT and retry once
+      if (e.message?.includes('MAC address')) {
+        try {
+          localStorage.removeItem('ganCubeMac');
+          const connection = await connectGanCube();
+          await setupConnection(connection);
+          setLoading(false);
+          return;
+        } catch (retryError) {
+          const re = retryError as Error;
+          setLoading(false);
+          if (re.name !== 'NotFoundError') {
+            setError(re.message);
           }
+          return;
         }
-        setLoading(false);
-        if (e.name !== 'NotFoundError') {
-          setError(e.message);
-        }
+      }
+      setLoading(false);
+      if (e.name !== 'NotFoundError') {
+        setError(e.message);
       }
     }
   };
@@ -260,15 +252,48 @@ const App: React.FC = () => {
           <Group h="100%" px="md">
             <ReactLogo width="65px" height="100%"/>
             <Stack align="center">
-              <Button
-                leftSection={conn ? <MdBluetooth size="1.5rem" /> : <MdBluetoothDisabled size="1.5rem" />}
-                rightSection={conn && batteryLevel !== null ? <Tooltip label={`${batteryLevel}%`} withArrow><Box><BatteryIcon level={batteryLevel} /></Box></Tooltip> : undefined}
-                onClick={handleBluetoothConnect}
-                color={conn ? 'green' : 'red'}
-                loading={loading}
-              >
-                {conn ? `${cubeName} Connected` : 'Connect GAN Cube'}
-              </Button>
+              {conn ? (
+                <Group gap={0}>
+                  <Button
+                    leftSection={<MdBluetooth size="1.5rem" />}
+                    rightSection={batteryLevel !== null ? <Tooltip label={`${batteryLevel}%`} withArrow><Box><BatteryIcon level={batteryLevel} /></Box></Tooltip> : undefined}
+                    color="green"
+                    style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+                  >
+                    {cubeName} Connected
+                  </Button>
+                  <Menu position="bottom-end">
+                    <Menu.Target>
+                      <Button color="green" px="xs" style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
+                        <TbChevronDown size="1rem" />
+                      </Button>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item leftSection={<TbCube size={14} />} onClick={() => conn.sendCubeCommand({ type: 'REQUEST_RESET' })}>
+                        Reset Cube State
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item leftSection={<TbPlugConnectedX size={14} />} color="red" onClick={() => {
+                        conn.disconnect();
+                        setConn(null);
+                        setCubeName('GAN Cube');
+                        setBatteryLevel(null);
+                      }}>
+                        Disconnect
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                </Group>
+              ) : (
+                <Button
+                  leftSection={<MdBluetoothDisabled size="1.5rem" />}
+                  onClick={handleBluetoothConnect}
+                  color="red"
+                  loading={loading}
+                >
+                  Connect GAN Cube
+                </Button>
+              )}
               <Text color="red" size="xs" pos="absolute" top={0}>{error}</Text>
             </Stack>
           </Group>

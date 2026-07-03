@@ -21,6 +21,7 @@ export default function DifferentialScramble({
   const hasComputed = useRef(false);
   const scrambleRef = useRef(scramble);
   scrambleRef.current = scramble;
+  const computingRef = useRef(false);
 
   const compute = useCallback(async (targetScramble: string) => {
     if (!kpuzzle || !conn) {
@@ -29,6 +30,9 @@ export default function DifferentialScramble({
       return;
     }
 
+    // Prevent concurrent GATT operations (BLE can only handle one at a time)
+    if (computingRef.current) return;
+    computingRef.current = true;
     setComputing(true);
     try {
       const facelets = await requestFacelets(conn);
@@ -49,6 +53,7 @@ export default function DifferentialScramble({
       }
     } finally {
       setComputing(false);
+      computingRef.current = false;
       hasComputed.current = true;
     }
   }, [kpuzzle, conn, onScrambleComplete]);
