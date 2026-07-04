@@ -533,7 +533,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={setupAlg} effectiveSolvedState={effectiveSolvedState} movesRef={movesRef} />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder={true}>
           <Card.Section withBorder={true} px="xs">
               <Title order={2} style={{ cursor: 'pointer' }} onClick={() => setCaseHidden(h => !h)}>
@@ -564,13 +564,13 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Stack>
           <SummaryStatsView algSetId={currentAlgSet.id} />
           <TimesListView algSetId={currentAlgSet.id} algSetName={currentAlgSet.name} maxHeight="calc(100vh - 360px)" />
         </Stack>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2}>Settings</Title>

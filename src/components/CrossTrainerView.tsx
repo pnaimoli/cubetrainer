@@ -461,7 +461,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS} displayRotation={displayRotation} movesRef={movesRef} />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           {!scramble ? (
             <Stack align="center" gap="xs" p="md">
@@ -565,7 +565,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           )}
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Stack>
           <Card withBorder padding={0}>
             <Card.Section withBorder px="xs">
@@ -632,7 +632,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           </Card>
         </Stack>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} mt="xs" mb="xs">Settings</Title>

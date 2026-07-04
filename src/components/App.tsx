@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal } from '@mantine/core';
-import { useLocalStorage } from '@mantine/hooks';
+import { AppShell, ScrollArea, Box, Group, Button, Text, Accordion, ActionIcon, Menu, Flex, Stack, Tooltip, Modal, Burger } from '@mantine/core';
+import { useLocalStorage, useDisclosure } from '@mantine/hooks';
 import { FaFolder, FaFolderOpen, FaStar, FaEllipsisH, FaPlus } from 'react-icons/fa';
 import { MdBluetooth, MdBluetoothDisabled } from 'react-icons/md';
 import { TbBattery1, TbBattery2, TbBattery3, TbBattery4, TbBatteryOff, TbBarbell, TbEdit, TbReport, TbTrash, TbChevronDown, TbCube, TbPlugConnectedX } from 'react-icons/tb';
@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [cubeName, setCubeName] = useState<string>('GAN Cube');
   const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [navOpened, { toggle: toggleNav, close: closeNav }] = useDisclosure();
 
   // Disconnect BLE on page reload so the cube doesn't get stuck in a
   // zombie GATT connection. The library's disconnect() is async so we
@@ -184,14 +185,17 @@ const App: React.FC = () => {
             setInitialAlg(null);
             setCurrentAlgSet(set);
             setView('TrainerView');
+            closeNav();
           }}>Train</Menu.Item>
           <Menu.Item leftSection={<TbEdit size={14} />} onClick={() => {
             setEditingAlgSet(set);
             setView('AddAlgSetView');
+            closeNav();
           }}>Edit</Menu.Item>
           <Menu.Item leftSection={<TbReport size={14} />} onClick={() => {
             setCurrentAlgSet(set);
             setView('ReportsView');
+            closeNav();
           }}>Reports</Menu.Item>
           <Menu.Item leftSection={<TbTrash size={14} />} color="red" onClick={() => setDeleteTarget(set.name)}>Delete</Menu.Item>
         </Menu.Dropdown>
@@ -201,6 +205,7 @@ const App: React.FC = () => {
 
   const handleFRFL = () => {
     setView('FRFLView');
+    closeNav();
   };
 
   const renderView = (): React.ReactNode => {
@@ -245,12 +250,13 @@ const App: React.FC = () => {
     <AppShell
       header={{ height: 75 }}
       padding="md"
-      navbar={{ width: 300, breakpoint: 'sm' }}
+      navbar={{ width: 300, breakpoint: 'sm', collapsed: { mobile: !navOpened } }}
     >
       <AppShell.Header>
         <Flex justify="space-between" align="center">
           <Group h="100%" px="md">
-            <ReactLogo width="65px" height="100%"/>
+            <Burger opened={navOpened} onClick={toggleNav} hiddenFrom="sm" size="sm" />
+            <ReactLogo width="65px" height="100%" />
             <Stack align="center">
               {conn ? (
                 <Group gap={0}>
@@ -297,7 +303,7 @@ const App: React.FC = () => {
               <Text color="red" size="xs" pos="absolute" top={0}>{error}</Text>
             </Stack>
           </Group>
-          <Group mr="md">
+          <Group mr="md" visibleFrom="sm">
             <Text>Cubetrainer v{version}</Text>
           </Group>
         </Flex>
@@ -306,19 +312,19 @@ const App: React.FC = () => {
         <ScrollArea scrollbars="y">
           <MinigamesSection
             onFRFL={handleFRFL}
-            onOptimalCross={() => setView('CrossTrainerView')}
-            onXCross={() => setView('XCrossTrainerView')}
-            onFinalF2L={() => setView('FinalF2LView')}
+            onOptimalCross={() => { setView('CrossTrainerView'); closeNav(); }}
+            onXCross={() => { setView('XCrossTrainerView'); closeNav(); }}
+            onFinalF2L={() => { setView('FinalF2LView'); closeNav(); }}
           />
           <Button
             leftSection={<FaPlus />}
             fullWidth
-            onClick={() => { setEditingAlgSet(null); setView('AddAlgSetView'); }}
+            onClick={() => { setEditingAlgSet(null); setView('AddAlgSetView'); closeNav(); }}
             style={{ borderRadius: '0px' }}
           >
             New Algorithm Set
           </Button>
-          <Box w={300}>
+          <Box>
             <Accordion
               value={expandedItem}
               chevronSize="0px"
@@ -341,6 +347,7 @@ const App: React.FC = () => {
                           setCurrentAlgSet(set);
                           setInitialAlg(alg);
                           setView('TrainerView');
+                          closeNav();
                         }}
                       >
                         <Text span size="xs" fw={700} ml="xs"><FaStar style={{ marginRight: "8px", width: '10px', height: '10px'}} />{alg.name}:</Text>

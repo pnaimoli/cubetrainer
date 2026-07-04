@@ -550,7 +550,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={scramble} effectiveSolvedState={SolvedState.CROSS | (SLOT_SOLVED_STATE[solverToVisualSlot[targetSlot] ?? targetSlot] ?? 0)} displayRotation={displayRotation} movesRef={movesRef} />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           {!scramble && !solving && !solverReady ? (
             <Stack align="center" gap="xs" p="md">
@@ -660,7 +660,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           )}
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Stack>
           <Card withBorder padding={0}>
             <Card.Section withBorder px="xs">
@@ -727,7 +727,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           </Card>
         </Stack>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} mt="xs" mb="xs">Settings</Title>

@@ -381,7 +381,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
           <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={setupAlg} effectiveSolvedState={effectiveSolvedState} movesRef={movesRef} />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} style={{ cursor: 'pointer' }} onClick={() => setCaseHidden(h => !h)}>
@@ -402,7 +402,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
           />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} mt="xs" mb="xs">Results</Title>
@@ -442,7 +442,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
           </Stack>
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} mt="xs" mb="xs">Settings</Title>

@@ -402,7 +402,7 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
           <SolvedStateBadges ref={badgesRef} kpuzzle={kpuzzle} setupAlg={setupAlg} effectiveSolvedState={effectiveSolvedState} movesRef={movesRef} />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2} style={{ cursor: 'pointer' }} onClick={() => setCaseHidden(h => !h)}>
@@ -426,13 +426,13 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
           />
         </Card>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Stack>
           <SummaryStatsView algSetId={ALGSET_ID} />
           <TimesListView algSetId={ALGSET_ID} algSetName={ALGSET_NAME} maxHeight="calc(100vh - 360px)" />
         </Stack>
       </Grid.Col>
-      <Grid.Col span={4}>
+      <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
             <Title order={2}>Settings</Title>
