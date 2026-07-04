@@ -120,7 +120,7 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
     const rotation = displayRotation ?? (crossFace && crossFace !== 'D' ? FACE_TO_D_ROTATION[crossFace] : '');
 
     return (
-      <Group gap="xs" mt="xs">
+      <Group gap="xs" p="xs" visibleFrom="md">
         {Object.keys(SolvedState)
           .filter((key) => isNaN(Number(key)))
           .map((key) => {
@@ -513,10 +513,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   return (
     <Grid>
       <Grid.Col span={12}>
-        <Card withBorder={true} padding="xs">
-          <Card.Section withBorder={true} px="xs">
-            <Group justify="space-between">
-              <Title mt="xs" mb="xs">Algorithm Set: {currentAlgSet.name}</Title>
+        <Card withBorder={true} padding={0}>
+          <Card.Section withBorder={true} px="xs" py="xs">
+            <Group justify="space-between" wrap="wrap">
+              <Title style={{ fontSize: 'clamp(1.25rem, 7vw, var(--mantine-h1-font-size))', whiteSpace: 'nowrap' }}>Algorithm Set: {currentAlgSet.name}</Title>
               <Group>
                 <Button disabled={historyOffset >= currentStats.length} variant="outline" size="xs" onClick={handlePrev} leftSection={<TbArrowLeft />}>
                   Previous

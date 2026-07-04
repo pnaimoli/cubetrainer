@@ -385,10 +385,10 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
   return (
     <Grid>
       <Grid.Col span={12}>
-        <Card withBorder padding="xs">
-          <Card.Section withBorder px="xs">
-            <Group justify="space-between">
-              <Title mt="xs" mb="xs">{ALGSET_NAME}</Title>
+        <Card withBorder padding={0}>
+          <Card.Section withBorder px="xs" py="xs">
+            <Group justify="space-between" wrap="wrap">
+              <Title style={{ fontSize: 'clamp(1.25rem, 7vw, var(--mantine-h1-font-size))', whiteSpace: 'nowrap' }}>{ALGSET_NAME}</Title>
               <Group>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
                   Retry [D4]
