@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl, Skeleton, Select } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl, Skeleton, Select, Slider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -13,7 +13,7 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
-import { movesToHTM } from '../util/cubeState';
+import { movesToHTM, simplifyMoves } from '../util/cubeState';
 import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import { FACE_TO_D_ROTATION, translateMove, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
@@ -69,6 +69,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const randomRotationAxisRef = useRef(randomRotationAxis);
   randomRotationAxisRef.current = randomRotationAxis;
   const [extraRotation, setExtraRotation] = useState('');
+
+  // Exact move count filter (0 = any)
+  const [crossMoveCount, setCrossMoveCount] = useLocalStorage<number>({ key: 'crossMoveCount', defaultValue: 0, getInitialValueInEffect: false });
 
   // Clear old stats that lack the new inspectionMs/executionMs fields
   useEffect(() => {
@@ -148,22 +151,70 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     cubeTimerRef.current?.start();
   }, []);
 
+  const moveCountRef = useRef(crossMoveCount);
+  moveCountRef.current = crossMoveCount;
+
   // Generate new scramble from solved, then compute differential from cube state
   const generateNewScramble = useCallback(async () => {
     if (!kpuzzle || !solverReady) return;
 
     const colors = crossColorsRef.current;
     const face = colors[Math.floor(Math.random() * colors.length)];
-    const scrambleAlg = await randomScrambleForEvent('333');
-    const moves = scrambleAlg.toString();
-    const targetPattern = kpuzzle.defaultPattern().applyAlg(moves);
-    const solutions = solveCross(targetPattern, face);
+    const targetMoves = moveCountRef.current;
 
-    scrambleRef.current = moves;
-    setScramble(moves);
+    // Try to find a scramble matching the move count filter
+    let finalScramble = '';
+    let finalSolutions: CrossSolution[] = [];
+    let finalPattern: KPattern | null = null;
 
-    setOptimalSolutions(solutions);
-    setScrambledPattern(targetPattern);
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const scrambleAlg = await randomScrambleForEvent('333');
+      const baseScramble = scrambleAlg.toString();
+      const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
+      const solutions = solveCross(basePattern, face);
+
+      if (solutions.length === 0) continue;
+
+      // No filter: use as-is
+      if (targetMoves === 0) {
+        finalScramble = baseScramble;
+        finalSolutions = solutions;
+        finalPattern = basePattern;
+        break;
+      }
+
+      // Check if optimal already matches
+      if (solutions[0].moveCount === targetMoves) {
+        finalScramble = baseScramble;
+        finalSolutions = solutions;
+        finalPattern = basePattern;
+        break;
+      }
+
+      // Solution too long: shorten by appending prefix moves to the scramble
+      if (solutions[0].moveCount > targetMoves) {
+        const solMoves = solutions[0].solution.split(/\s+/).filter(Boolean);
+        const prefixMoves = solMoves.slice(0, solMoves.length - targetMoves);
+        const newScrambleMoves = simplifyMoves([
+          ...baseScramble.split(/\s+/).filter(Boolean),
+          ...prefixMoves,
+        ]);
+        const newScramble = newScrambleMoves.join(' ');
+        const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
+        const newSolutions = solveCross(newPattern, face);
+        if (newSolutions.length > 0 && newSolutions[0].moveCount === targetMoves) {
+          finalScramble = newScramble;
+          finalSolutions = newSolutions;
+          finalPattern = newPattern;
+          break;
+        }
+      }
+    }
+
+    scrambleRef.current = finalScramble;
+    setScramble(finalScramble);
+    setOptimalSolutions(finalSolutions);
+    setScrambledPattern(finalPattern);
     setCrossFace(face);
     setExtraRotation(randomRotationString(randomRotationAxisRef.current));
     isRetryRef.current = false;
@@ -630,6 +681,18 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 data={["x", "y", "z"]}
               />
             </Group>
+            <Divider label="Solution Filter" />
+            <Text fz="sm">Cross length: {crossMoveCount === 0 ? 'any' : crossMoveCount}</Text>
+            <Slider
+              min={0}
+              max={8}
+              step={1}
+              value={crossMoveCount}
+              onChange={setCrossMoveCount}
+              marks={[{ value: 0, label: 'any' }, { value: 4, label: '4' }, { value: 8, label: '8' }]}
+              size="sm"
+              mb="xs"
+            />
           </Stack>
         </Card>
       </Grid.Col>
