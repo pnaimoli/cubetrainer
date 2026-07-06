@@ -636,7 +636,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 highlightOnHover
                 striped
                 columns={timesColumns}
-                records={crossStats.toReversed().slice(0, 50).map((stat, index) => ({ ...stat, id: index }))}
+                records={crossStats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
                 onRowDoubleClick={({ index }) => handleDeleteStat(crossStats.length - 1 - index)}
                 rowStyle={() => ({ cursor: 'pointer' })}
               />

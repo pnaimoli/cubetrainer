@@ -720,7 +720,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 highlightOnHover
                 striped
                 columns={timesColumns}
-                records={xcrossStats.toReversed().slice(0, 50).map((stat, index) => ({ ...stat, id: index }))}
+                records={xcrossStats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
                 onRowDoubleClick={({ index }) => handleDeleteStat(xcrossStats.length - 1 - index)}
                 rowStyle={() => ({ cursor: 'pointer' })}
               />

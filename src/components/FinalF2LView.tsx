@@ -422,7 +422,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
                   </Group>
                   <Divider />
                   <Stack gap={2} style={{ maxHeight: 'calc(100vh - 360px)', overflow: 'auto' }}>
-                    {[...ollStats].reverse().slice(0, 50).map((stat, i) => (
+                    {[...ollStats].reverse().map((stat, i) => (
                       <Group key={i} justify="space-between" gap="xs">
                         <Text fz="xs" ff="monospace">F2L-{stat.f2lCase} + OLL-{stat.ollCase}</Text>
                         <Text fz="xs" fw={700} c={stat.correct ? 'green' : 'red'}>
