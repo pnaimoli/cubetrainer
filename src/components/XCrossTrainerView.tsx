@@ -418,6 +418,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const handleRetry = () => {
     isRetryRef.current = true;
     solvedRef.current = false;
+    cubeTimerRef.current?.stop();
     setPhase('scrambling');
     setResult(null);
 

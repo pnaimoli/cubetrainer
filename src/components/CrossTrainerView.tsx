@@ -73,6 +73,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   // Exact move count filter (0 = any)
   const [crossMoveCount, setCrossMoveCount] = useLocalStorage<number>({ key: 'crossMoveCount', defaultValue: 0, getInitialValueInEffect: false });
 
+  // Retry override policy: 'fastest' | 'latest' | 'never'
+  const [retryPolicy, setRetryPolicy] = useLocalStorage<string>({ key: 'crossRetryPolicy', defaultValue: 'fastest', getInitialValueInEffect: false });
+
   // Clear old stats that lack the new inspectionMs/executionMs fields
   useEffect(() => {
     if (crossStats.length > 0 && !('executionMs' in crossStats[0])) {
@@ -314,15 +317,23 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
           executionMs,
           timestamp: new Date().toISOString(),
         };
-        if (isRetryRef.current) {
+        if (isRetryRef.current && retryPolicy !== 'never') {
           const idx = crossStats.findLastIndex(s => s.scramble === scramble);
-          setCrossStats(prev => idx >= 0 ? prev.map((s, i) => i === idx ? (stat.executionMs < s.executionMs ? stat : s) : s) : [...prev, stat]);
-        } else {
+          if (idx >= 0) {
+            setCrossStats(prev => prev.map((s, i) => {
+              if (i !== idx) return s;
+              if (retryPolicy === 'latest') return stat;
+              return stat.executionMs < s.executionMs ? stat : s; // 'fastest'
+            }));
+          } else {
+            setCrossStats(prev => [...prev, stat]);
+          }
+        } else if (!isRetryRef.current) {
           setCrossStats(prev => [...prev, stat]);
         }
       }
     }
-  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace, displayRotation]);
+  }, [phase, kpuzzle, scramble, optimalSolutions, setCrossStats, maskAfterFirstMove, crossFace, displayRotation, retryPolicy, crossStats]);
 
   const handleCubeMoveEventRef = useRef(handleCubeMoveEvent);
   useEffect(() => {
@@ -341,6 +352,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const handleRetry = () => {
     isRetryRef.current = true;
     solvedRef.current = false;
+    cubeTimerRef.current?.stop();
     setPhase('scrambling');
     setResult(null);
 
@@ -681,6 +693,17 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 data={["x", "y", "z"]}
               />
             </Group>
+            <Divider label="Retry Override" />
+            <SegmentedControl
+              size="xs"
+              value={retryPolicy}
+              onChange={setRetryPolicy}
+              data={[
+                { label: 'Fastest', value: 'fastest' },
+                { label: 'Latest', value: 'latest' },
+                { label: 'Keep First', value: 'never' },
+              ]}
+            />
             <Divider label="Solution Filter" />
             <Text fz="sm">Cross length: {crossMoveCount === 0 ? 'any' : crossMoveCount}</Text>
             <Slider
