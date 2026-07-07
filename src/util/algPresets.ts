@@ -168,9 +168,16 @@ Gd-3, U2 R U R' U' D R2 U' R U' R' U R' U R2 D'
 Gd-4, U R U R' U' D R2 U' R U' R' U R' U R2 D'
 `,
 
+	// Advanced F2L algs from: https://study-notes-pdfs.s3.us-west-2.amazonaws.com/51713894.pdf
 	"Advanced F2L": `
 1, R' D' F' D R, CROSS | F2LFR
 2, F D R D' F', CROSS | F2LFR
+3, F' D' L' D F, CROSS | F2LFL
+4, F' (R' U' R) F, CROSS | F2LBR
+5, L F' U F L', CROSS | F2LBL
+6, R' F U' F' R, CROSS | F2LBR
+7, (L' u' L) U' (L' u L), CROSS | F2LFL
+8, (R u R') U (R u' R'), CROSS | F2LFR
 `,
 
 	"Connected F2L": `
