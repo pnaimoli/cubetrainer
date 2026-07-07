@@ -208,6 +208,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     solvedRef.current = false;
     setPhase('scrambling');
     setResult(null);
+    cubeTimerRef.current?.reset();
     movesRef.current = [];
     setMoveCount(0);
     setCaseKey(k => k + 1);

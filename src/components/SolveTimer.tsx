@@ -10,6 +10,8 @@ export interface SolveTimerHandle {
   stop: () => void;
   /** Call when the solve is complete at a specific timestamp */
   stopAt: (time: number) => void;
+  /** Reset the timer display to 0 without starting */
+  reset: () => void;
   /** Get the current timing breakdown */
   getTimes: () => { inspectionMs: number; executionMs: number };
 }
@@ -58,6 +60,7 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoSt
       }
     },
     stop: () => {
+      if (endTime.current !== null) return; // Already stopped
       endTime.current = Date.now();
       if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
       setNow(Date.now());
@@ -66,6 +69,13 @@ const SolveTimer = React.forwardRef<SolveTimerHandle, SolveTimerProps>(({ autoSt
       endTime.current = time;
       if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
       setNow(time);
+    },
+    reset: () => {
+      startTime.current = null;
+      firstMoveAt.current = null;
+      endTime.current = null;
+      if (intervalRef.current !== undefined) { clearInterval(intervalRef.current); intervalRef.current = undefined; }
+      setNow(Date.now());
     },
     getTimes: () => {
       const start = startTime.current ?? Date.now();

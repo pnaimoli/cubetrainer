@@ -13,6 +13,7 @@ export interface CubeTimerPlayerHandle {
   stop: () => void;
   stopAt: (time: number) => void;
   start: () => void;
+  reset: () => void;
   getStartTime: () => number;
   getTimes: () => { inspectionMs: number; executionMs: number };
 }
@@ -61,6 +62,9 @@ const CubeTimerPlayer = React.forwardRef<CubeTimerPlayerHandle, CubeTimerPlayerP
         const now = Date.now();
         startTimeRef.current = now;
         timerRef.current?.start(now);
+      },
+      reset: () => {
+        timerRef.current?.reset();
       },
       getStartTime: () => startTimeRef.current,
       getTimes: () => timerRef.current?.getTimes() ?? { inspectionMs: 0, executionMs: 0 },
