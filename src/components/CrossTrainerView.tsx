@@ -46,6 +46,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const [phase, setPhase] = useState<Phase>('scrambling');
   const [selectedGen, setSelectedGen] = useState<string>('');
   const [diffKey, setDiffKey] = useState(0);
+  const [retryMoves, setRetryMoves] = useState<string[]>([]);
   const movesRef = useRef<Move[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
@@ -221,6 +222,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setCrossFace(face);
     setExtraRotation(randomRotationString(randomRotationAxisRef.current));
     isRetryRef.current = false;
+    setRetryMoves([]);
     solvedRef.current = false;
     setPhase('scrambling');
     setResult(null);
@@ -245,6 +247,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     if (phase === 'solved') {
       isRetryRef.current = true;
       solvedRef.current = false;
+      setRetryMoves(movesRef.current.map(m => m.move));
       setPhase('scrambling');
       setResult(null);
 
@@ -353,6 +356,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     isRetryRef.current = true;
     solvedRef.current = false;
     cubeTimerRef.current?.stop();
+    setRetryMoves(movesRef.current.map(m => m.move));
     setPhase('scrambling');
     setResult(null);
 
@@ -529,6 +533,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                   scramble={scramble}
                   phase={phase}
                   onScrambleComplete={handleScrambleComplete}
+                  retryMoves={isRetryRef.current ? retryMoves : undefined}
                 />
               </Box>
 

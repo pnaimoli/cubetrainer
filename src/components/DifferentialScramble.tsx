@@ -3,6 +3,7 @@ import { GanCubeConnection } from 'gan-web-bluetooth';
 import { Group, Text } from '@mantine/core';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { requestFacelets, computeTransitionMoves, simplifyMoves } from '../util/cubeState';
+import { invertQuarterTurn } from '../util/scrambleGuideState';
 import ScrambleGuide from './ScrambleGuide';
 
 interface DifferentialScrambleProps {
@@ -11,10 +12,12 @@ interface DifferentialScrambleProps {
   scramble: string;
   phase: string;
   onScrambleComplete: () => void;
+  /** Quarter-turn moves from the previous solve attempt (for retry optimization) */
+  retryMoves?: string[];
 }
 
 export default function DifferentialScramble({
-  conn, kpuzzle, scramble, phase, onScrambleComplete,
+  conn, kpuzzle, scramble, phase, onScrambleComplete, retryMoves,
 }: DifferentialScrambleProps) {
   const [transitionMoves, setTransitionMoves] = useState<string[]>([]);
   const [computing, setComputing] = useState(false);
@@ -36,8 +39,19 @@ export default function DifferentialScramble({
     setComputing(true);
     try {
       const facelets = await requestFacelets(conn);
-      const rawMoves = await computeTransitionMoves(facelets, targetScramble, kpuzzle);
-      const simplified = simplifyMoves(rawMoves);
+      const kociembaMoves = await computeTransitionMoves(facelets, targetScramble, kpuzzle);
+      const kociembaSimplified = simplifyMoves(kociembaMoves);
+
+      // On retry, inverting the solve moves is often shorter than Kociemba
+      let simplified = kociembaSimplified;
+      if (retryMoves && retryMoves.length > 0) {
+        const inverted = simplifyMoves(
+          [...retryMoves].reverse().map(invertQuarterTurn)
+        );
+        if (inverted.length < simplified.length) {
+          simplified = inverted;
+        }
+      }
       if (scrambleRef.current === targetScramble) {
         if (simplified.length === 0) {
           hasComputed.current = true;
