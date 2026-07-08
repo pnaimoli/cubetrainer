@@ -4,7 +4,7 @@ import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, 
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
-import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp } from 'react-icons/tb';
+import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp, TbReport } from 'react-icons/tb';
 import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -20,6 +20,7 @@ import FaceColorPicker from './FaceColorPicker';
 import DifferentialScramble from './DifferentialScramble';
 import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
+import CrossReportsView from './CrossReportsView';
 
 interface CrossTrainerViewProps {
   conn: GanCubeConnection | null;
@@ -57,6 +58,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const solvedRef = useRef(false);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
+  const [showReports, setShowReports] = useState(false);
 
   const [crossStats, setCrossStats] = useLocalStorage<CrossStat[]>({ key: 'crossStats', defaultValue: [], getInitialValueInEffect: false });
   const [showHintFacelets, setShowHintFacelets] = useLocalStorage<boolean>({ key: 'cross_showHintFacelets', defaultValue: settings.showHintFacelets, getInitialValueInEffect: false });
@@ -458,6 +460,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
 
   const summaryRecords = [{ id: 'current' }];
 
+  if (showReports) {
+    return <CrossReportsView stats={crossStats} onBack={() => setShowReports(false)} />;
+  }
+
   return (
     <Grid>
       <Grid.Col span={12}>
@@ -614,6 +620,12 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                   <Menu.Dropdown>
                     <Menu.Item leftSection={<TbInfoCircle />} disabled>
                       Hint: double-click a row to remove that time
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbReport style={{ width: rem(14), height: rem(14) }} />}
+                      onClick={() => setShowReports(true)}
+                    >
+                      Reports
                     </Menu.Item>
                     <Menu.Item
                       leftSection={<TbDownload style={{ width: rem(14), height: rem(14) }} />}
