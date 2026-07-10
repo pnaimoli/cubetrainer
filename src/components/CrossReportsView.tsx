@@ -62,6 +62,7 @@ const CrossReportsView: React.FC<CrossReportsViewProps> = ({ stats, onBack }) =>
   const [timeType, setTimeType] = useLocalStorage<'insp' | 'exec'>({ key: 'crossReportTimeType', defaultValue: 'exec', getInitialValueInEffect: false });
   const [eliminateOutliers, setEliminateOutliers] = useLocalStorage<boolean>({ key: 'crossReportEliminateOutliers', defaultValue: true, getInitialValueInEffect: false });
   const [timelineCase, setTimelineCase] = useState<string>('all');
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus<CaseReport>>({
     columnAccessor: 'name',
     direction: 'asc',
@@ -164,13 +165,12 @@ const CrossReportsView: React.FC<CrossReportsViewProps> = ({ stats, onBack }) =>
     return times.map((_, i) => {
       const point: Record<string, number> = { solve: i + 1 };
       for (const { window, label } of MOVING_AVERAGES) {
-        if (i + 1 >= window) {
-          const slice = times.slice(i + 1 - window, i + 1);
-          const val = metric === 'mean'
-            ? slice.reduce((a, b) => a + b, 0) / window
-            : computeMedian(slice);
-          point[label] = val / 1000;
-        }
+        const size = Math.min(window, i + 1);
+        const slice = times.slice(i + 1 - size, i + 1);
+        const val = metric === 'mean'
+          ? slice.reduce((a, b) => a + b, 0) / size
+          : computeMedian(slice);
+        point[label] = val / 1000;
       }
       return point;
     });
@@ -284,7 +284,17 @@ const CrossReportsView: React.FC<CrossReportsViewProps> = ({ stats, onBack }) =>
               labelFormatter={(v) => `Solve #${v}`}
               formatter={(value) => [(value as number).toFixed(2) + 's']}
             />
-            <Legend wrapperStyle={{ paddingTop: 20 }} />
+            <Legend
+              wrapperStyle={{ paddingTop: 20, cursor: 'pointer' }}
+              onClick={(e) => {
+                const key = e.dataKey as string;
+                setHiddenLines(prev => {
+                  const next = new Set(prev);
+                  if (next.has(key)) next.delete(key); else next.add(key);
+                  return next;
+                });
+              }}
+            />
             {MOVING_AVERAGES.map(({ label, color }) => (
               <Line
                 key={label}
@@ -294,6 +304,7 @@ const CrossReportsView: React.FC<CrossReportsViewProps> = ({ stats, onBack }) =>
                 dot={false}
                 connectNulls
                 isAnimationActive={false}
+                hide={hiddenLines.has(label)}
               />
             ))}
           </LineChart>
