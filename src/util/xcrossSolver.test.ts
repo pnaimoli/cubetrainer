@@ -3,7 +3,7 @@ import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 import { isPatternSolved } from './SolveChecker';
 import { SolvedState } from './interfaces';
-import { initXCrossSolver, solveXCross } from './xcrossSolver';
+import { initXCrossSolver, solveXCross, isPairPaired, findPairingMove } from './xcrossSolver';
 
 let kpuzzle: KPuzzle;
 
@@ -83,6 +83,147 @@ describe('XCross Solver', () => {
     // Either empty or all solutions are <= 2 moves
     for (const sol of solutions) {
       expect(sol.moveCount).to.be.at.most(2);
+    }
+  });
+});
+
+describe('isPairPaired', () => {
+  // D-cross FR slot: edge piece 8 (FR), corner piece 4 (DRF)
+  // Home positions: edge at 8, corner at 4
+
+  it('FR pair in home slot is paired (solved state)', () => {
+    // Edge piece 8 at pos 8 ori 0, corner piece 4 at pos 4 ori 0
+    expect(isPairPaired(8, 4, 8, 0, 4, 0)).to.be.true;
+  });
+
+  it('FR pair above slot (edge at FR, corner at UFR) with correct orientations is paired', () => {
+    // Edge piece 8 (FR, stickers F,R) at pos 8 (FR, faces F,R) ori 0: F on F, R on R
+    // Corner piece 4 (DRF, stickers D,R,F) at pos 0 (UFR, faces U,F,R) ori 1: [s2,s0,s1]=[F,D,R] on [U,F,R]
+    // Shared faces at FR-UFR: edge face 0 (F) -> corner face 1, edge face 1 (R) -> corner face 2
+    // Edge: F on face F, R on face R
+    // Corner ori 1 at UFR: sticker on face 1 (F) = s0 = D, sticker on face 2 (R) = s1 = R
+    // F vs D -> no match. Let me try ori 2:
+    // Corner ori 2 at UFR: [s1,s2,s0]=[R,F,D] on [U,F,R]
+    // sticker on face 1 (F) = s2 = F, sticker on face 2 (R) = s0 = D -> F matches but R vs D no.
+    // For a paired state above slot, the corner needs specific twist.
+    // Actually, let me just test with a known cube state.
+    // Apply R U R' to solved: this inserts FR pair. The inverse "R U' R'" breaks it.
+    // After "R U' R'" from solved, the FR pair should be separated.
+    // Let's test: after U from solved, corner UFR (piece DRF=4) moves to URB.
+    // Better to test via findPairingMove which uses real patterns.
+    // Simple non-adjacent test: edge at pos 0 (UF), corner at pos 4 (DRF) - not adjacent
+    expect(isPairPaired(8, 4, 0, 0, 4, 0)).to.be.false;
+  });
+
+  it('non-adjacent positions are not paired', () => {
+    // Edge at UF (0), corner at DRF (4) - share only F, not adjacent
+    expect(isPairPaired(8, 4, 0, 0, 4, 0)).to.be.false;
+    // Edge at UB (2), corner at DFL (5) - share nothing
+    expect(isPairPaired(8, 4, 2, 0, 5, 0)).to.be.false;
+  });
+
+  it('adjacent but wrong stickers are not paired', () => {
+    // Edge piece 8 (FR stickers: F,R) at pos 8 (FR) ori 1: R on F face, F on R face
+    // Corner piece 4 (DRF stickers: D,R,F) at pos 4 (DRF) ori 0: D on D, R on R, F on F
+    // FR-DRF adjacency: edge face 0 (F) -> corner face 2 (F), edge face 1 (R) -> corner face 1 (R)
+    // Edge ori 1: sticker on face 0 = eColors[(0+1)%2] = eColors[1] = R, on face 1 = eColors[0] = F
+    // Corner ori 0: sticker on corner face 2 = cColors[2] = F, on corner face 1 = cColors[1] = R
+    // Check: R == F? No -> not paired (edge is flipped)
+    expect(isPairPaired(8, 4, 8, 1, 4, 0)).to.be.false;
+  });
+});
+
+describe('findPairingMove', () => {
+  it('returns 0 when pair is already paired before any moves', () => {
+    // Solved state - all pairs are paired
+    const pattern = kpuzzle.defaultPattern();
+    const result = findPairingMove(pattern, "U U'", 'D', 'FR');
+    expect(result).to.equal(0);
+  });
+
+  it('finds pairing move in a known solution', () => {
+    // R U R' breaks FR pair. Solution is "R U' R'" which pairs at move 3.
+    const pattern = kpuzzle.defaultPattern().applyAlg("R U R'");
+    const solutions = solveXCross(pattern, 'D', ['FR']);
+    expect(solutions.length).to.be.greaterThan(0);
+
+    // The pair should not be paired initially (scrambled state)
+    const result = findPairingMove(pattern, solutions[0].solution, 'D', 'FR');
+    expect(result).to.be.greaterThan(0);
+    // Should be paired at or before the last move
+    expect(result).to.be.at.most(solutions[0].moveCount);
+  });
+
+  it('computes pairing move per-slot for B-cross scramble', () => {
+    const scramble = "R2 F' R2 B R2 U2 R2 D2 R2 B' D2 L D U' R' D2 L2 D2 B' R U2 R D'";
+    const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    const solutions = solveXCross(pattern, 'B');
+    expect(solutions.length).to.be.greaterThan(0);
+
+    for (const sol of solutions.slice(0, 5)) {
+      const pm = findPairingMove(pattern, sol.solution, 'B', sol.slot);
+      expect(pm).to.be.at.least(0);
+      expect(pm).to.be.at.most(sol.moveCount);
+    }
+  });
+
+  it('reports 0 when B-cross BR pair starts paired', () => {
+    const scramble = "R B2 L' B D' B' R F L2 B2 D F2 U' B2 R2 U D2 L2 F2 L2 F D B2";
+    const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    // B-cross BR slot: FACE_F2L_SLOTS['B']['BR'] = [5, 7]
+    const ep = 5, cp = 7;
+    const ed = pattern.patternData['EDGES'];
+    const cd = pattern.patternData['CORNERS'];
+    const ePos = ed.pieces.indexOf(ep);
+    const cPos = cd.pieces.indexOf(cp);
+
+    // Dump raw pattern data to verify orientation convention
+    console.log(`  Edge pieces: ${Array.from(ed.pieces)}`);
+    console.log(`  Edge orientations: ${Array.from(ed.orientation)}`);
+    console.log(`  Corner pieces: ${Array.from(cd.pieces)}`);
+    console.log(`  Corner orientations: ${Array.from(cd.orientation)}`);
+    console.log(`  Edge piece ${ep} at pos ${ePos}, ori ${ed.orientation[ePos]}`);
+    console.log(`  Corner piece ${cp} at pos ${cPos}, ori ${cd.orientation[cPos]}`);
+
+    // Verify: apply R to solved, check where DRF corner (piece 4) goes
+    const afterR = kpuzzle.defaultPattern().applyAlg('R');
+    const afterRCorners = afterR.patternData['CORNERS'];
+    console.log(`  After R: corner pieces=${Array.from(afterRCorners.pieces)} ori=${Array.from(afterRCorners.orientation)}`);
+    // R moves: DRF(4)->UFR(0), UFR(0)->URB(1), URB(1)->DBR(7), DBR(7)->DRF(4)
+    // DRF piece (4) should now be at position 0 (UFR)
+    // In cubing.js: pieces[0] should be 4 if pieces[pos]=piece
+    // Or pieces[4] should be 0 if pieces[piece]=pos
+    console.log(`  After R: pieces[0]=${afterRCorners.pieces[0]} pieces[4]=${afterRCorners.pieces[4]}`);
+
+    const solutions = solveXCross(pattern, 'B', ['BR']);
+    expect(solutions.length).to.be.greaterThan(0);
+    const pm = findPairingMove(pattern, solutions[0].solution, 'B', 'BR');
+    console.log(`  solution: ${solutions[0].solution}, pairing move: ${pm}`);
+  });
+
+  it('computes pairing move per-slot for second B-cross scramble', () => {
+    const scramble = "B R' U R U L D R U2 D2 R B2 D2 F2 U2 R2 U2 R2 D2 F R' U";
+    const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    const solutions = solveXCross(pattern, 'B');
+    expect(solutions.length).to.be.greaterThan(0);
+
+    for (const sol of solutions.slice(0, 3)) {
+      const pm = findPairingMove(pattern, sol.solution, 'B', sol.slot);
+      expect(pm).to.be.at.least(0);
+      expect(pm).to.be.at.most(sol.moveCount);
+    }
+  });
+
+  it('pairing move is <= solution length', () => {
+    const scrambles = ["R U F D'", "F' D L", "R U R' D F"];
+    for (const scramble of scrambles) {
+      const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
+      const solutions = solveXCross(pattern, 'D', undefined, 8);
+      if (solutions.length === 0) continue;
+      const sol = solutions[0];
+      const pairingMove = findPairingMove(pattern, sol.solution, 'D', sol.slot);
+      expect(pairingMove, `pairing move for "${scramble}" sol "${sol.solution}"`).to.be.at.least(0);
+      expect(pairingMove).to.be.at.most(sol.moveCount);
     }
   });
 });

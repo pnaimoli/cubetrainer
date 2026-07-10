@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select, Slider } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, Divider, Menu, ActionIcon, rem, Modal, Chip, Skeleton, Select, Slider, RangeSlider } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -13,7 +13,7 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver, solveCross } from '../util/crossSolver';
-import { initXCrossSolver, solveXCross, XCrossSolution } from '../util/xcrossSolver';
+import { initXCrossSolver, solveXCross, XCrossSolution, findPairingMove } from '../util/xcrossSolver';
 import { movesToHTM, simplifyMoves } from '../util/cubeState';
 import { rankXCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import { FACE_TO_D_ROTATION, translateMove, translateSlot, randomRotationString } from '../util/crossRotation';
@@ -90,6 +90,10 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   // Minimum extra moves beyond cross optimal (0 = just must be strictly harder)
   const [minExtraMoves, setMinExtraMoves] = useLocalStorage<number>({ key: 'xcrossMinExtra', defaultValue: 0, getInitialValueInEffect: false });
 
+  // Pairing move range filter: [min, max] where pair becomes paired during solution
+  const [pairingRange, setPairingRange] = useState<[number, number]>([0, 10]);
+  const [pairingMoveNum, setPairingMoveNum] = useState<number | null>(null);
+
   // Clear old stats that lack required fields
   useEffect(() => {
     if (xcrossStats.length > 0 && !('executionMs' in xcrossStats[0])) {
@@ -147,11 +151,14 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   }, [solverSlotToDFrame]);
 
   // Stickering mask: highlight cross edges + target F2L pair
+  // Rotate pattern to D-frame so generateStickeringMask's hardcoded F2L slot definitions work correctly.
   const stickeringMask = useMemo(() => {
     if (!useMaskings || !kpuzzle || !scramble || !targetSlot) return null;
-    const setupPattern = kpuzzle.defaultPattern().applyAlg(scramble);
+    const baseRotation = FACE_TO_D_ROTATION[crossFace] ?? '';
+    const rotatedAlg = baseRotation ? `${scramble} ${baseRotation}` : scramble;
+    const setupPattern = kpuzzle.defaultPattern().applyAlg(rotatedAlg);
     const slotState = getDFrameSlotState(targetSlot);
-    return generateStickeringMask(setupPattern, SolvedState.CROSS | slotState, crossFace);
+    return generateStickeringMask(setupPattern, SolvedState.CROSS | slotState);
   }, [useMaskings, kpuzzle, scramble, crossFace, targetSlot, getDFrameSlotState]);
 
   // Initialize puzzle and solver
@@ -177,6 +184,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
   const minExtraRef = useRef(minExtraMoves);
   minExtraRef.current = minExtraMoves;
+
+  const pairingRangeRef = useRef(pairingRange);
+  pairingRangeRef.current = pairingRange;
 
   const selectedSlotsRef = useRef(selectedSlots);
   selectedSlotsRef.current = selectedSlots;
@@ -228,6 +238,22 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       return xcrossOpt > crossOpt && (xcrossOpt - crossOpt) >= Math.max(1, minExtra) ? crossOpt : null;
     };
 
+    // Check if the best solution's pairing move falls within the pairing range filter.
+    const pairRange = pairingRangeRef.current;
+    const computePairingMove = (pattern: KPattern, solutions: XCrossSolution[]): number => {
+      // Use the target slot's solution (same logic as targetSlot selection)
+      const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
+      const target = match.length > 0 ? match[0] : solutions[0];
+      return findPairingMove(pattern, target.solution, face, target.slot);
+    };
+    const checkPairingRange = (pattern: KPattern, solutions: XCrossSolution[]): { ok: boolean; pairingMove: number } => {
+      const pm = computePairingMove(pattern, solutions);
+      const best = solutions[0];
+      const isAny = pairRange[0] === 0 && pairRange[1] >= best.moveCount;
+      const ok = isAny || (pm >= pairRange[0] && pm <= Math.min(pairRange[1], best.moveCount));
+      return { ok, pairingMove: pm };
+    };
+
     // Generate a scramble with xcross solutions in the move range.
     // Rejects scrambles where xcross optimal <= cross optimal (free F2L pair).
     const findValidScramble = async () => {
@@ -241,14 +267,18 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
         const crossOpt = getCrossOptimalIfValid(basePattern, solutions);
         if (crossOpt === null) continue;
 
-        // No filter: use as-is
+        // No move count filter: use as-is
         if (targetMoves === 0) {
-          return { moves: baseScramble, solutions, crossOptimal: crossOpt };
+          const { ok, pairingMove } = checkPairingRange(basePattern, solutions);
+          if (!ok) continue;
+          return { moves: baseScramble, solutions, crossOptimal: crossOpt, pairingMove };
         }
 
         // Check if any solution already matches
         if (solutions.some(s => s.moveCount === targetMoves)) {
-          return { moves: baseScramble, solutions, crossOptimal: crossOpt };
+          const { ok, pairingMove } = checkPairingRange(basePattern, solutions);
+          if (!ok) continue;
+          return { moves: baseScramble, solutions, crossOptimal: crossOpt, pairingMove };
         }
 
         // Solution too long: shorten by appending prefix moves to the scramble
@@ -266,7 +296,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           if (newSolutions.some(s => s.moveCount === targetMoves)) {
             const newCrossOpt = getCrossOptimalIfValid(newPattern, newSolutions);
             if (newCrossOpt !== null) {
-              return { moves: newScramble, solutions: newSolutions, crossOptimal: newCrossOpt };
+              const { ok, pairingMove } = checkPairingRange(newPattern, newSolutions);
+              if (!ok) continue;
+              return { moves: newScramble, solutions: newSolutions, crossOptimal: newCrossOpt, pairingMove };
             }
           }
         }
@@ -283,12 +315,18 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
         setOptimalSolutions(solutions);
         setCrossOptimal(crossOpt);
         const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
-        setTargetSlot((match.length > 0 ? match[0] : solutions[0]).slot);
+        const target = match.length > 0 ? match[0] : solutions[0];
+        setTargetSlot(target.slot);
+        // Compute pairing move for the exact target solution
+        const pattern = kpuzzle.defaultPattern().applyAlg(moves);
+        const pm = findPairingMove(pattern, target.solution, face, target.slot);
+        setPairingMoveNum(pm >= 0 ? pm : null);
       } else {
         scrambleRef.current = '';
         setScramble('');
         setOptimalSolutions([]);
         setCrossOptimal(-1);
+        setPairingMoveNum(null);
         setTargetSlot('');
       }
       setSolving(false);
@@ -634,7 +672,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 ) : (
                   <Stack gap="xs">
                     {crossOptimal >= 0 && (
-                      <Text fz="xs" c="dimmed">Cross optimal: {crossOptimal} moves</Text>
+                      <Text fz="xs" c="dimmed">Cross optimal: {crossOptimal} moves{pairingMoveNum !== null && pairingMoveNum >= 0 ? ` | Pair at move ${pairingMoveNum}` : ''}</Text>
                     )}
                     {Object.entries(solutionsBySlot).map(([slot, sols]) => {
                       const moveCount = sols[0].solution.split(' ').filter(Boolean).length;
@@ -779,40 +817,67 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               />
             </Group>
             <Divider label="Solution Filter" />
-            <Text fz="sm">Moves: {xcrossMoveCount === 0 ? 'any' : xcrossMoveCount}</Text>
-            <Slider
-              min={0}
-              max={10}
-              step={1}
-              value={xcrossMoveCount}
-              onChange={setXcrossMoveCount}
-              marks={[{ value: 0, label: 'any' }, { value: 5, label: '5' }, { value: 10, label: '10' }]}
-              size="sm"
-              mb="xs"
-            />
-            <Text fz="sm">Min extra over cross: {minExtraMoves}</Text>
-            <Slider
-              min={0}
-              max={5}
-              step={1}
-              value={minExtraMoves}
-              onChange={setMinExtraMoves}
-              marks={[{ value: 0, label: '0' }, { value: 5, label: '5' }]}
-              size="sm"
-              mb="xs"
-            />
-            <Divider label="F2L Slots" />
-            <Chip.Group multiple value={selectedSlots} onChange={(val: string[]) => {
-              if (val.length > 0) setSelectedSlots(val);
-            }}>
-              <Group gap="xs">
-                {['FR', 'FL', 'BL', 'BR'].map(slot => (
-                  <Chip key={slot} value={slot} size="xs">
-                    {slot}
-                  </Chip>
-                ))}
-              </Group>
-            </Chip.Group>
+            <Group wrap="nowrap" gap="xs" align="center" mb="xs">
+              <Tooltip label="Filter scrambles to a specific optimal xcross move count" withArrow multiline w={250}>
+                <Text fz="sm" style={{ whiteSpace: 'nowrap', minWidth: '33%', cursor: 'help', textDecoration: 'underline dotted' }}>XCross Length:</Text>
+              </Tooltip>
+              <Slider
+                min={0}
+                max={10}
+                step={1}
+                value={xcrossMoveCount}
+                onChange={setXcrossMoveCount}
+                marks={Array.from({ length: 11 }, (_, i) => ({ value: i, label: i === 0 ? 'any' : String(i) }))}
+                size="sm"
+                style={{ flex: 1 }}
+              />
+            </Group>
+            <Group wrap="nowrap" gap="xs" align="center" mb="xs">
+              <Tooltip label="Minimum extra moves the xcross takes beyond the cross-only optimal" withArrow multiline w={250}>
+                <Text fz="sm" style={{ whiteSpace: 'nowrap', minWidth: '33%', cursor: 'help', textDecoration: 'underline dotted' }}>Cross {'\u0394'}:</Text>
+              </Tooltip>
+              <Slider
+                min={0}
+                max={5}
+                step={1}
+                value={minExtraMoves}
+                onChange={setMinExtraMoves}
+                marks={Array.from({ length: 6 }, (_, i) => ({ value: i, label: String(i) }))}
+                size="sm"
+                style={{ flex: 1 }}
+              />
+            </Group>
+            <Group wrap="nowrap" gap="xs" align="center" mb="lg">
+              <Tooltip label="Filter by when the F2L pair first becomes paired during the optimal solution. For example, 0 means the pair is already together in the scramble, while 2 means they don't come together until the 2nd move of the optimal xcross solution." withArrow multiline w={300}>
+                <Text fz="sm" style={{ whiteSpace: 'nowrap', minWidth: '33%', cursor: 'help', textDecoration: 'underline dotted' }}>Pairing Stage:</Text>
+              </Tooltip>
+              <RangeSlider
+                min={0}
+                max={10}
+                minRange={0}
+                size="sm"
+                defaultValue={[0, 10] as [number, number]}
+                marks={Array.from({ length: 11 }, (_, i) => ({ value: i, label: String(i) }))}
+                onChangeEnd={(val) => setPairingRange(val)}
+                style={{ flex: 1 }}
+              />
+            </Group>
+            <Group wrap="nowrap" gap="xs" align="center">
+              <Tooltip label="Only generate scrambles where the optimal xcross solves one of these F2L slots" withArrow multiline w={250}>
+                <Text fz="sm" style={{ whiteSpace: 'nowrap', minWidth: '33%', cursor: 'help', textDecoration: 'underline dotted' }}>Allowed Slot(s):</Text>
+              </Tooltip>
+              <Chip.Group multiple value={selectedSlots} onChange={(val: string[]) => {
+                if (val.length > 0) setSelectedSlots(val);
+              }}>
+                <Group gap="xs">
+                  {['FR', 'FL', 'BL', 'BR'].map(slot => (
+                    <Chip key={slot} value={slot} size="xs">
+                      {slot}
+                    </Chip>
+                  ))}
+                </Group>
+              </Chip.Group>
+            </Group>
           </Stack>
         </Card>
       </Grid.Col>

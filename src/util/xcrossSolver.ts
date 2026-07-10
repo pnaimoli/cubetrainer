@@ -242,6 +242,97 @@ function solveSlot(
   return solutions;
 }
 
+// Pairing detection: determines when an F2L corner-edge pair first becomes "paired up"
+// (geometrically adjacent with matching stickers on shared faces).
+
+// Faces for each edge position (index = position)
+const EDGE_POS_FACES: [string, string][] = [
+  ['U','F'], ['U','R'], ['U','B'], ['U','L'],  // UF, UR, UB, UL
+  ['D','F'], ['D','R'], ['D','B'], ['D','L'],  // DF, DR, DB, DL
+  ['F','R'], ['F','L'], ['B','R'], ['B','L'],  // FR, FL, BR, BL
+];
+
+// Faces for each corner position (index = position)
+const CORNER_POS_FACES: [string, string, string][] = [
+  ['U','F','R'], ['U','R','B'], ['U','B','L'], ['U','L','F'],  // UFR, URB, UBL, ULF
+  ['D','R','F'], ['D','F','L'], ['D','L','B'], ['D','B','R'],  // DRF, DFL, DLB, DBR
+];
+
+// Adjacency table: for each adjacent (edgePos, cornerPos) pair,
+// stores [cornerFaceIdx matching edge face 0, cornerFaceIdx matching edge face 1].
+// Every edge has exactly 2 adjacent corners (sharing both faces).
+const ADJACENCY: Record<string, [number, number]> = {
+  '0,0': [0,1], '0,3': [0,2],   // UF-UFR, UF-ULF
+  '1,0': [0,2], '1,1': [0,1],   // UR-UFR, UR-URB
+  '2,1': [0,2], '2,2': [0,1],   // UB-URB, UB-UBL
+  '3,2': [0,2], '3,3': [0,1],   // UL-UBL, UL-ULF
+  '4,4': [0,2], '4,5': [0,1],   // DF-DRF, DF-DFL
+  '5,4': [0,1], '5,7': [0,2],   // DR-DRF, DR-DBR
+  '6,6': [0,2], '6,7': [0,1],   // DB-DLB, DB-DBR
+  '7,5': [0,2], '7,6': [0,1],   // DL-DFL, DL-DLB
+  '8,0': [1,2], '8,4': [2,1],   // FR-UFR, FR-DRF
+  '9,3': [2,1], '9,5': [1,2],   // FL-ULF, FL-DFL
+  '10,1': [2,1], '10,7': [1,2], // BR-URB, BR-DBR
+  '11,2': [1,2], '11,6': [2,1], // BL-UBL, BL-DLB
+};
+
+// Check if an F2L edge-corner pair is "paired up" at their current positions.
+// Paired = geometrically adjacent with matching stickers on the 2 shared faces.
+export function isPairPaired(
+  edgePiece: number, cornerPiece: number,
+  edgePos: number, edgeOri: number,
+  cornerPos: number, cornerOri: number,
+): boolean {
+  const adj = ADJACENCY[`${edgePos},${cornerPos}`];
+  if (!adj) return false; // not adjacent
+
+  // Edge sticker on face index i = home face at index (i + eOri) % 2
+  const eColors = EDGE_POS_FACES[edgePiece];
+  const eSticker0 = eColors[(0 + edgeOri) % 2];
+  const eSticker1 = eColors[(1 + edgeOri) % 2];
+
+  // Corner sticker on face index i = home face at index (i + cOri) % 3
+  const cColors = CORNER_POS_FACES[cornerPiece];
+  const cSticker0 = cColors[(adj[0] + cornerOri) % 3];
+  const cSticker1 = cColors[(adj[1] + cornerOri) % 3];
+
+  return eSticker0 === cSticker0 && eSticker1 === cSticker1;
+}
+
+// Find the 1-based move index where the F2L pair first becomes paired during the solution.
+// Returns 0 if already paired before any moves, -1 if never paired (shouldn't happen).
+export function findPairingMove(
+  pattern: KPattern,
+  solution: string,
+  crossFace: string,
+  slot: string,
+): number {
+  const slotDef = FACE_F2L_SLOTS[crossFace]?.[slot];
+  if (!slotDef) return -1;
+  const [edgePiece, cornerPiece] = slotDef;
+
+  const checkPaired = (pat: KPattern): boolean => {
+    const edgeData = pat.patternData['EDGES'];
+    const cornerData = pat.patternData['CORNERS'];
+    const ePos = edgeData.pieces.indexOf(edgePiece);
+    const eOri = edgeData.orientation[ePos];
+    const cPos = cornerData.pieces.indexOf(cornerPiece);
+    const cOri = cornerData.orientation[cPos];
+    return isPairPaired(edgePiece, cornerPiece, ePos, eOri, cPos, cOri);
+  };
+
+  if (checkPaired(pattern)) return 0;
+
+  const moves = solution.split(/\s+/).filter(Boolean);
+  let current = pattern;
+  for (let i = 0; i < moves.length; i++) {
+    current = current.applyAlg(moves[i]);
+    if (checkPaired(current)) return i + 1;
+  }
+
+  return -1;
+}
+
 export function solveXCross(
   pattern: KPattern,
   crossFace: string = 'D',

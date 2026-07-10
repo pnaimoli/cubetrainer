@@ -1,6 +1,14 @@
 /* Make sure the styles are applied IN THE CORRECT order */
 @layer mantine, mantine-datatable;
 
+/* Prevent chip jitter - use same padding always, hide checkmark */
+.mantine-Chip-label {
+  padding-inline: var(--chip-padding) !important;
+}
+.mantine-Chip-iconWrapper {
+  display: none;
+}
+
 .reports-table thead th {
   background-color: var(--mantine-color-dark-5);
   border-bottom: 2px solid var(--mantine-color-dark-3);
