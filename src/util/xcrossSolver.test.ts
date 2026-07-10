@@ -142,16 +142,13 @@ describe('findPairingMove', () => {
   });
 
   it('finds pairing move in a known solution', () => {
-    // R U R' breaks FR pair. Solution is "R U' R'" which pairs at move 3.
-    const pattern = kpuzzle.defaultPattern().applyAlg("R U R'");
+    // R U' R' separates the FR pair (corner twisted in slot, edge on U layer)
+    const pattern = kpuzzle.defaultPattern().applyAlg("R U' R'");
     const solutions = solveXCross(pattern, 'D', ['FR']);
     expect(solutions.length).to.be.greaterThan(0);
 
-    // The pair should not be paired initially (scrambled state)
     const result = findPairingMove(pattern, solutions[0].solution, 'D', 'FR');
-    expect(result).to.be.greaterThan(0);
-    // Should be paired at or before the last move
-    expect(result).to.be.at.most(solutions[0].moveCount);
+    expect(result).to.equal(1);
   });
 
   it('computes pairing move per-slot for B-cross scramble', () => {
@@ -170,35 +167,10 @@ describe('findPairingMove', () => {
   it('reports 0 when B-cross BR pair starts paired', () => {
     const scramble = "R B2 L' B D' B' R F L2 B2 D F2 U' B2 R2 U D2 L2 F2 L2 F D B2";
     const pattern = kpuzzle.defaultPattern().applyAlg(scramble);
-    // B-cross BR slot: FACE_F2L_SLOTS['B']['BR'] = [5, 7]
-    const ep = 5, cp = 7;
-    const ed = pattern.patternData['EDGES'];
-    const cd = pattern.patternData['CORNERS'];
-    const ePos = ed.pieces.indexOf(ep);
-    const cPos = cd.pieces.indexOf(cp);
-
-    // Dump raw pattern data to verify orientation convention
-    console.log(`  Edge pieces: ${Array.from(ed.pieces)}`);
-    console.log(`  Edge orientations: ${Array.from(ed.orientation)}`);
-    console.log(`  Corner pieces: ${Array.from(cd.pieces)}`);
-    console.log(`  Corner orientations: ${Array.from(cd.orientation)}`);
-    console.log(`  Edge piece ${ep} at pos ${ePos}, ori ${ed.orientation[ePos]}`);
-    console.log(`  Corner piece ${cp} at pos ${cPos}, ori ${cd.orientation[cPos]}`);
-
-    // Verify: apply R to solved, check where DRF corner (piece 4) goes
-    const afterR = kpuzzle.defaultPattern().applyAlg('R');
-    const afterRCorners = afterR.patternData['CORNERS'];
-    console.log(`  After R: corner pieces=${Array.from(afterRCorners.pieces)} ori=${Array.from(afterRCorners.orientation)}`);
-    // R moves: DRF(4)->UFR(0), UFR(0)->URB(1), URB(1)->DBR(7), DBR(7)->DRF(4)
-    // DRF piece (4) should now be at position 0 (UFR)
-    // In cubing.js: pieces[0] should be 4 if pieces[pos]=piece
-    // Or pieces[4] should be 0 if pieces[piece]=pos
-    console.log(`  After R: pieces[0]=${afterRCorners.pieces[0]} pieces[4]=${afterRCorners.pieces[4]}`);
-
     const solutions = solveXCross(pattern, 'B', ['BR']);
     expect(solutions.length).to.be.greaterThan(0);
     const pm = findPairingMove(pattern, solutions[0].solution, 'B', 'BR');
-    console.log(`  solution: ${solutions[0].solution}, pairing move: ${pm}`);
+    expect(pm).to.equal(0);
   });
 
   it('computes pairing move per-slot for second B-cross scramble', () => {
