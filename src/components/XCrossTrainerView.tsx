@@ -31,6 +31,34 @@ const SLOT_SOLVED_STATE: Record<string, SolvedState> = {
 };
 
 
+interface XCrossMoveCountDisplayHandle {
+  update: (n: number) => void;
+}
+
+interface XCrossMoveCountDisplayProps {
+  optimalMoves: number;
+  phase: string;
+  result: { userMoves: number } | null;
+}
+
+const XCrossMoveCountDisplay = React.forwardRef<XCrossMoveCountDisplayHandle, XCrossMoveCountDisplayProps>(
+  ({ optimalMoves, phase, result }, ref) => {
+    const [moves, setMoves] = useState(0);
+
+    React.useImperativeHandle(ref, () => ({
+      update: (n: number) => { setMoves(n); },
+    }));
+
+    const curMoves = phase === 'solving' ? moves : (result ? result.userMoves : 0);
+    const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+    return (
+      <Text fz="lg" fw={700} c="dimmed">
+        <Text span c={moveColor} inherit>{curMoves} moves</Text>
+      </Text>
+    );
+  }
+);
+
 interface XCrossTrainerViewProps {
   conn: GanCubeConnection | null;
   settings: Settings;
@@ -60,7 +88,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const movesRef = useRef<Move[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
-  const [moveCount, setMoveCount] = useState(0);
+  const userMoveCountRef = useRef(0);
+  const moveCountDisplayRef = useRef<XCrossMoveCountDisplayHandle>(null);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
   const isRetryRef = useRef(false);
   const solvedRef = useRef(false);
@@ -218,7 +247,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setResult(null);
     cubeTimerRef.current?.reset();
     movesRef.current = [];
-    setMoveCount(0);
+    userMoveCountRef.current = 0;
+    moveCountDisplayRef.current?.update(0);
     setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
@@ -363,7 +393,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       setResult(null);
 
       movesRef.current = [];
-      setMoveCount(0);
+      userMoveCountRef.current = 0;
+      moveCountDisplayRef.current?.update(0);
       setCaseKey(k => k + 1);
       setShowSliceWarning(false);
       return;
@@ -392,7 +423,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
     const moveStrs = newMoves.map(m => m.move);
-    setMoveCount(movesToHTM(moveStrs));
+    userMoveCountRef.current = movesToHTM(moveStrs);
+    moveCountDisplayRef.current?.update(userMoveCountRef.current);
     cubeTimerRef.current?.addMove(translateMove(event.move, displayRotation));
     badgesRef.current?.notify();
 
@@ -462,7 +494,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setResult(null);
 
     movesRef.current = [];
-    setMoveCount(0);
+    userMoveCountRef.current = 0;
+    moveCountDisplayRef.current?.update(0);
     setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
@@ -618,16 +651,12 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 ) : undefined}
               />
               <Stack align="center" gap={0}>
-                {(() => {
-                  const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
-                  const curMoves = phase === 'solving' ? moveCount : (result ? result.userMoves : 0);
-                  const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-                  return (
-                    <Text fz="lg" fw={700} c={moveColor}>
-                      {curMoves} moves
-                    </Text>
-                  );
-                })()}
+                <XCrossMoveCountDisplay
+                  ref={moveCountDisplayRef}
+                  optimalMoves={optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0}
+                  phase={phase}
+                  result={result}
+                />
               </Stack>
 
               <Divider label="Scramble" />

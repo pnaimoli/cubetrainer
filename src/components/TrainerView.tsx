@@ -118,6 +118,9 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
     // Rotate the pattern so cross is on D and F2L slots align with the visual display.
     // displayRotation includes extra y rotations; fall back to base rotation from crossFace.
     const rotation = displayRotation ?? (crossFace && crossFace !== 'D' ? FACE_TO_D_ROTATION[crossFace] : '');
+    const moveString = (movesRef.current ?? []).map((move) => move.move).join(' ');
+    let currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
+    if (rotation) currentPattern = currentPattern.applyAlg(rotation);
 
     return (
       <Group gap="xs" p="xs" visibleFrom="md">
@@ -126,10 +129,7 @@ export const SolvedStateBadges = React.forwardRef<SolvedStateBadgesHandle, Solve
           .map((key) => {
             const solvedStateValue = SolvedState[key as keyof typeof SolvedState];
             const isActive = (solvedStateValue & effectiveSolvedState) === solvedStateValue;
-            const moveString = (movesRef.current ?? []).map((move) => move.move).join(' ');
-            let currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
-            if (rotation) currentPattern = currentPattern.applyAlg(rotation);
-            const solved = isPatternSolved(currentPattern, SolvedState[key as keyof typeof SolvedState]);
+            const solved = isPatternSolved(currentPattern, solvedStateValue);
 
             return (
               <Badge

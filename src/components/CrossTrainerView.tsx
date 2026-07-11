@@ -22,6 +22,41 @@ import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
 import CrossReportsView from './CrossReportsView';
 
+interface MoveCountDisplayHandle {
+  update: (moves: number, gens: number) => void;
+}
+
+interface MoveCountDisplayProps {
+  optimalMoves: number;
+  optimalGen: number;
+  phase: string;
+  result: { userMoves: number } | null;
+}
+
+const MoveCountDisplay = React.forwardRef<MoveCountDisplayHandle, MoveCountDisplayProps>(
+  ({ optimalMoves, optimalGen, phase, result }, ref) => {
+    const [moves, setMoves] = useState(0);
+    const [gens, setGens] = useState(0);
+
+    React.useImperativeHandle(ref, () => ({
+      update: (m: number, g: number) => { setMoves(m); setGens(g); },
+    }));
+
+    const curMoves = phase === 'solving' ? moves : (result ? result.userMoves : 0);
+    const curGen = phase === 'solving' ? gens : gens;
+    const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+    const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+    return (
+      <Text fz="lg" fw={700} c="dimmed">
+        <Text span c={moveColor} inherit>{curMoves} moves</Text>
+        {' ('}
+        <Text span c={gColor} inherit>{curGen}-gen</Text>
+        {')'}
+      </Text>
+    );
+  }
+);
+
 interface CrossTrainerViewProps {
   conn: GanCubeConnection | null;
   settings: Settings;
@@ -50,8 +85,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   const movesRef = useRef<Move[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
-  const [moveCount, setMoveCount] = useState(0);
-  const [genCount, setGenCount] = useState(0);
+  const userMoveCountRef = useRef(0);
+  const userGenCountRef = useRef(0);
+  const moveCountDisplayRef = useRef<MoveCountDisplayHandle>(null);
   const [showSliceWarning, setShowSliceWarning] = useState(false);
   const isRetryRef = useRef(false);
   const solvedRef = useRef(false);
@@ -229,8 +265,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     cubeTimerRef.current?.reset();
 
     movesRef.current = [];
-    setMoveCount(0);
-    setGenCount(0);
+    userMoveCountRef.current = 0;
+    userGenCountRef.current = 0;
+    moveCountDisplayRef.current?.update(0, 0);
     setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
@@ -252,8 +289,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       setResult(null);
 
       movesRef.current = [];
-      setMoveCount(0);
-      setGenCount(0);
+      userMoveCountRef.current = 0;
+      userGenCountRef.current = 0;
+      moveCountDisplayRef.current?.update(0, 0);
       setCaseKey(k => k + 1);
       setShowSliceWarning(false);
       return;
@@ -282,8 +320,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
     const moveStrs = newMoves.map(m => m.move);
-    setMoveCount(movesToHTM(moveStrs));
-    setGenCount(new Set(moveStrs.map(m => m.charAt(0))).size);
+    const simplified = simplifyMoves(moveStrs);
+    userMoveCountRef.current = simplified.length;
+    userGenCountRef.current = new Set(simplified.map(m => m.charAt(0))).size;
+    moveCountDisplayRef.current?.update(userMoveCountRef.current, userGenCountRef.current);
     cubeTimerRef.current?.addMove(translateMove(event.move, displayRotation));
     badgesRef.current?.notify();
 
@@ -360,8 +400,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     setResult(null);
 
     movesRef.current = [];
-    setMoveCount(0);
-    setGenCount(0);
+    userMoveCountRef.current = 0;
+    userGenCountRef.current = 0;
+    moveCountDisplayRef.current?.update(0, 0);
     setCaseKey(k => k + 1);
     setShowSliceWarning(false);
     setDiffKey(k => k + 1);
@@ -508,22 +549,13 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 ) : undefined}
               />
               <Stack align="center" gap={0}>
-                {(() => {
-                  const optimalMoves = optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0;
-                  const optimalGen = genGroups.length > 0 ? genGroups[0].genCount : 0;
-                  const curMoves = phase === 'solving' ? moveCount : (result ? result.userMoves : 0);
-                  const curGen = phase === 'solving' ? genCount : (result ? genCount : 0);
-                  const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-                  const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-                  return (
-                    <Text fz="lg" fw={700} c="dimmed">
-                      <Text span c={moveColor} inherit>{curMoves} moves</Text>
-                      {' ('}
-                      <Text span c={gColor} inherit>{curGen}-gen</Text>
-                      {')'}
-                    </Text>
-                  );
-                })()}
+                <MoveCountDisplay
+                  ref={moveCountDisplayRef}
+                  optimalMoves={optimalSolutions.length > 0 ? optimalSolutions[0].moveCount : 0}
+                  optimalGen={genGroups.length > 0 ? genGroups[0].genCount : 0}
+                  phase={phase}
+                  result={result}
+                />
               </Stack>
 
               <Divider label="Scramble" />
