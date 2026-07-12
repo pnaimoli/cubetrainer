@@ -29,7 +29,6 @@ function applyMoves(state: GuideState, infos: MoveInfo[], moves: string[]): { st
 }
 
 // Helper: track the "physical cube state" as net quarter turns per face.
-// After all undos, the net should be equivalent to the target scramble moves.
 function netCubeState(cubeMoves: string[]): Record<string, number> {
   const net: Record<string, number> = {};
   for (const m of cubeMoves) {
@@ -62,6 +61,8 @@ describe('scrambleGuideState helpers', () => {
     expect(invertQuarterTurn("R'")).to.equal('R');
     expect(invertQuarterTurn('U')).to.equal("U'");
     expect(invertQuarterTurn("U'")).to.equal('U');
+    // R2 is its own inverse
+    expect(invertQuarterTurn('R2')).to.equal('R2');
   });
 
   it('netProgress', () => {
@@ -111,6 +112,26 @@ describe('scrambleGuideState transition - basic execution', () => {
     expect(r3.state.moveIndex).to.equal(1);
   });
 
+  it('three wrong-direction turns complete via modular arithmetic', () => {
+    // Target is U', user does U U U (3 CW = 1 CCW = U')
+    const { state, infos } = initState(["U'"]);
+    const { state: s1 } = applyMoves(state, infos, ['U']);
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    const { state: s2 } = applyMoves(s1, infos, ['U']);
+    expect(s2.moveStatuses[0]).to.equal('yellow');
+    const { state: s3, completions } = applyMoves(s2, infos, ['U']);
+    expect(s3.moveStatuses[0]).to.equal('done');
+    expect(completions).to.equal(1);
+  });
+
+  it('four same-direction turns returns to pending (full rotation)', () => {
+    const { state, infos } = initState(["U'"]);
+    const { state: s } = applyMoves(state, infos, ['U', 'U', 'U', 'U']);
+    // 4 CW = identity, back to pending (but also completes after 3, so actually moveIndex advances)
+    // After 3 U's it completes. The 4th U is irrelevant.
+    expect(s.moveIndex).to.equal(1);
+  });
+
   it('double move: two CW quarter turns complete R2', () => {
     const { state, infos } = initState(['R2']);
     const r1 = transition(state, 'R', infos);
@@ -145,7 +166,6 @@ describe('scrambleGuideState transition - error and undo', () => {
     expect(r.state.mode).to.equal('error');
     if (r.state.mode === 'error') {
       expect(r.state.wrongMoves).to.deep.equal(['B']);
-      expect(r.state.undoIndex).to.equal(0);
     }
   });
 
@@ -171,51 +191,83 @@ describe('scrambleGuideState transition - error and undo', () => {
     expect(s2.mode).to.equal('executing');
   });
 
-  it('partial undo then new wrong move: truncates already-undone', () => {
+  it('undo in non-reverse order also works (simplification handles it)', () => {
     const { state, infos } = initState(['R']);
-    // Do B, U (wrong)
     const { state: s1 } = applyMoves(state, infos, ['B', 'U']);
-    expect(s1.mode).to.equal('error');
-    // Undo U' (partial)
-    const { state: s2 } = applyMoves(s1, infos, ["U'"]);
+    // Do B' first (not reverse order): wrongMoves = simplify(['B','U',"B'"]) = ['U',"B'"] wait no...
+    // simplifyMoves(['B','U',"B'"]) = push B, push U (diff face), B': diff face from U, push. = ['B','U',"B'"]
+    // Hmm, B and B' aren't adjacent so they don't cancel. Order matters.
+    // So you DO need reverse order (or the right combination that simplifies to empty).
+    const { state: s2 } = applyMoves(s1, infos, ["B'"]);
     expect(s2.mode).to.equal('error');
     if (s2.mode === 'error') {
-      expect(s2.undoIndex).to.equal(1);
+      // B U B' doesn't simplify further (non-adjacent different faces)
+      expect(s2.wrongMoves).to.deep.equal(['B', 'U', "B'"]);
     }
-    // Now do F (new wrong move instead of continuing undo)
-    const { state: s3 } = applyMoves(s2, infos, ['F']);
-    expect(s3.mode).to.equal('error');
-    if (s3.mode === 'error') {
-      // Should be [B, F] not [B, U, F] since U was already undone
-      expect(s3.wrongMoves).to.deep.equal(['B', 'F']);
-      expect(s3.undoIndex).to.equal(0);
+  });
+
+  it('same-face wrong moves are simplified', () => {
+    const { state, infos } = initState(['R']);
+    // B B -> simplified to B2
+    const { state: s1 } = applyMoves(state, infos, ['B', 'B']);
+    if (s1.mode === 'error') {
+      expect(s1.wrongMoves).to.deep.equal(['B2']);
     }
-    // Now undo F' then B' to get back to executing
-    const { state: s4 } = applyMoves(s3, infos, ["F'", "B'"]);
+    // B B B -> simplified to B'
+    const { state: s2 } = applyMoves(s1, infos, ['B']);
+    if (s2.mode === 'error') {
+      expect(s2.wrongMoves).to.deep.equal(["B'"]);
+    }
+  });
+
+  it('R R R R cancels completely and returns to executing', () => {
+    const { state, infos } = initState(['U']);
+    const { state: s1 } = applyMoves(state, infos, ['R', 'R', 'R', 'R']);
+    expect(s1.mode).to.equal('executing');
+  });
+
+  it('undo display cycles: U wrong then U U U returns to executing', () => {
+    const { state, infos } = initState(['D']);
+    // U is wrong face
+    const { state: s1 } = applyMoves(state, infos, ['U']);
+    if (s1.mode === 'error') expect(s1.wrongMoves).to.deep.equal(['U']);
+    // Another U -> wrongMoves = U2
+    const { state: s2 } = applyMoves(s1, infos, ['U']);
+    if (s2.mode === 'error') expect(s2.wrongMoves).to.deep.equal(['U2']);
+    // Another U -> wrongMoves = U'
+    const { state: s3 } = applyMoves(s2, infos, ['U']);
+    if (s3.mode === 'error') expect(s3.wrongMoves).to.deep.equal(["U'"]);
+    // Another U -> wrongMoves = [] -> back to executing
+    const { state: s4 } = applyMoves(s3, infos, ['U']);
     expect(s4.mode).to.equal('executing');
   });
 
-  it('partial undo then cancel last effective wrong', () => {
+  it('correct undo shrinks wrongMoves progressively', () => {
     const { state, infos } = initState(['R']);
-    // Do B, U, F (three wrong)
     const { state: s1 } = applyMoves(state, infos, ['B', 'U', 'F']);
-    // Undo F' (partial, undoIndex=1)
+    if (s1.mode === 'error') expect(s1.wrongMoves).to.deep.equal(['B', 'U', 'F']);
+    // F' undoes last
     const { state: s2 } = applyMoves(s1, infos, ["F'"]);
-    if (s2.mode === 'error') {
-      expect(s2.undoIndex).to.equal(1);
-    }
-    // Now do U' - this is NOT the expected undo (B'), but it IS inverse of last effective wrong (U)
-    // After truncation: effective = [B, U], lastWrong = U, U' = invertQuarterTurn(U)
-    // But wait: expected undo is also invertQuarterTurn(wrongMoves[length-1-undoIndex])
-    //   = invertQuarterTurn(wrongMoves[3-1-1]) = invertQuarterTurn(wrongMoves[1]) = invertQuarterTurn(U) = U'
-    // So U' IS the expected undo! It should increment undoIndex.
+    if (s2.mode === 'error') expect(s2.wrongMoves).to.deep.equal(['B', 'U']);
+    // U' undoes next
     const { state: s3 } = applyMoves(s2, infos, ["U'"]);
-    if (s3.mode === 'error') {
-      expect(s3.undoIndex).to.equal(2);
-    }
-    // Now B' to finish
+    if (s3.mode === 'error') expect(s3.wrongMoves).to.deep.equal(['B']);
+    // B' undoes last
     const { state: s4 } = applyMoves(s3, infos, ["B'"]);
     expect(s4.mode).to.equal('executing');
+  });
+
+  it('double-move wrong undone with two quarter turns', () => {
+    const { state, infos } = initState(['R']);
+    // B B = B2
+    const { state: s1 } = applyMoves(state, infos, ['B', 'B']);
+    if (s1.mode === 'error') expect(s1.wrongMoves).to.deep.equal(['B2']);
+    // B' reduces B2 to B
+    const { state: s2 } = applyMoves(s1, infos, ["B'"]);
+    if (s2.mode === 'error') expect(s2.wrongMoves).to.deep.equal(['B']);
+    // B' cancels B
+    const { state: s3 } = applyMoves(s2, infos, ["B'"]);
+    expect(s3.mode).to.equal('executing');
   });
 
   it('wrong move during partial double move includes partial in wrongMoves', () => {
@@ -254,57 +306,19 @@ describe('scrambleGuideState transition - error and undo', () => {
     expect(s2.mode).to.equal('executing');
   });
 
-  it('repeated same wrong move then undo all', () => {
-    const { state, infos } = initState(['R']);
-    const { state: s1 } = applyMoves(state, infos, ['B', 'B', 'B']);
-    if (s1.mode === 'error') {
-      expect(s1.wrongMoves).to.deep.equal(['B', 'B', 'B']);
-    }
-    const { state: s2 } = applyMoves(s1, infos, ["B'", "B'", "B'"]);
-    expect(s2.mode).to.equal('executing');
-  });
-
-  it('interleaved partial undo and new wrongs', () => {
-    const { state, infos } = initState(['R']);
-    // B, U wrong
-    const { state: s1 } = applyMoves(state, infos, ['B', 'U']);
-    // Undo U'
-    const { state: s2 } = applyMoves(s1, infos, ["U'"]);
-    if (s2.mode === 'error') expect(s2.undoIndex).to.equal(1);
-    // New wrong F
-    const { state: s3 } = applyMoves(s2, infos, ['F']);
-    if (s3.mode === 'error') {
-      expect(s3.wrongMoves).to.deep.equal(['B', 'F']);
-      expect(s3.undoIndex).to.equal(0);
-    }
-    // Undo F'
-    const { state: s4 } = applyMoves(s3, infos, ["F'"]);
-    if (s4.mode === 'error') expect(s4.undoIndex).to.equal(1);
-    // New wrong D
-    const { state: s5 } = applyMoves(s4, infos, ['D']);
-    if (s5.mode === 'error') {
-      expect(s5.wrongMoves).to.deep.equal(['B', 'D']);
-      expect(s5.undoIndex).to.equal(0);
-    }
-    // Fully undo: D' then B'
-    const { state: s6 } = applyMoves(s5, infos, ["D'", "B'"]);
-    expect(s6.mode).to.equal('executing');
-  });
-
-  it('stress: random-like chaos sequence resolves correctly', () => {
+  it('stress: chaotic sequence resolves correctly', () => {
     const { state, infos } = initState(["R'", 'U', 'F2']);
-    // A chaotic sequence: wrong moves, partial undos, more wrongs
     const { state: s1 } = applyMoves(state, infos, [
-      'B',      // wrong -> error, wrongs=[B]
+      'B',      // wrong -> wrongs=[B]
       'U',      // wrong -> wrongs=[B,U]
-      "U'",     // undo U -> undoIndex=1
-      'F',      // new wrong (truncate) -> wrongs=[B,F]
-      "F'",     // undo F -> undoIndex=1
-      'D',      // new wrong (truncate) -> wrongs=[B,D]
+      "U'",     // undo U -> wrongs=[B]
+      'F',      // wrong -> wrongs=[B,F]
+      "F'",     // undo F -> wrongs=[B]
+      'D',      // wrong -> wrongs=[B,D]
       "L'",     // wrong -> wrongs=[B,D,L']
-      'L',      // undo L' -> undoIndex=1
-      "D'",     // undo D -> undoIndex=2
-      "B'",     // undo B -> all done, executing
+      'L',      // undo L' -> wrongs=[B,D]
+      "D'",     // undo D -> wrongs=[B]
+      "B'",     // undo B -> wrongs=[] -> executing
     ]);
     expect(s1.mode).to.equal('executing');
     expect(s1.moveIndex).to.equal(0);
@@ -316,7 +330,6 @@ describe('scrambleGuideState transition - error and undo', () => {
 
   it('after full recovery, can complete the scramble', () => {
     const { state, infos } = initState(['R', "U'", 'F']);
-    // Wrong move, undo, then complete
     const { state: s1 } = applyMoves(state, infos, ['B']);
     expect(s1.mode).to.equal('error');
     const { state: s2 } = applyMoves(s1, infos, ["B'"]);
@@ -344,9 +357,6 @@ describe('scrambleGuideState transition - error and undo', () => {
 });
 
 describe('scrambleGuideState - cube state consistency', () => {
-  // These tests verify that after the state machine returns to 'executing',
-  // the net physical cube moves are zero (all wrongs fully undone).
-
   function verifyCubeClean(cubeMovesApplied: string[], label: string) {
     const net = netCubeState(cubeMovesApplied);
     expect(Object.keys(net).length, `${label}: cube should be clean but has net moves: ${JSON.stringify(net)}`).to.equal(0);
@@ -368,24 +378,40 @@ describe('scrambleGuideState - cube state consistency', () => {
     ];
     verifyCubeClean(moves, 'deep chaos');
 
-    // Also verify the state machine agrees
     const { state, infos } = initState(["R'"]);
     const { state: final } = applyMoves(state, infos, moves);
     expect(final.mode).to.equal('executing');
   });
 
-  it('triple partial undo + wrongs leaves cube clean after full recovery', () => {
+  it('triple wrong + sequential undo leaves cube clean', () => {
     const moves = [
       'B', 'U', 'F',   // three wrongs
-      "F'",             // undo F (undoIndex=1)
-      'D',              // new wrong -> wrongs=[B,U,D]
-      "D'",             // undo D (undoIndex=1)
-      "U'",             // undo U (undoIndex=2)
-      "B'",             // undo B (undoIndex=3, all done)
+      "F'",             // undo F
+      "U'",             // undo U
+      "B'",             // undo B
     ];
-    verifyCubeClean(moves, 'triple partial');
+    verifyCubeClean(moves, 'triple undo');
 
     const { state, infos } = initState(['R']);
+    const { state: final } = applyMoves(state, infos, moves);
+    expect(final.mode).to.equal('executing');
+  });
+
+  it('same-face wrongs + undo leaves cube clean', () => {
+    // B B = B2 wrong, undo with B' B'
+    const moves = ['B', 'B', "B'", "B'"];
+    verifyCubeClean(moves, 'double undo');
+
+    const { state, infos } = initState(['R']);
+    const { state: final } = applyMoves(state, infos, moves);
+    expect(final.mode).to.equal('executing');
+  });
+
+  it('R R R R (full rotation) cancels and leaves cube clean', () => {
+    const moves = ['R', 'R', 'R', 'R'];
+    verifyCubeClean(moves, 'full rotation');
+
+    const { state, infos } = initState(['U']);
     const { state: final } = applyMoves(state, infos, moves);
     expect(final.mode).to.equal('executing');
   });

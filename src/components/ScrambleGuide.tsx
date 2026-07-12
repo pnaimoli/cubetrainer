@@ -45,6 +45,8 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
 
   if (moves.length === 0) return null;
 
+  // Undo display: wrongMoves reversed and inverted.
+  // wrongMoves is already simplified, so the undo list is clean (no R R', D D, etc.)
   const undoMoves = state.mode === 'error'
     ? [...state.wrongMoves].reverse().map(invertQuarterTurn)
     : [];
@@ -86,25 +88,11 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
             );
           })}
           <Text ff="monospace" fz="sm" c="red" fw={700}>| Undo:</Text>
-          {undoMoves.map((move, i) => {
-            const isCompleted = i < state.undoIndex;
-            const isCurrent = i === state.undoIndex;
-
-            let color = 'gray.3';
-            let fw: number | undefined;
-            if (isCompleted) {
-              color = 'dimmed';
-            } else if (isCurrent) {
-              color = 'red';
-              fw = 700;
-            }
-
-            return (
-              <Text key={`undo-${i}`} ff="monospace" fz="sm" c={color} fw={fw}>
-                {move}
-              </Text>
-            );
-          })}
+          {undoMoves.map((move, i) => (
+            <Text key={`undo-${i}`} ff="monospace" fz="sm" c={i === 0 ? 'red' : 'gray.3'} fw={i === 0 ? 700 : undefined}>
+              {move}
+            </Text>
+          ))}
         </>
       )}
     </Group>

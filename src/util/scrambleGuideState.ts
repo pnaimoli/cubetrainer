@@ -1,5 +1,7 @@
 // Pure state machine for ScrambleGuide, extracted for testability.
 
+import { simplifyMoves } from './cubeState';
+
 export interface MoveInfo {
   face: string;
   isDouble: boolean;
@@ -19,7 +21,7 @@ export function parseMoveInfo(move: string): MoveInfo {
 
 export function invertQuarterTurn(move: string): string {
   const match = move.match(/^([A-Za-z])('?)$/);
-  if (!match) return move;
+  if (!match) return move; // R2 returns as-is (R2 is its own inverse)
   const [, face, prime] = match;
   return prime ? face : `${face}'`;
 }
@@ -47,8 +49,7 @@ export type GuideState =
       moveIndex: number;
       moveStatuses: MoveStatus[];
       partialMoves: string[];
-      wrongMoves: string[];
-      undoIndex: number;
+      wrongMoves: string[];  // simplified (may contain R2)
     };
 
 export type TransitionResult = { state: GuideState; completed: boolean };
@@ -88,8 +89,11 @@ export function transition(
         const newPartial = [...prev.partialMoves, actual];
         const net = netProgress(newPartial, info.face);
         const targetDir = info.expected === info.face ? 1 : -1;
+        // Use modular arithmetic: 3 CW turns = 1 CCW turn
+        const netMod = ((net % 4) + 4) % 4;
+        const targetMod = ((targetDir % 4) + 4) % 4;
 
-        if (net === targetDir) {
+        if (netMod === targetMod) {
           const newStatuses = [...prev.moveStatuses];
           newStatuses[prev.moveIndex] = 'done';
           const nextIndex = prev.moveIndex + 1;
@@ -101,13 +105,14 @@ export function transition(
         }
 
         const newStatuses = [...prev.moveStatuses];
-        newStatuses[prev.moveIndex] = net === 0 ? 'pending' : 'yellow';
+        newStatuses[prev.moveIndex] = netMod === 0 ? 'pending' : 'yellow';
         return { state: { ...prev, moveStatuses: newStatuses, partialMoves: newPartial }, completed: false };
       }
     }
 
-    // Wrong face
-    const wrongMoves = [...prev.partialMoves, actual];
+    // Wrong face: enter error mode with simplified wrongMoves
+    const wrongMoves = simplifyMoves([...prev.partialMoves, actual]);
+    if (wrongMoves.length === 0) return { state: { ...prev, partialMoves: [] }, completed: false };
     return {
       state: {
         mode: 'error',
@@ -115,54 +120,37 @@ export function transition(
         moveStatuses: prev.moveStatuses,
         partialMoves: [],
         wrongMoves,
-        undoIndex: 0,
       },
       completed: false,
     };
   }
 
-  // Error state
-  const undoMoves = [...prev.wrongMoves].reverse().map(invertQuarterTurn);
-  const expectedUndo = undoMoves[prev.undoIndex];
+  // Error state: every move appends to wrongMoves and re-simplifies.
+  // If the result is empty, all wrongs are undone and we return to executing.
+  const newWrongMoves = simplifyMoves([...prev.wrongMoves, actual]);
 
-  if (actual === expectedUndo) {
-    const nextUndoIndex = prev.undoIndex + 1;
-    if (nextUndoIndex >= undoMoves.length) {
-      const newStatuses = [...prev.moveStatuses];
-      newStatuses[prev.moveIndex] = 'pending';
-      return {
-        state: {
-          mode: 'executing',
-          moveIndex: prev.moveIndex,
-          moveStatuses: newStatuses,
-          partialMoves: [],
-        },
-        completed: false,
-      };
-    }
-    return { state: { ...prev, undoIndex: nextUndoIndex }, completed: false };
+  if (newWrongMoves.length === 0) {
+    const newStatuses = [...prev.moveStatuses];
+    newStatuses[prev.moveIndex] = 'pending';
+    return {
+      state: {
+        mode: 'executing',
+        moveIndex: prev.moveIndex,
+        moveStatuses: newStatuses,
+        partialMoves: [],
+      },
+      completed: false,
+    };
   }
 
-  const effectiveWrongs = prev.wrongMoves.slice(0, prev.wrongMoves.length - prev.undoIndex);
-
-  const lastWrong = effectiveWrongs[effectiveWrongs.length - 1];
-  if (lastWrong && actual === invertQuarterTurn(lastWrong)) {
-    const trimmed = effectiveWrongs.slice(0, -1);
-    if (trimmed.length === 0) {
-      const newStatuses = [...prev.moveStatuses];
-      newStatuses[prev.moveIndex] = 'pending';
-      return {
-        state: {
-          mode: 'executing',
-          moveIndex: prev.moveIndex,
-          moveStatuses: newStatuses,
-          partialMoves: [],
-        },
-        completed: false,
-      };
-    }
-    return { state: { ...prev, wrongMoves: trimmed, undoIndex: 0 }, completed: false };
-  }
-
-  return { state: { ...prev, wrongMoves: [...effectiveWrongs, actual], undoIndex: 0 }, completed: false };
+  return {
+    state: {
+      mode: 'error',
+      moveIndex: prev.moveIndex,
+      moveStatuses: prev.moveStatuses,
+      partialMoves: [],
+      wrongMoves: newWrongMoves,
+    },
+    completed: false,
+  };
 }
