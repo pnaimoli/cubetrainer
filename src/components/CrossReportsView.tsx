@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Card, Title, Group, SegmentedControl, Checkbox, Text, Button, Select } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
-import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { TbArrowLeft } from 'react-icons/tb';
 
 interface CrossStat {
@@ -295,6 +295,15 @@ const CrossReportsView: React.FC<CrossReportsViewProps> = ({ stats, onBack }) =>
                 });
               }}
             />
+            {timeType === 'insp' && timelineData.length > 0 && (() => {
+              const allValues = timelineData.flatMap(d =>
+                MOVING_AVERAGES.filter(({ label }) => !hiddenLines.has(label)).map(({ label }) => d[label] as number).filter(v => v != null)
+              );
+              const max = Math.max(...allValues);
+              return max >= 15 ? (
+                <ReferenceLine y={15} stroke="gray" strokeDasharray="4 4" strokeWidth={1} label={{ value: '15s', position: 'right', fill: 'gray', fontSize: 12 }} />
+              ) : null;
+            })()}
             {MOVING_AVERAGES.map(({ label, color }) => (
               <Line
                 key={label}
