@@ -302,6 +302,23 @@ export function faceCharToIndex(face: string): number {
   return FACE_NAMES.indexOf(face);
 }
 
+export function countCrossEdgesInPlace(pattern: KPattern, crossFace: string): number {
+  const edgeIndices = FACE_CROSS_EDGES[crossFace];
+  if (!edgeIndices) return 0;
+  let best = 0;
+  let current = pattern;
+  for (let rot = 0; rot < 4; rot++) {
+    if (rot > 0) current = current.applyAlg(crossFace);
+    const { pieces, orientations } = extractCrossState(current, edgeIndices);
+    let count = 0;
+    for (let i = 0; i < 4; i++) {
+      if (pieces[i] === edgeIndices[i] && orientations[i] === 0) count++;
+    }
+    best = Math.max(best, count);
+  }
+  return best;
+}
+
 function invertHTMMove(move: string): string {
   if (move.endsWith('2')) return move;
   if (move.endsWith("'")) return move.slice(0, -1);

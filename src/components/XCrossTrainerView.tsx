@@ -11,8 +11,8 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { randomScrambleForEvent } from 'cubing/scramble';
 import { initCrossSolver, solveCross } from '../util/crossSolver';
+import { generateCrossScramble, rotateScramble } from '../util/scrambleGenerator';
 import { initXCrossSolver, solveXCross, XCrossSolution, findPairingMove } from '../util/xcrossSolver';
 import { movesToHTM, simplifyMoves } from '../util/cubeState';
 import { rankXCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
@@ -96,14 +96,15 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [solutionsOpen, setSolutionsOpen] = useState(false);
   const [solving, setSolving] = useState(false);
+  const [searchAttempt, setSearchAttempt] = useState(0);
 
   const [xcrossStats, setXcrossStats] = useLocalStorage<XCrossStat[]>({ key: 'xcrossStats', defaultValue: [], getInitialValueInEffect: false });
   const [showHintFacelets, setShowHintFacelets] = useLocalStorage<boolean>({ key: 'xcross_showHintFacelets', defaultValue: settings.showHintFacelets, getInitialValueInEffect: false });
   const [useMaskings, setUseMaskings] = useLocalStorage<boolean>({ key: 'xcross_useMaskings', defaultValue: settings.useMaskings, getInitialValueInEffect: false });
   const [maskAfterFirstMove, setMaskAfterFirstMove] = useLocalStorage<boolean>({ key: 'xcross_maskAfterFirstMove', defaultValue: settings.maskAfterFirstMove, getInitialValueInEffect: false });
-  const [crossColors, setCrossColors] = useLocalStorage<string[]>({ key: 'xcrossColors', defaultValue: ['D'], getInitialValueInEffect: false });
-  const crossColorsRef = useRef(crossColors);
-  crossColorsRef.current = crossColors;
+  const [crossColor, setCrossColor] = useLocalStorage<string>({ key: 'xcrossColor', defaultValue: 'D', getInitialValueInEffect: false });
+  const crossColorRef = useRef(crossColor);
+  crossColorRef.current = crossColor;
   const [crossFace, setCrossFace] = useState('D');
   const [randomRotationAxis, setRandomRotationAxis] = useLocalStorage<string>({ key: 'xcrossRandomRotation', defaultValue: '', getInitialValueInEffect: false });
   const randomRotationAxisRef = useRef(randomRotationAxis);
@@ -122,6 +123,11 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   // Pairing move range filter: [min, max] where pair becomes paired during solution
   const [pairingRange, setPairingRange] = useState<[number, number]>([0, 10]);
   const [pairingMoveNum, setPairingMoveNum] = useState<number | null>(null);
+
+  // Cross pieces in place filter
+  const [crossPip, setCrossPip] = useState<number | null>(null);
+  const crossPipRef = useRef(crossPip);
+  crossPipRef.current = crossPip;
 
   // Clear old stats that lack required fields
   useEffect(() => {
@@ -223,8 +229,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const generateNewScramble = useCallback(async () => {
     if (!kpuzzle || !solverReady) return;
 
-    const colors = crossColorsRef.current;
-    const face = colors[Math.floor(Math.random() * colors.length)];
+    const face = crossColorRef.current;
     const targetMoves = moveCountRef.current;
     const extra = randomRotationString(randomRotationAxisRef.current);
     const rotation = [FACE_TO_D_ROTATION[face], extra].filter(Boolean).join(' ');
@@ -257,21 +262,17 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     setTargetSlot('');
 
     // Solve cross and check that xcross is sufficiently harder.
-    // Returns cross optimal if valid, null if xcross is too easy.
     const minExtra = minExtraRef.current;
     const getCrossOptimalIfValid = (pattern: KPattern, xcrossSolutions: XCrossSolution[]): number | null => {
       if (xcrossSolutions.length === 0) return null;
       const crossSolutions = solveCross(pattern, face);
       const crossOpt = crossSolutions.length > 0 ? crossSolutions[0].moveCount : 0;
       const xcrossOpt = xcrossSolutions[0].moveCount;
-      // Must be strictly harder, and at least minExtra moves beyond cross
       return xcrossOpt > crossOpt && (xcrossOpt - crossOpt) >= Math.max(1, minExtra) ? crossOpt : null;
     };
 
-    // Check if the best solution's pairing move falls within the pairing range filter.
     const pairRange = pairingRangeRef.current;
     const computePairingMove = (pattern: KPattern, solutions: XCrossSolution[]): number => {
-      // Use the target slot's solution (same logic as targetSlot selection)
       const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
       const target = match.length > 0 ? match[0] : solutions[0];
       return findPairingMove(pattern, target.solution, face, target.slot);
@@ -284,34 +285,33 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       return { ok, pairingMove: pm };
     };
 
-    // Generate a scramble with xcross solutions in the move range.
-    // Rejects scrambles where xcross optimal <= cross optimal (free F2L pair).
     const findValidScramble = async () => {
       for (let outerAttempt = 0; outerAttempt < 20; outerAttempt++) {
-        const scrambleAlg = await randomScrambleForEvent('333');
-        const baseScramble = scrambleAlg.toString();
-        const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
-        const solutions = solveXCross(basePattern, face, solverSlots);
+        setSearchAttempt(outerAttempt + 1);
+        const { scramble: dScramble } = await generateCrossScramble(kpuzzle, {
+          piecesInPlace: crossPipRef.current,
+        });
 
+        const baseScramble = face === 'D' ? dScramble : rotateScramble(dScramble, face);
+        const basePattern = kpuzzle.defaultPattern().applyAlg(baseScramble);
+
+        const solutions = solveXCross(basePattern, face, solverSlots);
         if (solutions.length === 0) continue;
         const crossOpt = getCrossOptimalIfValid(basePattern, solutions);
         if (crossOpt === null) continue;
 
-        // No move count filter: use as-is
         if (targetMoves === 0) {
           const { ok, pairingMove } = checkPairingRange(basePattern, solutions);
           if (!ok) continue;
           return { moves: baseScramble, solutions, crossOptimal: crossOpt, pairingMove };
         }
 
-        // Check if any solution already matches
         if (solutions.some(s => s.moveCount === targetMoves)) {
           const { ok, pairingMove } = checkPairingRange(basePattern, solutions);
           if (!ok) continue;
           return { moves: baseScramble, solutions, crossOptimal: crossOpt, pairingMove };
         }
 
-        // Solution too long: shorten by appending prefix moves to the scramble
         const best = solutions[0];
         if (best.moveCount > targetMoves) {
           const solMoves = best.solution.split(/\s+/).filter(Boolean);
@@ -347,7 +347,6 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
         const match = targetMoves > 0 ? solutions.filter(s => s.moveCount === targetMoves) : solutions;
         const target = match.length > 0 ? match[0] : solutions[0];
         setTargetSlot(target.slot);
-        // Compute pairing move for the exact target solution
         const pattern = kpuzzle.defaultPattern().applyAlg(moves);
         const pm = findPairingMove(pattern, target.solution, face, target.slot);
         setPairingMoveNum(pm >= 0 ? pm : null);
@@ -663,9 +662,12 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
               <Box px="xs" py="xs">
                 {solving ? (
-                  <Text fz="sm" c="dimmed">Searching for a scramble...</Text>
+                  <Text fz="sm" c="dimmed">Searching ({searchAttempt}/20)...</Text>
                 ) : !scramble ? (
-                  <Text fz="sm" c="red" fw={700}>No scrambles found!</Text>
+                  <Stack gap={2}>
+                    <Text fz="sm" c="red" fw={700}>No Scramble Found!</Text>
+                    <Text fz="xs" c="dimmed">Press &lt;New Scramble&gt; to try again.</Text>
+                  </Stack>
                 ) : (
                   <DifferentialScramble
                     key={diffKey}
@@ -829,7 +831,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
             <Divider label="Preorientation" />
             <Group gap="xs" align="center">
               <Text fz="sm">Cross:</Text>
-              <FaceColorPicker value={crossColors} onChange={setCrossColors} />
+              <FaceColorPicker value={crossColor} onChange={setCrossColor} />
             </Group>
             <Group gap="xs" align="center">
               <Tooltip label="Add random rotations around an axis after preorientation to train solving from different angles" withArrow multiline w={250}>
@@ -888,6 +890,21 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 defaultValue={[0, 10] as [number, number]}
                 marks={Array.from({ length: 11 }, (_, i) => ({ value: i, label: String(i) }))}
                 onChangeEnd={(val) => setPairingRange(val)}
+                style={{ flex: 1 }}
+              />
+            </Group>
+            <Group wrap="nowrap" gap="xs" align="center" mb="lg">
+              <Tooltip label="Filter by how many cross edges are already correctly positioned and oriented (best over all cross-face rotations)" withArrow multiline w={300}>
+                <Text fz="sm" style={{ whiteSpace: 'nowrap', minWidth: '33%', cursor: 'help', textDecoration: 'underline dotted' }}>Pieces in Place:</Text>
+              </Tooltip>
+              <Slider
+                min={-1}
+                max={4}
+                step={1}
+                size="sm"
+                value={crossPip === null ? -1 : crossPip}
+                onChange={(v) => setCrossPip(v === -1 ? null : v)}
+                marks={[{ value: -1, label: 'any' }, ...Array.from({ length: 5 }, (_, i) => ({ value: i, label: String(i) }))]}
                 style={{ flex: 1 }}
               />
             </Group>

@@ -7,19 +7,20 @@ const SHORT_NAMES: Record<string, string> = {
 };
 
 interface FaceColorPickerProps {
-  value: string[];
-  onChange: (value: string[]) => void;
+  value: string;
+  onChange: (value: string) => void;
 }
 
 export default function FaceColorPicker({ value, onChange }: FaceColorPickerProps) {
   return (
-    <Chip.Group multiple value={value} onChange={(val: string[]) => {
-      if (val.length > 0) onChange(val);
+    <Chip.Group value={value} onChange={(val: string | string[]) => {
+      const v = Array.isArray(val) ? val[0] : val;
+      if (v) onChange(v);
     }}>
       <Group gap={4}>
         {FACES.map(face => {
           const color = FACE_COLORS[face];
-          const active = value.includes(face);
+          const active = value === face;
           return (
             <Chip
               key={face}

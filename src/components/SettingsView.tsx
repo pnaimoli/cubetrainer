@@ -172,8 +172,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ disableAlgSelection = false
       <Group gap="xs" align="center">
         <Text fz="sm">Cross:</Text>
         <FaceColorPicker
-          value={settings.crossFaces ?? ['D']}
-          onChange={(value) => setSettings({ ...settings, crossFaces: value })}
+          value={(settings.crossFaces ?? ['D'])[0] ?? 'D'}
+          onChange={(value) => setSettings({ ...settings, crossFaces: [value] })}
         />
       </Group>
       <Group gap="xs" align="center">
