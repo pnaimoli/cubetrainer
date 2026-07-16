@@ -121,7 +121,7 @@ export function generateRandomCubeState(kpuzzle: KPuzzle, fixedCount: number): K
 export async function patternToScramble(pattern: KPattern): Promise<string> {
   const { experimentalSolve3x3x3IgnoringCenters } = await import('cubing/search');
   const solution = await experimentalSolve3x3x3IgnoringCenters(pattern);
-  return solution.invert().toString();
+  return solution.invert().toString().replace(/2'/g, '2');
 }
 
 export interface CrossScrambleOptions {

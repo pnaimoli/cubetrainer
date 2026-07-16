@@ -44,8 +44,9 @@ const MoveCountDisplay = React.forwardRef<MoveCountDisplayHandle, MoveCountDispl
 
     const curMoves = phase === 'solving' ? moves : (result ? result.userMoves : 0);
     const curGen = phase === 'solving' ? gens : gens;
-    const moveColor = curMoves > optimalMoves ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
-    const gColor = curGen > optimalGen ? 'red' : (phase === 'solved' ? 'green' : 'dimmed');
+    const showResult = phase === 'solved' || (phase === 'scrambling' && result);
+    const moveColor = curMoves > optimalMoves ? 'red' : (showResult ? 'green' : 'dimmed');
+    const gColor = curGen > optimalGen ? 'red' : (showResult ? 'green' : 'dimmed');
     return (
       <Text fz="lg" fw={700} c="dimmed">
         <Text span c={moveColor} inherit>{curMoves} moves</Text>
@@ -195,7 +196,11 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
   // Handle scramble complete - transition to solving
   const handleScrambleComplete = useCallback(() => {
     setPhase('solving');
+    setResult(null);
     movesRef.current = [];
+    userMoveCountRef.current = 0;
+    userGenCountRef.current = 0;
+    moveCountDisplayRef.current?.update(0, 0);
     cubeTimerRef.current?.start();
   }, []);
 
@@ -288,12 +293,10 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       isRetryRef.current = true;
       solvedRef.current = false;
       setPhase('scrambling');
-      setResult(null);
 
       movesRef.current = [];
       userMoveCountRef.current = 0;
       userGenCountRef.current = 0;
-      moveCountDisplayRef.current?.update(0, 0);
       setCaseKey(k => k + 1);
       setShowSliceWarning(false);
       return;
