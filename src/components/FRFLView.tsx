@@ -134,6 +134,7 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
 
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => generateAlg(selectedFL, selectedFR));
   const movesRef = useRef<Move[]>([]);
+  const consecutiveDRef = useRef<string[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
   const preorientationMoves = preorientationResult.moves;
@@ -259,14 +260,40 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
   }, [selectedFL, selectedFR, settings]);
 
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
-    if (event.type !== 'MOVE' || solvedRef.current) return;
+    if (event.type !== 'MOVE') return;
+
+    // D4 / D4' shortcuts: track consecutive D or D' across all phases
+    const move = event.move;
+    if (move === 'D' || move === "D'") {
+      const prev = consecutiveDRef.current;
+      if (prev.length === 0 || prev[0] === move) {
+        consecutiveDRef.current = [...prev, move];
+      } else {
+        consecutiveDRef.current = [move];
+      }
+      if (consecutiveDRef.current.length >= 4) {
+        consecutiveDRef.current = [];
+        if (move === 'D') {
+          movesRef.current = [];
+          solvedRef.current = false;
+          setCaseKey(k => k + 1);
+        } else {
+          advanceToNext();
+        }
+        return;
+      }
+    } else {
+      consecutiveDRef.current = [];
+    }
+
+    if (solvedRef.current) return;
 
     const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
     const now = Date.now();
     const cubeTs = event.cubeTimestamp ?? null;
 
     const prevMoves = movesRef.current;
-    const moveFace = event.move.charAt(0);
+    const moveFace = move.charAt(0);
     const isSliceRecovery = cubeTs === null
       && prevMoves.length > 0
       && OPPOSITE_FACES[prevMoves[prevMoves.length - 1].move.charAt(0)] === moveFace;
@@ -277,21 +304,10 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
       cubeTimerRef.current?.firstMove(timeOfMove);
     }
 
-    const newMove = { move: event.move, timeOfMove };
+    const newMove = { move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
-    cubeTimerRef.current?.addMove(event.move);
-
-    // D4 / D4' retry shortcut
-    if (newMoves.length >= 4) {
-      const last4 = newMoves.slice(-4).map(m => m.move);
-      if (last4.every(m => m === 'D') || last4.every(m => m === "D'")) {
-        movesRef.current = [];
-        solvedRef.current = false;
-        setCaseKey(k => k + 1);
-        return;
-      }
-    }
+    cubeTimerRef.current?.addMove(move);
 
     const moveString = newMoves.map(m => m.move).join(' ');
     let isSolved = false;
@@ -394,7 +410,7 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
                   Retry [D4]
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
-                  Skip
+                  Next [D4']
                 </Button>
               </Group>
             </Group>

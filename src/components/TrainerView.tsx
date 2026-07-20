@@ -153,6 +153,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   const [kpuzzle, setKpuzzle] = useState<KPuzzle | null>(null);
   const [currentAlg, setCurrentAlg] = useState<Alg>(() => initializeCurrentAlg(initialAlg, currentAlgSet, settings));
   const movesRef = useRef<Move[]>([]);
+  const consecutiveDRef = useRef<string[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [preorientationResult, setPreorientationResult] = useState(() => recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
   const preorientationMoves = preorientationResult.moves;
@@ -298,7 +299,44 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
   // Handle cube move event
   /////////////////////////////////////////////////////////////////////////////
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
-    if (event.type !== "MOVE" || solvedRef.current) return;
+    if (event.type !== "MOVE") return;
+
+    // D4 / D4' shortcuts: track consecutive D or D' across all phases
+    const move = event.move;
+    if (move === 'D' || move === "D'") {
+      const prev = consecutiveDRef.current;
+      if (prev.length === 0 || prev[0] === move) {
+        consecutiveDRef.current = [...prev, move];
+      } else {
+        consecutiveDRef.current = [move];
+      }
+      if (consecutiveDRef.current.length >= 4) {
+        consecutiveDRef.current = [];
+        if (move === 'D') {
+          movesRef.current = [];
+          solvedRef.current = false;
+          setCaseKey(k => k + 1);
+        } else {
+          const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
+          setCurrentAlg(newCurrentAlg);
+          setShuffleQueue(newShuffleQueue);
+          setPreorientationResult(recomputePreorientationMoves(settings.crossFaces, settings.randomRotations1));
+          setRandomPreUs(recomputeRandomUs(settings.randomPreAUF));
+          setRandomUs(recomputeRandomUs(settings.randomAUF));
+          setRandomYs(recomputeRandomYs(settings.randomYs));
+          setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
+          setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+          movesRef.current = [];
+          solvedRef.current = false;
+          setCaseKey(k => k + 1);
+        }
+        return;
+      }
+    } else {
+      consecutiveDRef.current = [];
+    }
+
+    if (solvedRef.current) return;
 
     const OPPOSITE_FACES: Record<string, string> = { L:'R', R:'L', F:'B', B:'F', U:'D', D:'U' };
 
@@ -307,7 +345,7 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
 
     // Detect slice move recovery: recovered move (null cube timestamp) on opposite face
     const prevMoves = movesRef.current;
-    const moveFace = event.move.charAt(0);
+    const moveFace = move.charAt(0);
     const isSliceRecovery = cubeTs === null
       && prevMoves.length > 0
       && OPPOSITE_FACES[prevMoves[prevMoves.length - 1].move.charAt(0)] === moveFace;
@@ -319,12 +357,12 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       setShowSliceWarning(false);
     }
 
-    const newMove = { move: event.move, timeOfMove };
+    const newMove = { move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
-    cubeTimerRef.current?.addMove(event.move);
+    cubeTimerRef.current?.addMove(move);
 
-    const moveString = newMoves.map(move => move.move).join(' ');
+    const moveString = newMoves.map(m => m.move).join(' ');
     let isSolved = false;
     if (kpuzzle) {
       const currentPattern = kpuzzle.defaultPattern().applyAlg(setupAlg).applyAlg(moveString);
@@ -522,10 +560,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
                   Previous
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
-                  Retry
+                  Retry [D4]
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
-                  {historyOffset > 0 ? 'Forward' : 'Skip'}
+                  {historyOffset > 0 ? 'Forward' : 'Next [D4\']'}
                 </Button>
               </Group>
             </Group>

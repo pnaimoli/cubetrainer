@@ -87,6 +87,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const [targetSlot, setTargetSlot] = useState<string>('');
   const [diffKey, setDiffKey] = useState(0);
   const movesRef = useRef<Move[]>([]);
+  const consecutiveDRef = useRef<string[]>([]);
   const [caseKey, setCaseKey] = useState(0);
   const [result, setResult] = useState<{ userMoves: number; optimal: number; inspectionMs: number; executionMs: number } | null>(null);
   const userMoveCountRef = useRef(0);
@@ -386,6 +387,38 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
   const handleCubeMoveEvent = useCallback((event: GanCubeEvent) => {
     if (event.type !== 'MOVE') return;
 
+    // D4 / D4' shortcuts: track consecutive D or D' across all phases
+    const move = event.move;
+    if (move === 'D' || move === "D'") {
+      const prev = consecutiveDRef.current;
+      if (prev.length === 0 || prev[0] === move) {
+        consecutiveDRef.current = [...prev, move];
+      } else {
+        consecutiveDRef.current = [move];
+      }
+      if (consecutiveDRef.current.length >= 4) {
+        consecutiveDRef.current = [];
+        if (move === 'D') {
+          isRetryRef.current = true;
+          solvedRef.current = false;
+          cubeTimerRef.current?.stop();
+          setPhase('scrambling');
+          setResult(null);
+          movesRef.current = [];
+          userMoveCountRef.current = 0;
+          moveCountDisplayRef.current?.update(0);
+          setCaseKey(k => k + 1);
+          setShowSliceWarning(false);
+          setDiffKey(k => k + 1);
+        } else {
+          generateNewScramble();
+        }
+        return;
+      }
+    } else {
+      consecutiveDRef.current = [];
+    }
+
     if (phase === 'solved') {
       isRetryRef.current = true;
       solvedRef.current = false;
@@ -407,7 +440,7 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     const cubeTs = event.cubeTimestamp ?? null;
 
     const prevMoves = movesRef.current;
-    const moveFace = event.move.charAt(0);
+    const moveFace = move.charAt(0);
     const isSliceRecovery = cubeTs === null
       && prevMoves.length > 0
       && OPPOSITE_FACES[prevMoves[prevMoves.length - 1].move.charAt(0)] === moveFace;
@@ -419,13 +452,13 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       cubeTimerRef.current?.firstMove(timeOfMove);
     }
 
-    const newMove = { move: event.move, timeOfMove };
+    const newMove = { move, timeOfMove };
     const newMoves = [...movesRef.current, newMove];
     movesRef.current = newMoves;
     const moveStrs = newMoves.map(m => m.move);
     userMoveCountRef.current = movesToHTM(moveStrs);
     moveCountDisplayRef.current?.update(userMoveCountRef.current);
-    cubeTimerRef.current?.addMove(translateMove(event.move, displayRotation));
+    cubeTimerRef.current?.addMove(translateMove(move, displayRotation));
     badgesRef.current?.notify();
 
     const moveString = newMoves.map(m => m.move).join(' ');
@@ -680,10 +713,10 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               <Title style={{ fontSize: 'clamp(1.25rem, 7vw, var(--mantine-h1-font-size))', whiteSpace: 'nowrap' }}>XCross Trainer</Title>
               <Group>
                 <Button variant="outline" size="xs" onClick={handleRetry} leftSection={<TbRefresh />}>
-                  Retry
+                  Retry [D4]
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleSkip} leftSection={<TbArrowRight />}>
-                  New Scramble
+                  Next [D4']
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleCurrentScramble} leftSection={<TbCube />} disabled={!conn}>
                   Current Scramble

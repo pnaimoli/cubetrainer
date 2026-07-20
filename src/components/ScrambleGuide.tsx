@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Group, Text } from '@mantine/core';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
 import { parseMoveInfo, invertQuarterTurn, transition, GuideState } from '../util/scrambleGuideState';
@@ -11,6 +11,7 @@ interface ScrambleGuideProps {
 
 const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }) => {
   const moveInfos = React.useMemo(() => moves.map(parseMoveInfo), [moves]);
+  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [state, setState] = useState<GuideState>({
     mode: 'executing',
@@ -29,11 +30,20 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
     });
   }, [moves]);
 
+  // Clean up pending complete timer on unmount
+  useEffect(() => {
+    return () => {
+      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
+    };
+  }, []);
+
   const handleMove = useCallback((event: GanCubeEvent) => {
     if (event.type !== 'MOVE') return;
     setState(prev => {
       const result = transition(prev, event.move, moveInfos);
-      if (result.completed) setTimeout(onComplete, 0);
+      if (result.completed) {
+        completeTimerRef.current = setTimeout(onComplete, 0);
+      }
       return result.state;
     });
   }, [moves, moveInfos, onComplete]);
