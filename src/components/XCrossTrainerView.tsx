@@ -4,7 +4,7 @@ import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, 
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
-import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp } from 'react-icons/tb';
+import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp, TbCube } from 'react-icons/tb';
 import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -14,7 +14,8 @@ import { generateStickeringMask } from '../util/StickeringMask';
 import { initCrossSolver, solveCross } from '../util/crossSolver';
 import { generateCrossScramble, rotateScramble } from '../util/scrambleGenerator';
 import { initXCrossSolver, solveXCross, XCrossSolution, findPairingMove } from '../util/xcrossSolver';
-import { movesToHTM, simplifyMoves } from '../util/cubeState';
+import { movesToHTM, simplifyMoves, requestFacelets, faceletsToKPattern } from '../util/cubeState';
+import { patternToScramble } from '../util/scrambleGenerator';
 import { rankXCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import { FACE_TO_D_ROTATION, translateMove, translateSlot, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
@@ -504,6 +505,74 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
     generateNewScramble();
   };
 
+  const handleCurrentScramble = useCallback(async () => {
+    if (!kpuzzle || !conn) return;
+
+    const face = crossColorRef.current;
+    const extra = randomRotationString(randomRotationAxisRef.current);
+    const rotation = [FACE_TO_D_ROTATION[face], extra].filter(Boolean).join(' ');
+
+    setSolving(true);
+    setScramble('');
+    setOptimalSolutions([]);
+    setSearchAttempt(0);
+
+    try {
+      const facelets = await requestFacelets(conn);
+      const pattern = faceletsToKPattern(facelets, kpuzzle);
+      const scrambleStr = await patternToScramble(pattern);
+
+      const basePattern = kpuzzle.defaultPattern().applyAlg(scrambleStr);
+
+      const visualSlots = selectedSlotsRef.current.length > 0 ? selectedSlotsRef.current : ['FR', 'FL', 'BL', 'BR'];
+      const allSolverSlots = ['FR', 'FL', 'BL', 'BR'];
+      const solverSlots = visualSlots.map(vs => {
+        for (const ss of allSolverSlots) {
+          if (translateSlot(ss, face, rotation) === vs) return ss;
+        }
+        return vs;
+      });
+
+      const solutions = solveXCross(basePattern, face, solverSlots);
+      const crossSolutions = solveCross(basePattern, face);
+      const crossOpt = crossSolutions.length > 0 ? crossSolutions[0].moveCount : 0;
+
+      const target = solutions.length > 0 ? solutions[0] : null;
+
+      setSolving(false);
+      scrambleRef.current = scrambleStr;
+      setScramble(scrambleStr);
+      setOptimalSolutions(solutions);
+      setCrossOptimal(crossOpt);
+      setCrossFace(face);
+      setExtraRotation(extra);
+      isRetryRef.current = false;
+      solvedRef.current = false;
+      setPhase('solving');
+      setResult(null);
+      cubeTimerRef.current?.reset();
+      cubeTimerRef.current?.start();
+
+      if (target) {
+        setTargetSlot(target.slot);
+        const pm = findPairingMove(basePattern, target.solution, face, target.slot);
+        setPairingMoveNum(pm >= 0 ? pm : null);
+      } else {
+        setTargetSlot('');
+        setPairingMoveNum(null);
+      }
+
+      movesRef.current = [];
+      userMoveCountRef.current = 0;
+      moveCountDisplayRef.current?.update(0);
+      setCaseKey(k => k + 1);
+      setShowSliceWarning(false);
+      setDiffKey(k => k + 1);
+    } catch {
+      setSolving(false);
+    }
+  }, [kpuzzle, conn]);
+
   // Stats computations
   const recentStats = xcrossStats.slice(-50);
   const optimalCount = recentStats.filter(s => s.userMoveCount === s.optimalMoveCount).length;
@@ -615,6 +684,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleSkip} leftSection={<TbArrowRight />}>
                   New Scramble
+                </Button>
+                <Button variant="outline" size="xs" onClick={handleCurrentScramble} leftSection={<TbCube />} disabled={!conn}>
+                  Current Scramble
                 </Button>
               </Group>
             </Group>

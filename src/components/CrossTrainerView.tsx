@@ -4,7 +4,7 @@ import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Tooltip, 
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable, DataTableColumn } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
-import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp, TbReport } from 'react-icons/tb';
+import { TbRefresh, TbArrowRight, TbAlertTriangle, TbDots, TbTrash, TbInfoCircle, TbDownload, TbChevronDown, TbChevronUp, TbReport, TbCube } from 'react-icons/tb';
 import { KPuzzle, KPattern } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -13,7 +13,8 @@ import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
 import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
 import { generateCrossScramble, rotateScramble } from '../util/scrambleGenerator';
-import { movesToHTM, simplifyMoves } from '../util/cubeState';
+import { movesToHTM, simplifyMoves, requestFacelets, faceletsToKPattern } from '../util/cubeState';
+import { patternToScramble } from '../util/scrambleGenerator';
 import { rankCrossSolutions, RankedSolution } from '../util/crossSolutionRanker';
 import { FACE_TO_D_ROTATION, translateMove, randomRotationString } from '../util/crossRotation';
 import FaceColorPicker from './FaceColorPicker';
@@ -417,6 +418,51 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
     generateNewScramble();
   };
 
+  const handleCurrentScramble = useCallback(async () => {
+    if (!kpuzzle || !conn) return;
+
+    const face = crossColorRef.current;
+
+    setSolving(true);
+    setScramble('');
+    setOptimalSolutions([]);
+    setScrambledPattern(null);
+    setSearchAttempt(0);
+
+    try {
+      const facelets = await requestFacelets(conn);
+      const pattern = faceletsToKPattern(facelets, kpuzzle);
+      const scrambleStr = await patternToScramble(pattern);
+
+      const basePattern = kpuzzle.defaultPattern().applyAlg(scrambleStr);
+      const solutions = solveCross(basePattern, face);
+
+      setSolving(false);
+      scrambleRef.current = scrambleStr;
+      setScramble(scrambleStr);
+      setOptimalSolutions(solutions);
+      setScrambledPattern(basePattern);
+      setCrossFace(face);
+      setExtraRotation(randomRotationString(randomRotationAxisRef.current));
+      isRetryRef.current = false;
+      solvedRef.current = false;
+      setPhase('solving');
+      setResult(null);
+      cubeTimerRef.current?.reset();
+      cubeTimerRef.current?.start();
+
+      movesRef.current = [];
+      userMoveCountRef.current = 0;
+      userGenCountRef.current = 0;
+      moveCountDisplayRef.current?.update(0, 0);
+      setCaseKey(k => k + 1);
+      setShowSliceWarning(false);
+      setDiffKey(k => k + 1);
+    } catch {
+      setSolving(false);
+    }
+  }, [kpuzzle, conn]);
+
   // Stats computations
   const recentStats = crossStats.slice(-50);
   const optimalCount = recentStats.filter(s => s.userMoveCount === s.optimalMoveCount).length;
@@ -519,6 +565,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleSkip} leftSection={<TbArrowRight />}>
                   New Scramble
+                </Button>
+                <Button variant="outline" size="xs" onClick={handleCurrentScramble} leftSection={<TbCube />} disabled={!conn}>
+                  Current Scramble
                 </Button>
               </Group>
             </Group>
