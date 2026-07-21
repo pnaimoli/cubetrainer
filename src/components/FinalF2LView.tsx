@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Collapse, Divider, Menu, ActionIcon, rem, Modal } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Collapse, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
+import { DataTable } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
-import { TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbDots, TbTrash, TbDownload, TbReport, TbArrowLeft } from 'react-icons/tb';
+import { TbArrowRight, TbRefresh, TbEye, TbEyeOff, TbDots, TbTrash, TbDownload, TbReport, TbInfoCircle } from 'react-icons/tb';
 import { KPuzzle } from 'cubing/kpuzzle';
 import { cube3x3x3 } from 'cubing/puzzles';
 
@@ -16,12 +17,15 @@ import { F2L_DB, OLL_DB } from '../util/algDatabase';
 import SettingsView from './SettingsView';
 import CubeTimerPlayer, { CubeTimerPlayerHandle } from './CubeTimerPlayer';
 import { SolvedStateBadges, SolvedStateBadgesHandle } from './TrainerView';
+import OLLPredictionReportsView from './OLLPredictionReportsView';
 
-interface OLLPredictionStat {
+export interface OLLPredictionStat {
   f2lCase: string;
   ollCase: string;
   attempts: number;
   correct: boolean;
+  inspectionMs: number;
+  executionMs: number;
   timestamp: string;
 }
 
@@ -98,7 +102,7 @@ function migrateOldStats(oldStats: unknown[]): OLLPredictionStat[] {
 
     if (s.correct) {
       // Standalone success
-      result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts: 1, correct: true, timestamp: s.timestamp });
+      result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts: 1, correct: true, inspectionMs: 0, executionMs: 0, timestamp: s.timestamp });
       i++;
     } else {
       // Count consecutive failures for same case
@@ -110,11 +114,11 @@ function migrateOldStats(oldStats: unknown[]): OLLPredictionStat[] {
       // Check if followed by a success for same case
       if (i < stats.length && stats[i].correct && stats[i].f2lCase === s.f2lCase && stats[i].ollCase === s.ollCase) {
         attempts = failCount + 1;
-        result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts, correct: true, timestamp: stats[i].timestamp });
+        result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts, correct: true, inspectionMs: 0, executionMs: 0, timestamp: stats[i].timestamp });
         i++;
       } else {
         // DNF
-        result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts: failCount, correct: false, timestamp: s.timestamp });
+        result.push({ f2lCase: s.f2lCase, ollCase: s.ollCase, attempts: failCount, correct: false, inspectionMs: 0, executionMs: 0, timestamp: s.timestamp });
       }
     }
   }
@@ -126,58 +130,24 @@ const F2L_CASES_KEY = 'ollPrediction_selectedF2L';
 const OLL_CASES_KEY = 'ollPrediction_selectedOLL';
 
 ///////////////////////////////////////////////////////////////////////////////
-// Reports View
+// Stats helpers
 ///////////////////////////////////////////////////////////////////////////////
-const OLLPredictionReportsView: React.FC<{ stats: OLLPredictionStat[]; onBack: () => void }> = ({ stats, onBack }) => {
-  const total = stats.length;
-  const correct = stats.filter(s => s.correct).length;
-  const overallAccuracy = total > 0 ? ((correct / total) * 100).toFixed(1) : '0';
+const formatTime = (ms: number | null): string => {
+  if (ms === null || ms === 0) return '-';
+  return (ms / 1000).toFixed(3);
+};
 
-  // Group by OLL case
-  const ollBreakdown = useMemo(() => {
-    const map = new Map<string, { correct: number; total: number; totalAttempts: number }>();
-    for (const s of stats) {
-      const entry = map.get(s.ollCase) ?? { correct: 0, total: 0, totalAttempts: 0 };
-      entry.total++;
-      entry.totalAttempts += s.attempts;
-      if (s.correct) entry.correct++;
-      map.set(s.ollCase, entry);
-    }
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
-  }, [stats]);
+const computeAoN = (values: number[], n: number): number | null => {
+  if (values.length < n) return null;
+  const slice = values.slice(-n);
+  return slice.reduce((a, b) => a + b, 0) / n;
+};
 
-  return (
-    <Grid>
-      <Grid.Col span={12}>
-        <Card withBorder>
-          <Card.Section withBorder px="xs" py="xs">
-            <Group justify="space-between">
-              <Title order={3}>OLL Prediction Reports</Title>
-              <Button variant="outline" size="xs" onClick={onBack} leftSection={<TbArrowLeft />}>Back</Button>
-            </Group>
-          </Card.Section>
-          <Stack gap="xs" p="xs">
-            <Text fz="sm" fw={700}>Overall Accuracy: {overallAccuracy}% ({correct}/{total})</Text>
-            <Divider label="By OLL Case" />
-            <Stack gap={2} style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}>
-              {ollBreakdown.map(([ollCase, data]) => (
-                <Group key={ollCase} justify="space-between" gap="xs">
-                  <Text fz="xs" ff="monospace" style={{ minWidth: 80 }}>OLL-{ollCase}</Text>
-                  <Text fz="xs" ff="monospace">
-                    {data.total > 0 ? ((data.correct / data.total) * 100).toFixed(0) : 0}% ({data.correct}/{data.total})
-                  </Text>
-                  <Text fz="xs" ff="monospace" c="dimmed">
-                    avg {data.total > 0 ? (data.totalAttempts / data.total).toFixed(1) : '-'} tries
-                  </Text>
-                </Group>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
-      </Grid.Col>
-    </Grid>
-  );
+const computeAccuracyAoN = (stats: OLLPredictionStat[], n: number): string => {
+  if (stats.length < n) return '-';
+  const slice = stats.slice(-n);
+  const correct = slice.filter(s => s.correct).length;
+  return `${((correct / n) * 100).toFixed(0)}%`;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -232,6 +202,17 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       // Migrate
       const migrated = migrateOldStats(ollStats);
       setOllStats(migrated);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Second migration: add inspectionMs/executionMs to old entries
+  useEffect(() => {
+    if (ollStats.length > 0 && !('inspectionMs' in ollStats[0])) {
+      setOllStats(prev => prev.map(s => ({
+        ...s,
+        inspectionMs: (s as OLLPredictionStat).inspectionMs ?? 0,
+        executionMs: (s as OLLPredictionStat).executionMs ?? 0,
+      })));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -357,12 +338,14 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     setCaseKey(k => k + 1);
   }, [selectedF2L, selectedOLL, localSettings]);
 
-  const recordStat = useCallback((correct: boolean, attempts: number) => {
+  const recordStat = useCallback((correct: boolean, attempts: number, inspectionMs = 0, executionMs = 0) => {
     setOllStats(prev => [...prev, {
       f2lCase: currentF2L.name,
       ollCase: currentOLL.name,
       attempts,
       correct,
+      inspectionMs,
+      executionMs,
       timestamp: new Date().toISOString(),
     }]);
   }, [currentF2L, currentOLL, setOllStats]);
@@ -433,7 +416,11 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     }
 
     cubeTimerRef.current?.stopAt(timeOfMove);
-    recordStat(true, attemptsRef.current);
+    const firstMoveTime = newMoves[0].timeOfMove;
+    const lastMoveTime = newMoves[newMoves.length - 1].timeOfMove;
+    const inspectionMs = firstMoveTime - (cubeTimerRef.current?.getStartTime() ?? 0);
+    const executionMs = lastMoveTime - firstMoveTime;
+    recordStat(true, attemptsRef.current, inspectionMs, executionMs);
 
     const delay = localSettings.postSolveDelay * 1000;
     if (delay > 0) {
@@ -524,17 +511,40 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     });
   };
 
-  // Summary stats
-  const totalStats = ollStats.length;
-  const correctStats = ollStats.filter(s => s.correct).length;
-  const accuracyPct = totalStats > 0 ? ((correctStats / totalStats) * 100).toFixed(0) : '-';
-  const last50 = ollStats.slice(-50);
-  const last50Correct = last50.filter(s => s.correct).length;
-  const ao50Accuracy = last50.length > 0 ? ((last50Correct / last50.length) * 100).toFixed(0) : '-';
+  const [statsMode, setStatsMode] = useLocalStorage<string>({ key: 'ollPrediction_statsMode', defaultValue: '% Correct', getInitialValueInEffect: false });
+
+  // Stats: correct entries with real times (for Insp/Exec modes)
+  const timedCorrect = useMemo(() =>
+    ollStats.filter(s => s.correct && s.executionMs > 0),
+    [ollStats],
+  );
+
+  const handleDeleteStat = (index: number) => {
+    setOllStats(prev => prev.filter((_, i) => i !== index));
+  };
 
   if (showReports) {
     return <OLLPredictionReportsView stats={ollStats} onBack={() => setShowReports(false)} />;
   }
+
+  // Summary stats columns depend on mode
+  const summaryColumns = statsMode === '% Correct'
+    ? [
+        { accessor: 'n', title: 'n', render: () => ollStats.length },
+        { accessor: 'accuracy', title: 'accuracy', render: () => ollStats.length > 0 ? `${((ollStats.filter(s => s.correct).length / ollStats.length) * 100).toFixed(0)}%` : '-' },
+        { accessor: 'ao12acc', title: 'ao12 acc', render: () => computeAccuracyAoN(ollStats, 12) },
+        { accessor: 'ao50acc', title: 'ao50 acc', render: () => computeAccuracyAoN(ollStats, 50) },
+      ]
+    : (() => {
+        const times = timedCorrect.map(s => statsMode === 'Insp' ? s.inspectionMs : s.executionMs);
+        const best = times.length > 0 ? Math.min(...times) : null;
+        return [
+          { accessor: 'n', title: 'n', render: () => timedCorrect.length },
+          { accessor: 'best', title: 'best', render: () => formatTime(best) },
+          { accessor: 'ao5', title: 'ao5', render: () => formatTime(computeAoN(times, 5)) },
+          { accessor: 'ao12', title: 'ao12', render: () => formatTime(computeAoN(times, 12)) },
+        ];
+      })();
 
   return (
     <Grid>
@@ -578,62 +588,97 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
         </Card>
       </Grid.Col>
       <Grid.Col span={{ base: 12, md: 4 }}>
-        <Card withBorder>
-          <Card.Section withBorder px="xs">
-            <Group justify="space-between">
-              <Title order={2} mt="xs" mb="xs">Results</Title>
-              <Menu withinPortal position="bottom-end" shadow="sm">
-                <Menu.Target>
-                  <ActionIcon variant="subtle" color="gray">
-                    <TbDots style={{ width: rem(16), height: rem(16) }} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item
-                    leftSection={<TbReport style={{ width: rem(14), height: rem(14) }} />}
-                    onClick={() => setShowReports(true)}
-                  >
-                    Reports
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={<TbDownload style={{ width: rem(14), height: rem(14) }} />}
-                    onClick={handleExportData}
-                  >
-                    Export to CSV
-                  </Menu.Item>
-                  <Menu.Item
-                    leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
-                    color="red"
-                    onClick={() => setConfirmDeleteAll(true)}
-                  >
-                    Clear stats
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </Group>
-          </Card.Section>
-          <Stack gap="xs" p="xs">
-            <Text fz="sm" fw={700} ff="monospace">
-              total {totalStats} | accuracy {accuracyPct}% | ao50 {ao50Accuracy}%
-            </Text>
-            <Divider />
-            <Stack gap={2} style={{ maxHeight: 'calc(100vh - 360px)', overflow: 'auto' }}>
-              {[...ollStats].reverse().map((stat, i) => (
-                <Group key={i} justify="space-between" gap="xs">
-                  <Text fz="xs" ff="monospace">F2L-{stat.f2lCase} + OLL-{stat.ollCase}</Text>
-                  <Group gap={4}>
-                    {stat.attempts > 1 && (
-                      <Text fz="xs" ff="monospace" c="dimmed">{stat.attempts} tries</Text>
-                    )}
-                    <Text fz="xs" fw={700} c={stat.correct ? 'green' : 'red'}>
-                      {stat.correct ? 'OK' : 'DNF'}
-                    </Text>
-                  </Group>
-                </Group>
-              ))}
-            </Stack>
-          </Stack>
-        </Card>
+        <Stack>
+          <Card withBorder padding={0}>
+            <Card.Section withBorder px="xs">
+              <Group justify="space-between">
+                <Title order={4} my={4}>Stats</Title>
+                <SegmentedControl
+                  size="xs"
+                  value={statsMode}
+                  onChange={setStatsMode}
+                  data={['% Correct', 'Insp', 'Exec']}
+                />
+              </Group>
+            </Card.Section>
+            <DataTable
+              ff="monospace"
+              fz="xs"
+              verticalSpacing={0}
+              horizontalSpacing="xs"
+              columns={summaryColumns}
+              records={[{ id: 'current' }]}
+              defaultColumnProps={{ textAlign: 'center' }}
+            />
+          </Card>
+          <Card withBorder padding={0} style={{ display: 'flex', flexDirection: 'column' as const, maxHeight: 'calc(100vh - 500px)' }}>
+            <Card.Section withBorder px="xs">
+              <Group justify="space-between">
+                <Title order={4} my={4}>Results</Title>
+                <Menu withinPortal position="bottom-end" shadow="sm">
+                  <Menu.Target>
+                    <ActionIcon variant="subtle" color="gray">
+                      <TbDots style={{ width: rem(16), height: rem(16) }} />
+                    </ActionIcon>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Item leftSection={<TbInfoCircle />} disabled>
+                      Hint: double-click a row to remove it
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbReport style={{ width: rem(14), height: rem(14) }} />}
+                      onClick={() => setShowReports(true)}
+                    >
+                      Reports
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbDownload style={{ width: rem(14), height: rem(14) }} />}
+                      onClick={handleExportData}
+                    >
+                      Export to CSV
+                    </Menu.Item>
+                    <Menu.Item
+                      leftSection={<TbTrash style={{ width: rem(14), height: rem(14) }} />}
+                      color="red"
+                      onClick={() => setConfirmDeleteAll(true)}
+                    >
+                      Clear stats
+                    </Menu.Item>
+                  </Menu.Dropdown>
+                </Menu>
+              </Group>
+            </Card.Section>
+            <Box style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <DataTable
+                ff="monospace"
+                fz="xs"
+                withRowBorders={false}
+                verticalSpacing={0}
+                horizontalSpacing="xs"
+                highlightOnHover
+                striped
+                columns={[
+                  { accessor: 'index', title: '#', textAlign: 'right', render: (_: OLLPredictionStat, index: number) => ollStats.length - index },
+                  { accessor: 'case', title: 'Case', render: (record: OLLPredictionStat) => `F2L-${record.f2lCase} + OLL-${record.ollCase}` },
+                  { accessor: 'attempts', title: 'Tries', textAlign: 'right' },
+                  { accessor: 'inspectionMs', title: 'Insp', textAlign: 'right', render: (record: OLLPredictionStat) => formatTime(record.inspectionMs) },
+                  { accessor: 'executionMs', title: 'Exec', textAlign: 'right', render: (record: OLLPredictionStat) => formatTime(record.executionMs) },
+                  {
+                    accessor: 'correct', title: 'Result', textAlign: 'center',
+                    render: (record: OLLPredictionStat) => (
+                      <Text fz="xs" fw={700} c={record.correct ? 'green' : 'red'} component="span">
+                        {record.correct ? 'OK' : 'DNF'}
+                      </Text>
+                    ),
+                  },
+                ]}
+                records={ollStats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
+                onRowDoubleClick={({ index }) => handleDeleteStat(ollStats.length - 1 - index)}
+                rowStyle={() => ({ cursor: 'pointer' })}
+              />
+            </Box>
+          </Card>
+        </Stack>
       </Grid.Col>
       <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
