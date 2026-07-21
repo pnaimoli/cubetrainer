@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { GanCubeConnection, GanCubeEvent } from 'gan-web-bluetooth';
-import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Collapse, Divider, Menu, ActionIcon, rem, Modal, SegmentedControl } from '@mantine/core';
+import { Grid, Card, Box, Text, Title, Group, Stack, Button, Checkbox, Collapse, Divider, Menu, ActionIcon, rem, Modal } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { DataTable } from 'mantine-datatable';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
@@ -146,7 +146,7 @@ const computeAoN = (values: number[], n: number): number | null => {
 const computeAccuracyAoN = (stats: OLLPredictionStat[], n: number): string => {
   if (stats.length < n) return '-';
   const slice = stats.slice(-n);
-  const correct = slice.filter(s => s.correct).length;
+  const correct = slice.filter(s => s.correct && s.attempts === 1).length;
   return `${((correct / n) * 100).toFixed(0)}%`;
 };
 
@@ -365,10 +365,8 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       if (consecutiveDRef.current.length >= 4) {
         consecutiveDRef.current = [];
         if (move === 'D') {
-          // Next/skip
-          if (movesRef.current.length > 0 || attemptsRef.current > 1) {
-            recordStat(false, attemptsRef.current);
-          }
+          // Next/skip - always record DNF
+          recordStat(false, attemptsRef.current);
           advanceToNext();
         } else {
           // Retry
@@ -470,9 +468,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
   };
 
   const handleNext = () => {
-    if (movesRef.current.length > 0 || attemptsRef.current > 1) {
-      recordStat(false, attemptsRef.current);
-    }
+    recordStat(false, attemptsRef.current);
     advanceToNext();
   };
 
@@ -511,9 +507,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     });
   };
 
-  const [statsMode, setStatsMode] = useLocalStorage<string>({ key: 'ollPrediction_statsMode', defaultValue: '% Correct', getInitialValueInEffect: false });
-
-  // Stats: correct entries with real times (for Insp/Exec modes)
+  // Stats: correct entries with real times (for Insp/Exec ao50)
   const timedCorrect = useMemo(() =>
     ollStats.filter(s => s.correct && s.executionMs > 0),
     [ollStats],
@@ -527,24 +521,17 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
     return <OLLPredictionReportsView stats={ollStats} onBack={() => setShowReports(false)} />;
   }
 
-  // Summary stats columns depend on mode
-  const summaryColumns = statsMode === '% Correct'
-    ? [
-        { accessor: 'n', title: 'n', render: () => ollStats.length },
-        { accessor: 'accuracy', title: 'accuracy', render: () => ollStats.length > 0 ? `${((ollStats.filter(s => s.correct).length / ollStats.length) * 100).toFixed(0)}%` : '-' },
-        { accessor: 'ao12acc', title: 'ao12 acc', render: () => computeAccuracyAoN(ollStats, 12) },
-        { accessor: 'ao50acc', title: 'ao50 acc', render: () => computeAccuracyAoN(ollStats, 50) },
-      ]
-    : (() => {
-        const times = timedCorrect.map(s => statsMode === 'Insp' ? s.inspectionMs : s.executionMs);
-        const best = times.length > 0 ? Math.min(...times) : null;
-        return [
-          { accessor: 'n', title: 'n', render: () => timedCorrect.length },
-          { accessor: 'best', title: 'best', render: () => formatTime(best) },
-          { accessor: 'ao5', title: 'ao5', render: () => formatTime(computeAoN(times, 5)) },
-          { accessor: 'ao12', title: 'ao12', render: () => formatTime(computeAoN(times, 12)) },
-        ];
-      })();
+  const summaryColumns = (() => {
+    const inspTimes = timedCorrect.map(s => s.inspectionMs);
+    const execTimes = timedCorrect.map(s => s.executionMs);
+    return [
+      { accessor: 'n', title: 'n', render: () => ollStats.length },
+      { accessor: 'accuracy', title: 'acc%', render: () => ollStats.length > 0 ? `${((ollStats.filter(s => s.correct && s.attempts === 1).length / ollStats.length) * 100).toFixed(0)}%` : '-' },
+      { accessor: 'ao50acc', title: 'ao50 acc', render: () => computeAccuracyAoN(ollStats, 50) },
+      { accessor: 'ao50insp', title: 'ao50 insp', render: () => formatTime(computeAoN(inspTimes, 50)) },
+      { accessor: 'ao50exec', title: 'ao50 exec', render: () => formatTime(computeAoN(execTimes, 50)) },
+    ];
+  })();
 
   return (
     <Grid>
@@ -591,15 +578,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
         <Stack>
           <Card withBorder padding={0}>
             <Card.Section withBorder px="xs">
-              <Group justify="space-between">
-                <Title order={4} my={4}>Stats</Title>
-                <SegmentedControl
-                  size="xs"
-                  value={statsMode}
-                  onChange={setStatsMode}
-                  data={['% Correct', 'Insp', 'Exec']}
-                />
-              </Group>
+              <Title order={2}>Stats</Title>
             </Card.Section>
             <DataTable
               ff="monospace"
@@ -614,7 +593,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
           <Card withBorder padding={0} style={{ display: 'flex', flexDirection: 'column' as const, maxHeight: 'calc(100vh - 500px)' }}>
             <Card.Section withBorder px="xs">
               <Group justify="space-between">
-                <Title order={4} my={4}>Results</Title>
+                <Title order={2}>Results</Title>
                 <Menu withinPortal position="bottom-end" shadow="sm">
                   <Menu.Target>
                     <ActionIcon variant="subtle" color="gray">
@@ -660,16 +639,25 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
                 columns={[
                   { accessor: 'index', title: '#', textAlign: 'right', render: (_: OLLPredictionStat, index: number) => ollStats.length - index },
                   { accessor: 'case', title: 'Case', render: (record: OLLPredictionStat) => `F2L-${record.f2lCase} + OLL-${record.ollCase}` },
-                  { accessor: 'attempts', title: 'Tries', textAlign: 'right' },
-                  { accessor: 'inspectionMs', title: 'Insp', textAlign: 'right', render: (record: OLLPredictionStat) => formatTime(record.inspectionMs) },
-                  { accessor: 'executionMs', title: 'Exec', textAlign: 'right', render: (record: OLLPredictionStat) => formatTime(record.executionMs) },
                   {
-                    accessor: 'correct', title: 'Result', textAlign: 'center',
+                    accessor: 'attempts', title: 'Tries', textAlign: 'right',
                     render: (record: OLLPredictionStat) => (
-                      <Text fz="xs" fw={700} c={record.correct ? 'green' : 'red'} component="span">
-                        {record.correct ? 'OK' : 'DNF'}
+                      <Text fz="xs" fw={700} c={record.correct && record.attempts === 1 ? 'green' : 'red'} component="span">
+                        {record.correct ? record.attempts : 'DNF'}
                       </Text>
                     ),
+                  },
+                  {
+                    accessor: 'inspectionMs', title: 'Insp', textAlign: 'right',
+                    render: (record: OLLPredictionStat) => record.correct
+                      ? formatTime(record.inspectionMs)
+                      : <Text fz="xs" fw={700} c="red" component="span">DNF</Text>,
+                  },
+                  {
+                    accessor: 'executionMs', title: 'Exec', textAlign: 'right',
+                    render: (record: OLLPredictionStat) => record.correct
+                      ? formatTime(record.executionMs)
+                      : <Text fz="xs" fw={700} c="red" component="span">DNF</Text>,
                   },
                 ]}
                 records={ollStats.toReversed().map((stat, index) => ({ ...stat, id: index }))}
@@ -683,7 +671,7 @@ const OLLPredictionView: React.FC<OLLPredictionViewProps> = ({ conn, settings })
       <Grid.Col span={{ base: 12, md: 4 }}>
         <Card withBorder>
           <Card.Section withBorder px="xs">
-            <Title order={2} mt="xs" mb="xs">Settings</Title>
+            <Title order={2}>Settings</Title>
           </Card.Section>
           <Box pt="xs">
             <SettingsView disableAlgSelection />

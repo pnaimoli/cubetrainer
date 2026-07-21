@@ -5,7 +5,7 @@ import { DataTable, type DataTableSortStatus } from 'mantine-datatable';
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { TbArrowLeft } from 'react-icons/tb';
 
-import type { OLLPredictionStat } from './FinalF2LView';
+import type { OLLPredictionStat } from './OLLPredictionView';
 
 interface OLLPredictionReportsViewProps {
   stats: OLLPredictionStat[];

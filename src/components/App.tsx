@@ -14,10 +14,10 @@ import { defaultSettings } from './SettingsView';
 import WelcomeView from './WelcomeView';
 import ReportsView from './ReportsView';
 import MinigamesSection from './MinigamesSection';
-import CrossTrainerView from './CrossTrainerView';
-import XCrossTrainerView from './XCrossTrainerView';
-import OLLPredictionView from './FinalF2LView';
-import FRFLView from './FRFLView';
+import CrossView from './CrossView';
+import XCrossView from './XCrossView';
+import OLLPredictionView from './OLLPredictionView';
+import FRFLSimulView from './FRFLSimulView';
 
 
 // One-time migration: assign ids to AlgSets and re-key stats.
@@ -203,8 +203,8 @@ const App: React.FC = () => {
     </Flex>
   );
 
-  const handleFRFL = () => {
-    setView('FRFLView');
+  const handleFRFLSimul = () => {
+    setView('FRFLSimulView');
     closeNav();
   };
 
@@ -233,13 +233,13 @@ const App: React.FC = () => {
           return <ReportsView key={currentAlgSet.id} currentAlgSet={currentAlgSet} />;
         else
           return <WelcomeView />;
-      case 'CrossTrainerView':
-        return <CrossTrainerView conn={conn} settings={settings} />;
-      case 'XCrossTrainerView':
-        return <XCrossTrainerView conn={conn} settings={settings} />;
-      case 'FRFLView':
-        return <FRFLView conn={conn} settings={settings} />;
-      case 'FinalF2LView':
+      case 'CrossView':
+        return <CrossView conn={conn} settings={settings} />;
+      case 'XCrossView':
+        return <XCrossView conn={conn} settings={settings} />;
+      case 'FRFLSimulView':
+        return <FRFLSimulView conn={conn} settings={settings} />;
+      case 'OLLPredictionView':
         return <OLLPredictionView conn={conn} settings={settings} />;
       default:
         return <WelcomeView />;
@@ -311,10 +311,10 @@ const App: React.FC = () => {
       <AppShell.Navbar>
         <ScrollArea scrollbars="y">
           <MinigamesSection
-            onFRFL={handleFRFL}
-            onOptimalCross={() => { setView('CrossTrainerView'); closeNav(); }}
-            onXCross={() => { setView('XCrossTrainerView'); closeNav(); }}
-            onFinalF2L={() => { setView('FinalF2LView'); closeNav(); }}
+            onFRFLSimul={handleFRFLSimul}
+            onCross={() => { setView('CrossView'); closeNav(); }}
+            onXCross={() => { setView('XCrossView'); closeNav(); }}
+            onOLLPrediction={() => { setView('OLLPredictionView'); closeNav(); }}
           />
           <Button
             leftSection={<FaPlus />}

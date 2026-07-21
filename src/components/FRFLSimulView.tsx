@@ -25,7 +25,7 @@ interface FRFLViewProps {
 }
 
 const ALGSET_ID = 'minigame-frfl';
-const ALGSET_NAME = 'FR+FL Slot Game';
+const ALGSET_NAME = 'FR+FL Slot Simul';
 
 const recomputeRandomUs = (randomAUF: boolean): number => {
   return randomAUF ? Math.floor(Math.random() * 4) : 0;

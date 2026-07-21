@@ -3,13 +3,13 @@ import { Button, Stack, Box, Text } from '@mantine/core';
 import { TbPuzzle } from 'react-icons/tb';
 
 interface MinigamesSectionProps {
-  onFRFL: () => void;
-  onOptimalCross: () => void;
+  onFRFLSimul: () => void;
+  onCross: () => void;
   onXCross: () => void;
-  onFinalF2L: () => void;
+  onOLLPrediction: () => void;
 }
 
-const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCross, onXCross, onFinalF2L }) => {
+const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFLSimul, onCross, onXCross, onOLLPrediction }) => {
   return (
     <Box>
       <Button
@@ -28,20 +28,20 @@ const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCr
           variant="subtle"
           color="orange"
           size="xs"
-          onClick={onFRFL}
+          onClick={onFRFLSimul}
           style={{ borderRadius: '0px' }}
         >
-          FR+FL Slot Game
+          FR+FL Slot Simul
         </Button>
         <Button
           fullWidth
           variant="subtle"
           color="orange"
           size="xs"
-          onClick={onOptimalCross}
+          onClick={onCross}
           style={{ borderRadius: '0px' }}
         >
-          Optimal Cross
+          Cross
         </Button>
         <Button
           fullWidth
@@ -58,7 +58,7 @@ const MinigamesSection: React.FC<MinigamesSectionProps> = ({ onFRFL, onOptimalCr
           variant="subtle"
           color="orange"
           size="xs"
-          onClick={onFinalF2L}
+          onClick={onOLLPrediction}
           style={{ borderRadius: '0px' }}
         >
           OLL Prediction
