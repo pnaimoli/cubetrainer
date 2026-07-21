@@ -52,16 +52,27 @@ export default function DifferentialScramble({
     computingRef.current = true;
     setComputing(true);
     try {
-      const facelets = await requestFacelets(conn);
-      const rawMoves = await computeTransitionMoves(facelets, targetScramble, kpuzzle);
-      const simplified = simplifyMoves(rawMoves);
-      if (scrambleRef.current === targetScramble) {
-        if (simplified.length === 0) {
-          hasComputed.current = true;
-          onScrambleComplete();
-          return;
+      // Loop: compute transition, then verify the cube hasn't moved during
+      // the async solver. If it has, recompute from the new state.
+      let facelets = await requestFacelets(conn);
+      while (scrambleRef.current === targetScramble) {
+        const rawMoves = await computeTransitionMoves(facelets, targetScramble, kpuzzle);
+        const simplified = simplifyMoves(rawMoves);
+
+        // Re-read facelets to check for moves made during computation
+        const verifyFacelets = await requestFacelets(conn);
+        if (verifyFacelets === facelets) {
+          // Cube didn't move during computation - result is valid
+          if (simplified.length === 0) {
+            hasComputed.current = true;
+            onScrambleComplete();
+            return;
+          }
+          setTransitionMoves(simplified);
+          break;
         }
-        setTransitionMoves(simplified);
+        // Cube moved during computation - recompute from new state
+        facelets = verifyFacelets;
       }
     } catch (err) {
       console.warn('Failed to compute transition, using raw scramble:', err);

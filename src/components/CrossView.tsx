@@ -325,7 +325,8 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       consecutiveDRef.current = [];
     }
 
-    // Auto-retry: any cube move after solve triggers retry (ScrambleGuide tracks it independently)
+    // Auto-retry: any cube move after solve triggers retry
+    // Keep result/moveCount displayed while user re-scrambles
     if (phase === 'solved') {
       isRetryRef.current = true;
       solvedRef.current = false;
@@ -336,6 +337,7 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
       userGenCountRef.current = 0;
       setCaseKey(k => k + 1);
       setShowSliceWarning(false);
+      setDiffKey(k => k + 1);
       return;
     }
 

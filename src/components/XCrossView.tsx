@@ -421,17 +421,17 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       consecutiveDRef.current = [];
     }
 
+    // Auto-retry: keep result displayed while user re-scrambles
     if (phase === 'solved') {
       isRetryRef.current = true;
       solvedRef.current = false;
       setPhase('scrambling');
-      setResult(null);
 
       movesRef.current = [];
       userMoveCountRef.current = 0;
-      moveCountDisplayRef.current?.update(0);
       setCaseKey(k => k + 1);
       setShowSliceWarning(false);
+      setDiffKey(k => k + 1);
       return;
     }
 
