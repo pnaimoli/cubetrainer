@@ -1,8 +1,10 @@
 import { expect } from 'chai';
 import {
-  parseMoveInfo, invertQuarterTurn, netProgress, transition,
+  parseMoveInfo, invertQuarterTurn, netProgress, transition, movesCommute,
+  computeDifferentialScramble, ComputeTransitionFn,
   GuideState, MoveInfo,
 } from './scrambleGuideState';
+import type { KPuzzle } from 'cubing/kpuzzle';
 
 // Helper: create initial state for a given move list
 function initState(moves: string[]): { state: GuideState; infos: MoveInfo[] } {
@@ -11,7 +13,7 @@ function initState(moves: string[]): { state: GuideState; infos: MoveInfo[] } {
     mode: 'executing',
     moveIndex: 0,
     moveStatuses: moves.map(() => 'pending' as const),
-    partialMoves: [],
+    partials: {},
   };
   return { state, infos };
 }
@@ -270,24 +272,28 @@ describe('scrambleGuideState transition - error and undo', () => {
     expect(s3.mode).to.equal('executing');
   });
 
-  it('wrong move during partial double move includes partial in wrongMoves', () => {
+  it('wrong move during partial double move preserves partial progress', () => {
     const { state, infos } = initState(['R2', 'U']);
     // R (first half of R2)
     const { state: s1 } = applyMoves(state, infos, ['R']);
     expect(s1.moveStatuses[0]).to.equal('yellow');
-    // B (wrong face)
+    // B (wrong face) - partials preserved, only B in wrongMoves
     const { state: s2 } = applyMoves(s1, infos, ['B']);
     expect(s2.mode).to.equal('error');
     if (s2.mode === 'error') {
-      expect(s2.wrongMoves).to.deep.equal(['R', 'B']);
+      expect(s2.wrongMoves).to.deep.equal(['B']);
+      expect(s2.partials[0]).to.deep.equal(['R']);
     }
-    // Undo: B' then R'
-    const { state: s3 } = applyMoves(s2, infos, ["B'", "R'"]);
+    // Undo B' -> back to executing with R partial progress
+    const { state: s3 } = applyMoves(s2, infos, ["B'"]);
     expect(s3.mode).to.equal('executing');
     expect(s3.moveIndex).to.equal(0);
-    expect(s3.moveStatuses[0]).to.equal('pending');
-    // Now redo R2 properly
-    const { state: s4 } = applyMoves(s3, infos, ['R', 'R']);
+    expect(s3.moveStatuses[0]).to.equal('yellow');
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+    // Now just one more R completes R2
+    const { state: s4 } = applyMoves(s3, infos, ['R']);
     expect(s4.moveStatuses[0]).to.equal('done');
     expect(s4.moveIndex).to.equal(1);
   });
@@ -414,5 +420,369 @@ describe('scrambleGuideState - cube state consistency', () => {
     const { state, infos } = initState(['U']);
     const { state: final } = applyMoves(state, infos, moves);
     expect(final.mode).to.equal('executing');
+  });
+});
+
+describe('movesCommute', () => {
+  it('opposite faces commute', () => {
+    expect(movesCommute('R', 'L')).to.be.true;
+    expect(movesCommute('L', 'R')).to.be.true;
+    expect(movesCommute('U', 'D')).to.be.true;
+    expect(movesCommute('D', 'U')).to.be.true;
+    expect(movesCommute('F', 'B')).to.be.true;
+    expect(movesCommute('B', 'F')).to.be.true;
+  });
+
+  it('non-opposite faces do not commute', () => {
+    expect(movesCommute('R', 'U')).to.be.false;
+    expect(movesCommute('R', 'F')).to.be.false;
+    expect(movesCommute('R', 'B')).to.be.false;
+    expect(movesCommute('R', 'D')).to.be.false;
+    expect(movesCommute('U', 'F')).to.be.false;
+  });
+
+  it('same face does not commute (not relevant but should be false)', () => {
+    expect(movesCommute('R', 'R')).to.be.false;
+  });
+});
+
+describe('scrambleGuideState - partial move preservation', () => {
+  it('R2 scramble: do R, wrong B, undo B -> back to executing with R counted, then R completes R2', () => {
+    const { state, infos } = initState(['R2', "B'"]);
+    // R (partial)
+    const { state: s1 } = applyMoves(state, infos, ['R']);
+    expect(s1.mode).to.equal('executing');
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    // B (wrong)
+    const { state: s2 } = applyMoves(s1, infos, ['B']);
+    expect(s2.mode).to.equal('error');
+    if (s2.mode === 'error') {
+      expect(s2.wrongMoves).to.deep.equal(['B']);
+      expect(s2.partials[0]).to.deep.equal(['R']);
+    }
+    // B' (undo) -> back to executing with R partial
+    const { state: s3 } = applyMoves(s2, infos, ["B'"]);
+    expect(s3.mode).to.equal('executing');
+    expect(s3.moveStatuses[0]).to.equal('yellow');
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+    // R -> completes R2
+    const { state: s4 } = applyMoves(s3, infos, ['R']);
+    expect(s4.moveStatuses[0]).to.equal('done');
+    expect(s4.moveIndex).to.equal(1);
+  });
+
+  it('R2 scramble: do R, wrong B, wrong U, undo U, undo B -> back with R partial', () => {
+    const { state, infos } = initState(['R2']);
+    const { state: s1 } = applyMoves(state, infos, ['R']);
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    // Two wrong moves
+    const { state: s2 } = applyMoves(s1, infos, ['B', 'U']);
+    expect(s2.mode).to.equal('error');
+    if (s2.mode === 'error') {
+      expect(s2.wrongMoves).to.deep.equal(['B', 'U']);
+      expect(s2.partials[0]).to.deep.equal(['R']);
+    }
+    // Undo both
+    const { state: s3 } = applyMoves(s2, infos, ["U'", "B'"]);
+    expect(s3.mode).to.equal('executing');
+    expect(s3.moveStatuses[0]).to.equal('yellow');
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+    // Complete R2
+    const { completions } = applyMoves(s3, infos, ['R']);
+    expect(completions).to.equal(1);
+  });
+
+  it("R' scramble: wrong direction R, wrong move, undo -> partial preserved", () => {
+    const { state, infos } = initState(["R'"]);
+    // R (wrong direction but same face)
+    const { state: s1 } = applyMoves(state, infos, ['R']);
+    expect(s1.mode).to.equal('executing');
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    // B (wrong face)
+    const { state: s2 } = applyMoves(s1, infos, ['B']);
+    expect(s2.mode).to.equal('error');
+    if (s2.mode === 'error') {
+      expect(s2.partials[0]).to.deep.equal(['R']);
+    }
+    // Undo B
+    const { state: s3 } = applyMoves(s2, infos, ["B'"]);
+    expect(s3.mode).to.equal('executing');
+    expect(s3.moveStatuses[0]).to.equal('yellow');
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+  });
+
+  it('specific scenario: R2 with partial R, wrong move, undo -> only R remaining (not R\' + R2)', () => {
+    const { state, infos } = initState(['R2', 'U']);
+    // Do R (partial)
+    const { state: s1 } = applyMoves(state, infos, ['R']);
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    // Wrong move B
+    const { state: s2 } = applyMoves(s1, infos, ['B']);
+    expect(s2.mode).to.equal('error');
+    // Undo wrong move B
+    const { state: s3 } = applyMoves(s2, infos, ["B'"]);
+    expect(s3.mode).to.equal('executing');
+    // Only one more R needed (not R' + R2)
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+    expect(s3.moveStatuses[0]).to.equal('yellow');
+    const { state: s4 } = applyMoves(s3, infos, ['R']);
+    expect(s4.moveStatuses[0]).to.equal('done');
+    expect(s4.moveIndex).to.equal(1);
+  });
+});
+
+describe('scrambleGuideState - commutative adjacent moves', () => {
+  it('R L\': do L\' first, then R -> completes', () => {
+    const { state, infos } = initState(['R', "L'"]);
+    // L' out of order (commutes with R)
+    const { state: s1 } = applyMoves(state, infos, ["L'"]);
+    expect(s1.mode).to.equal('executing');
+    expect(s1.moveStatuses[1]).to.equal('done');
+    expect(s1.moveIndex).to.equal(0); // R still pending
+    // Now do R
+    const { completions } = applyMoves(s1, infos, ['R']);
+    expect(completions).to.equal(1);
+  });
+
+  it('R L\': do R first (normal order) -> still works', () => {
+    const { state, infos } = initState(['R', "L'"]);
+    const { completions } = applyMoves(state, infos, ['R', "L'"]);
+    expect(completions).to.equal(1);
+  });
+
+  it('R L\' U: do L\' first, then R, then U -> completes', () => {
+    const { state, infos } = initState(['R', "L'", 'U']);
+    const { state: s1 } = applyMoves(state, infos, ["L'"]);
+    expect(s1.moveStatuses[1]).to.equal('done');
+    const { state: s2 } = applyMoves(s1, infos, ['R']);
+    expect(s2.moveStatuses[0]).to.equal('done');
+    // moveIndex should advance past both done indices to 2
+    expect(s2.moveIndex).to.equal(2);
+    const { completions } = applyMoves(s2, infos, ['U']);
+    expect(completions).to.equal(1);
+  });
+
+  it('R U: do U first -> error (R and U don\'t commute)', () => {
+    const { state, infos } = initState(['R', 'U']);
+    const { state: s1 } = applyMoves(state, infos, ['U']);
+    expect(s1.mode).to.equal('error');
+  });
+
+  it('R L\' U: do U first -> error (U doesn\'t commute with R)', () => {
+    const { state, infos } = initState(['R', "L'", 'U']);
+    const { state: s1 } = applyMoves(state, infos, ['U']);
+    expect(s1.mode).to.equal('error');
+  });
+
+  it('U D R: do D first, then U, then R -> completes (U/D commute)', () => {
+    const { state, infos } = initState(['U', 'D', 'R']);
+    const { state: s1 } = applyMoves(state, infos, ['D']);
+    expect(s1.moveStatuses[1]).to.equal('done');
+    expect(s1.moveIndex).to.equal(0);
+    const { state: s2 } = applyMoves(s1, infos, ['U']);
+    expect(s2.moveStatuses[0]).to.equal('done');
+    expect(s2.moveIndex).to.equal(2);
+    const { completions } = applyMoves(s2, infos, ['R']);
+    expect(completions).to.equal(1);
+  });
+
+  it('R2 L: do L first then R R -> completes', () => {
+    const { state, infos } = initState(['R2', 'L']);
+    // L out of order
+    const { state: s1 } = applyMoves(state, infos, ['L']);
+    expect(s1.moveStatuses[1]).to.equal('done');
+    expect(s1.moveIndex).to.equal(0);
+    // R R to complete R2
+    const { state: s2, completions } = applyMoves(s1, infos, ['R', 'R']);
+    expect(s2.moveStatuses[0]).to.equal('done');
+    expect(completions).to.equal(1);
+  });
+
+  it('R L2: do L L first (two quarter turns) then R -> completes', () => {
+    const { state, infos } = initState(['R', 'L2']);
+    // First L (partial of L2)
+    const { state: s1 } = applyMoves(state, infos, ['L']);
+    expect(s1.moveStatuses[1]).to.equal('yellow');
+    expect(s1.moveIndex).to.equal(0);
+    // Second L (completes L2)
+    const { state: s2 } = applyMoves(s1, infos, ['L']);
+    expect(s2.moveStatuses[1]).to.equal('done');
+    expect(s2.moveIndex).to.equal(0);
+    // R to complete
+    const { completions } = applyMoves(s2, infos, ['R']);
+    expect(completions).to.equal(1);
+  });
+
+  it('L2 R2: interleaved L\' R L\' R -> completes (per-index partial tracking)', () => {
+    const { state, infos } = initState(['L2', 'R2']);
+    // L' (partial of L2)
+    const { state: s1 } = applyMoves(state, infos, ["L'"]);
+    expect(s1.moveStatuses[0]).to.equal('yellow');
+    // R (partial of R2, out of order)
+    const { state: s2 } = applyMoves(s1, infos, ['R']);
+    expect(s2.moveStatuses[1]).to.equal('yellow');
+    // L' still tracked for index 0
+    if (s2.mode === 'executing') {
+      expect(s2.partials[0]).to.deep.equal(["L'"]);
+      expect(s2.partials[1]).to.deep.equal(['R']);
+    }
+    // L' (completes L2)
+    const { state: s3 } = applyMoves(s2, infos, ["L'"]);
+    expect(s3.moveStatuses[0]).to.equal('done');
+    // R (completes R2)
+    const { state: s4, completions } = applyMoves(s3, infos, ['R']);
+    expect(s4.moveStatuses[1]).to.equal('done');
+    expect(completions).to.equal(1);
+  });
+
+  it('R2 L2: L\' R undo-L then error recovery works', () => {
+    const { state, infos } = initState(['R2', 'L2']);
+    // L' (out of order, partial of L2)
+    const { state: s1 } = applyMoves(state, infos, ["L'"]);
+    expect(s1.moveStatuses[1]).to.equal('yellow');
+    // R (partial of R2)
+    const { state: s2 } = applyMoves(s1, infos, ['R']);
+    expect(s2.moveStatuses[0]).to.equal('yellow');
+    // L (undo the L' on index 1)
+    const { state: s3 } = applyMoves(s2, infos, ['L']);
+    expect(s3.moveStatuses[1]).to.equal('pending');
+    // R partial for index 0 should still be intact
+    if (s3.mode === 'executing') {
+      expect(s3.partials[0]).to.deep.equal(['R']);
+    }
+    // B (wrong move)
+    const { state: s4 } = applyMoves(s3, infos, ['B']);
+    expect(s4.mode).to.equal('error');
+    // Undo B
+    const { state: s5 } = applyMoves(s4, infos, ["B'"]);
+    expect(s5.mode).to.equal('executing');
+    // R partial should still be there
+    if (s5.mode === 'executing') {
+      expect(s5.partials[0]).to.deep.equal(['R']);
+    }
+    // Complete R2 with one more R, then do L2
+    const { completions } = applyMoves(s5, infos, ['R', 'L', 'L']);
+    expect(completions).to.equal(1);
+  });
+});
+
+describe('computeDifferentialScramble', () => {
+  const fakeKPuzzle = {} as KPuzzle;
+
+  it('cube already at target -> returns alreadyDone', async () => {
+    const getFacelets = async () => 'SOLVED_STATE';
+    const computeTransition: ComputeTransitionFn = async () => [];
+
+    const result = await computeDifferentialScramble(
+      getFacelets, "R U R'", fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(result).to.deep.equal({ moves: [], alreadyDone: true });
+  });
+
+  it('cube at solved state -> returns scramble moves', async () => {
+    const getFacelets = async () => 'SOLVED';
+    const computeTransition: ComputeTransitionFn = async () => ['R', 'U', "R'"];
+
+    const result = await computeDifferentialScramble(
+      getFacelets, "R U R'", fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(result).to.deep.equal({ moves: ['R', 'U', "R'"], alreadyDone: false });
+  });
+
+  it('cube at different scramble -> returns valid transition moves', async () => {
+    const getFacelets = async () => 'SOME_STATE';
+    const computeTransition: ComputeTransitionFn = async () => ["U'", 'R'];
+
+    const result = await computeDifferentialScramble(
+      getFacelets, "R U", fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(result).to.deep.equal({ moves: ["U'", 'R'], alreadyDone: false });
+  });
+
+  it('verify loop: recomputes when cube moves during computation', async () => {
+    let callCount = 0;
+    const getFacelets = async () => {
+      callCount++;
+      if (callCount <= 1) return 'STATE_A';
+      if (callCount <= 2) return 'STATE_B';
+      return 'STATE_B';
+    };
+
+    const transitions: string[][] = [];
+    const computeTransition: ComputeTransitionFn = async (facelets) => {
+      if (facelets === 'STATE_A') {
+        const moves = ['R', 'U'];
+        transitions.push(moves);
+        return moves;
+      }
+      const moves = ["L'"];
+      transitions.push(moves);
+      return moves;
+    };
+
+    const result = await computeDifferentialScramble(
+      getFacelets, 'target', fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(transitions.length).to.equal(2);
+    expect(result).to.deep.equal({ moves: ["L'"], alreadyDone: false });
+  });
+
+  it('verify loop convergence: stabilizes on second iteration', async () => {
+    let callCount = 0;
+    const getFacelets = async () => {
+      callCount++;
+      return callCount <= 1 ? 'STATE_A' : 'STATE_B';
+    };
+
+    let computeCount = 0;
+    const computeTransition: ComputeTransitionFn = async () => {
+      computeCount++;
+      return ['F'];
+    };
+
+    const result = await computeDifferentialScramble(
+      getFacelets, 'target', fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(computeCount).to.equal(2);
+    expect(result).to.deep.equal({ moves: ['F'], alreadyDone: false });
+  });
+
+  it('isCurrentScramble returns false mid-computation -> returns null', async () => {
+    let isCurrentCall = 0;
+    const isCurrentScramble = () => {
+      isCurrentCall++;
+      return isCurrentCall <= 1;
+    };
+
+    let callCount = 0;
+    const getFacelets = async () => {
+      callCount++;
+      return `STATE_${callCount}`;
+    };
+
+    const computeTransition: ComputeTransitionFn = async () => ['R'];
+
+    const result = await computeDifferentialScramble(
+      getFacelets, 'target', fakeKPuzzle, isCurrentScramble, computeTransition,
+    );
+    expect(result).to.be.null;
+  });
+
+  it('simplifies transition moves (e.g. R R -> R2)', async () => {
+    const getFacelets = async () => 'STATE';
+    const computeTransition: ComputeTransitionFn = async () => ['R', 'R'];
+
+    const result = await computeDifferentialScramble(
+      getFacelets, 'target', fakeKPuzzle, () => true, computeTransition,
+    );
+    expect(result).to.deep.equal({ moves: ['R2'], alreadyDone: false });
   });
 });

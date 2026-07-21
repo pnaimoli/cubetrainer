@@ -17,7 +17,7 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
     mode: 'executing',
     moveIndex: 0,
     moveStatuses: moves.map(() => 'pending'),
-    partialMoves: [],
+    partials: {},
   });
 
   // Reset when moves change
@@ -26,7 +26,7 @@ const ScrambleGuide: React.FC<ScrambleGuideProps> = ({ moves, conn, onComplete }
       mode: 'executing',
       moveIndex: 0,
       moveStatuses: moves.map(() => 'pending'),
-      partialMoves: [],
+      partials: {},
     });
   }, [moves]);
 
