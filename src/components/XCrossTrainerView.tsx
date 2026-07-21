@@ -11,7 +11,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { initCrossSolver, solveCross } from '../util/crossSolver';
+import { initCrossSolver, solveCross, countCrossEdgesInPlace } from '../util/crossSolver';
 import { generateCrossScramble, rotateScramble } from '../util/scrambleGenerator';
 import { initXCrossSolver, solveXCross, XCrossSolution, findPairingMove } from '../util/xcrossSolver';
 import { movesToHTM, simplifyMoves, requestFacelets, faceletsToKPattern } from '../util/cubeState';
@@ -325,7 +325,9 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           const newScramble = newScrambleMoves.join(' ');
           const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
           const newSolutions = solveXCross(newPattern, face, solverSlots);
-          if (newSolutions.some(s => s.moveCount === targetMoves)) {
+          const pip = crossPipRef.current;
+          if (newSolutions.some(s => s.moveCount === targetMoves)
+              && (pip === null || countCrossEdgesInPlace(newPattern, face) === pip)) {
             const newCrossOpt = getCrossOptimalIfValid(newPattern, newSolutions);
             if (newCrossOpt !== null) {
               const { ok, pairingMove } = checkPairingRange(newPattern, newSolutions);

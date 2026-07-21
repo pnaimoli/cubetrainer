@@ -11,7 +11,7 @@ import { cube3x3x3 } from 'cubing/puzzles';
 import { Settings, SolvedState, Move } from '../util/interfaces';
 import { isPatternSolved } from '../util/SolveChecker';
 import { generateStickeringMask } from '../util/StickeringMask';
-import { initCrossSolver, solveCross, CrossSolution } from '../util/crossSolver';
+import { initCrossSolver, solveCross, CrossSolution, countCrossEdgesInPlace } from '../util/crossSolver';
 import { generateCrossScramble, rotateScramble } from '../util/scrambleGenerator';
 import { movesToHTM, simplifyMoves, requestFacelets, faceletsToKPattern } from '../util/cubeState';
 import { patternToScramble } from '../util/scrambleGenerator';
@@ -251,7 +251,9 @@ const CrossTrainerView: React.FC<CrossTrainerViewProps> = ({ conn, settings }) =
         const newScramble = newScrambleMoves.join(' ');
         const newPattern = kpuzzle.defaultPattern().applyAlg(newScramble);
         const newSolutions = solveCross(newPattern, face);
-        if (newSolutions.length > 0 && newSolutions[0].moveCount === targetMoves) {
+        const pip = crossPipRef.current;
+        if (newSolutions.length > 0 && newSolutions[0].moveCount === targetMoves
+            && (pip === null || countCrossEdgesInPlace(newPattern, face) === pip)) {
           finalScramble = newScramble;
           finalSolutions = newSolutions;
           finalPattern = newPattern;
