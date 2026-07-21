@@ -413,6 +413,10 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           moveCountDisplayRef.current?.update(0);
           setCaseKey(k => k + 1);
           setShowSliceWarning(false);
+          // Force DifferentialScramble to remount and recompute from current cube state.
+          // This is inlined (not calling handleRetry) because D4' fires inside
+          // handleCubeMoveEvent which runs on every cube move across all phases.
+          // handleRetry is a UI button handler that can't be called here.
           setDiffKey(k => k + 1);
         }
         return;
@@ -479,7 +483,6 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
 
         setResult({ userMoves, optimal, inspectionMs, executionMs });
         setPhase('solved');
-        setDiffKey(k => k + 1);
 
         if (isSliceRecovery) {
           setShowSliceWarning(true);
