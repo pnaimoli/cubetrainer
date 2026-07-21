@@ -274,11 +274,11 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
       if (consecutiveDRef.current.length >= 4) {
         consecutiveDRef.current = [];
         if (move === 'D') {
+          advanceToNext();
+        } else {
           movesRef.current = [];
           solvedRef.current = false;
           setCaseKey(k => k + 1);
-        } else {
-          advanceToNext();
         }
         return;
       }
@@ -407,10 +407,10 @@ const FRFLView: React.FC<FRFLViewProps> = ({ conn, settings }) => {
               <Title style={{ fontSize: 'clamp(1.25rem, 7vw, var(--mantine-h1-font-size))', whiteSpace: 'nowrap' }}>{ALGSET_NAME}</Title>
               <Group>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
-                  Retry [D4]
+                  Retry [D4']
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
-                  Next [D4']
+                  Next [D4]
                 </Button>
               </Group>
             </Group>

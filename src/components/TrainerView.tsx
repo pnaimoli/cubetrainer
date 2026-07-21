@@ -313,10 +313,6 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
       if (consecutiveDRef.current.length >= 4) {
         consecutiveDRef.current = [];
         if (move === 'D') {
-          movesRef.current = [];
-          solvedRef.current = false;
-          setCaseKey(k => k + 1);
-        } else {
           const { alg: newCurrentAlg, shuffleQueue: newShuffleQueue } = getNextAlg(displayedAlg, currentAlgSet, settings, shuffleQueue);
           setCurrentAlg(newCurrentAlg);
           setShuffleQueue(newShuffleQueue);
@@ -326,6 +322,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
           setRandomYs(recomputeRandomYs(settings.randomYs));
           setMirrorAcrossM(recomputeMirrorAcrossM(settings.mirrorAcrossM, settings.randomizeMirrorAcrossM));
           setMirrorAcrossS(recomputeMirrorAcrossS(settings.mirrorAcrossS, settings.randomizeMirrorAcrossS));
+          movesRef.current = [];
+          solvedRef.current = false;
+          setCaseKey(k => k + 1);
+        } else {
           movesRef.current = [];
           solvedRef.current = false;
           setCaseKey(k => k + 1);
@@ -560,10 +560,10 @@ const TrainerView: React.FC<TrainerViewProps> = ({ currentAlgSet, conn, settings
                   Previous
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleRestart} leftSection={<TbRefresh />}>
-                  Retry [D4]
+                  Retry [D4']
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleNext} leftSection={<TbArrowRight />}>
-                  {historyOffset > 0 ? 'Forward' : 'Next [D4\']'}
+                  {historyOffset > 0 ? 'Forward' : 'Next [D4]'}
                 </Button>
               </Group>
             </Group>

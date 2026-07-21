@@ -401,6 +401,8 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
       if (consecutiveDRef.current.length >= 4) {
         consecutiveDRef.current = [];
         if (move === 'D') {
+          generateNewScramble();
+        } else {
           isRetryRef.current = true;
           solvedRef.current = false;
           cubeTimerRef.current?.stop();
@@ -412,8 +414,6 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
           setCaseKey(k => k + 1);
           setShowSliceWarning(false);
           setDiffKey(k => k + 1);
-        } else {
-          generateNewScramble();
         }
         return;
       }
@@ -715,10 +715,10 @@ const XCrossTrainerView: React.FC<XCrossTrainerViewProps> = ({ conn, settings })
               <Title style={{ fontSize: 'clamp(1.25rem, 7vw, var(--mantine-h1-font-size))', whiteSpace: 'nowrap' }}>XCross Trainer</Title>
               <Group>
                 <Button variant="outline" size="xs" onClick={handleRetry} leftSection={<TbRefresh />}>
-                  Retry [D4]
+                  Retry [D4']
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleSkip} leftSection={<TbArrowRight />}>
-                  Next [D4']
+                  Next [D4]
                 </Button>
                 <Button variant="outline" size="xs" onClick={handleCurrentScramble} leftSection={<TbCube />} disabled={!conn}>
                   Current Scramble
